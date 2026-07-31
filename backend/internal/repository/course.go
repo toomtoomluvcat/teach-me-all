@@ -9,7 +9,7 @@ import (
 )
 
 type CourseRepository interface{
-	GetByCourseID(ctx context.Context,id string) (*dto.CourseWithLessons,error)
+	GetCourseByID(ctx context.Context,id string) (*dto.CourseWithLessons,error)
 }
 
 type courseRepository struct{
@@ -20,7 +20,7 @@ func NewCourseRepository(db *gorm.DB) CourseRepository {
 	return &courseRepository{db: db}
 }
 
-func (r *courseRepository) GetByCourseID(ctx context.Context,id string)(*dto.CourseWithLessons,error){
+func (r *courseRepository) GetCourseByID(ctx context.Context,id string)(*dto.CourseWithLessons,error){
 	var course models.Course
 	if err := r.db.WithContext(ctx).First(&course,"id = ?",id).Error;err!=nil{ 
 		return nil,err
