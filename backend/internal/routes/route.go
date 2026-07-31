@@ -10,6 +10,10 @@ import (
 func Setup(app *fiber.App,h *handler.Handlers){
 	api:=app.Group("/api")
 	
-	course := api.Group("/course")
-	course.Get("/:userId",h.Course.GetByCourseID)
+	course := api.Group("/courses")
+	course.Get("/:id",h.Course.GetCourseByID)
+
+	exam := api.Group("/exams")
+	exam.Get("/:id/questions",h.Question.GetQuestionByExamID)
+
 }

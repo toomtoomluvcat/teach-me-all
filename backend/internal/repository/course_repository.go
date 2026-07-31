@@ -4,6 +4,7 @@ import (
 	"context"
 	"teach_me_all/internal/dto"
 	"teach_me_all/internal/models"
+	apperror "teach_me_all/internal/pkg/errors"
 
 	"gorm.io/gorm"
 )
@@ -23,14 +24,14 @@ func NewCourseRepository(db *gorm.DB) CourseRepository {
 func (r *courseRepository) GetCourseByID(ctx context.Context,id string)(*dto.CourseWithLessons,error){
 	var course models.Course
 	if err := r.db.WithContext(ctx).First(&course,"id = ?",id).Error;err!=nil{ 
-		return nil,err
+		return nil,apperror.MapDBError(err)
 	}
 
 	var lessons []models.Lesson
 	if err:= r.db.WithContext(ctx).
 	Where("course_id = ?",course.ID).
 	Find(&lessons).Error;err!=nil{
-		return  nil,err
+		return  nil,apperror.MapDBError(err)
 	}
 
 	if len(lessons ) == 0 {
@@ -43,14 +44,14 @@ func (r *courseRepository) GetCourseByID(ctx context.Context,id string)(*dto.Cou
 		},nil		
 	}
 
-	var lessonsWithExams []dto.	LessonWithExams
+	var lessonsWithExams []dto.LessonWithExams
 
 	for _,l := range lessons{
 		var exams []models.Exam
 		
 		if err:= r.db.WithContext(ctx).
 		Where("lesson_id =  ?",l.ID).Find(&exams).Error;err!=nil{
-			return  nil,err
+			return  nil,apperror.MapDBError(err)
 		}
 		if exams == nil{
 			exams = []models.Exam{}

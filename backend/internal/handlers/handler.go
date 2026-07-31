@@ -8,12 +8,15 @@ import (
 
 type Handlers struct{
 	Course *CourseHandler
+	Question *QuestionHandler
 }
 
 func New(db *gorm.DB) *Handlers{
 	courseRepo := repository.NewCourseRepository(db)
+	questionRepo := repository.NewQuestionRepository(db)
 
 	return  &Handlers{
 		Course:NewCourseHandler(courseRepo),
+	Question: NewQuestionRepository(questionRepo),
 	}
 }
