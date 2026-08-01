@@ -24,5 +24,6 @@ func Setup(app *fiber.App,h *handler.Handlers){
 
 	exam := api.Group("/exams")
 	exam.Get("/:id/questions",h.Question.GetQuestionByExamID)
+	exam.Get("/:id/answers",h.Exam.GetExamAnswer)
 
 }

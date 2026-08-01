@@ -15,7 +15,6 @@ func NewCourseHandler(repo repository.CourseRepository) *CourseHandler{
 	return &CourseHandler{repo:repo}
 }
 
-
 func (h *CourseHandler) GetCoursesByUserID(c fiber.Ctx) error{
 	id := c.Params("id")
 	if _,err:=uuid.Parse(id);err!=nil{

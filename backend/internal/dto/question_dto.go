@@ -13,3 +13,10 @@ type QuestionWithChoice struct{
 	Content string `json:"content"`
 	Choices []ChoiceResponse `json:"choices"`
 }
+
+type QuestionAnswer struct{
+	ID uuid.UUID `json:"id"`
+	AnswerID uuid.UUID `json:"answer_id"`
+}
+
+

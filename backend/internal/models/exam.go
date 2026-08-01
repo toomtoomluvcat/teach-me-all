@@ -7,4 +7,5 @@ type Exam struct{
 	Title string `gorm:"size:100;not null"`
 
 	LessonID uuid.UUID `gorm:"type:uuid;not null;index"`
+	HasTaken bool `gorm:"default:false"`
 }

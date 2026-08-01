@@ -45,6 +45,7 @@ func (r *questionRepository) GetQuestionsByExamsID(ctx context.Context,id string
 	return &dto.ExamWithQuestions{
 		ID: exams.ID,
 		Title:exams.Title,
+		HasTaken: exams.HasTaken,
 		Questions: questions,
 	},nil
 }

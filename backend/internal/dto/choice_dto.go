@@ -6,3 +6,4 @@ type ChoiceResponse struct{
 	ID uuid.UUID `json:"id"`
 	Content string `json:"content"`
 }
+
