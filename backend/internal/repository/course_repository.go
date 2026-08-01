@@ -11,6 +11,8 @@ import (
 
 type CourseRepository interface{
 	GetCourseByID(ctx context.Context,id string) (*dto.CourseWithLessons,error)
+	GetCoursesByUserID(ctx context.Context,id string)([]dto.CourseResponse,error)
+
 }
 
 type courseRepository struct{
@@ -19,6 +21,24 @@ type courseRepository struct{
 
 func NewCourseRepository(db *gorm.DB) CourseRepository {
 	return &courseRepository{db: db}
+}
+
+
+func (r *courseRepository) GetCoursesByUserID(ctx context.Context,id string) ([]dto.CourseResponse,error){
+	var courses []models.Course
+	if err:=r.db.WithContext(ctx).Find(&courses,"user_id = ?",id).Error;err!=nil{
+		return nil,apperror.MapDBError(err)
+	}
+
+	coursesResponse :=make([]dto.CourseResponse,0,len(courses))	
+	for _,c := range courses{
+		coursesResponse = append(coursesResponse, dto.CourseResponse{
+			ID: c.ID,
+			Title: c.Title,
+			IsPublic: c.IsPublic,
+		})
+	}
+	return  coursesResponse,nil
 }
 
 func (r *courseRepository) GetCourseByID(ctx context.Context,id string)(*dto.CourseWithLessons,error){
@@ -40,24 +60,24 @@ func (r *courseRepository) GetCourseByID(ctx context.Context,id string)(*dto.Cou
 			Title: course.Title,
 			IsPublic: course.IsPublic,
 			UserID: course.UserID,
-			LessonsWithExams: []dto.LessonWithExams{},
+			LessonsWithExams: []dto.LessonWithExam{},
 		},nil		
 	}
 
-	var lessonsWithExams []dto.LessonWithExams
+	var lessonsWithExams []dto.LessonWithExam
 
 	for _,l := range lessons{
-		var exams []models.Exam
+		var exams []dto.ExamResponse
 		
 		if err:= r.db.WithContext(ctx).
-		Where("lesson_id =  ?",l.ID).Find(&exams).Error;err!=nil{
+		Where("lesson_id =  ?",l.ID).Model(&models.Exam{}).Find(&exams).Error;err!=nil{
 			return  nil,apperror.MapDBError(err)
 		}
 		if exams == nil{
-			exams = []models.Exam{}
+			exams = []dto.ExamResponse{}
 		}
 
-		lessonsWithExams = append(lessonsWithExams,dto.LessonWithExams{
+		lessonsWithExams = append(lessonsWithExams,dto.LessonWithExam{
 			ID: l.ID,
 			Title: l.Title,
 			Exams: exams,

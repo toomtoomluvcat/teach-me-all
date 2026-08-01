@@ -20,7 +20,7 @@ func (h *QuestionHandler) GetQuestionByExamID(c fiber.Ctx) error{
 	if _,err:= uuid.Parse(id);err!=nil{
 		return  fiber.NewError(fiber.StatusBadRequest)
 	}
-	 result,err:=h.repo.GetQuestionByExamsID(c.Context(),id)
+	 result,err:=h.repo.GetQuestionsByExamsID(c.Context(),id)
 	 if err!=nil{
 		return err
 	 }

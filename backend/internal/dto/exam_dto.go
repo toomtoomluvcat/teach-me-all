@@ -11,5 +11,5 @@ type ExamWithQuestions struct{
 	ID uuid.UUID `json:"id"`	
 	Title string `json:"content"`
 
-	Questions []QuestionRespone `json:"questions"`
+	Questions []QuestionWithChoice `json:"questions"`
 }
