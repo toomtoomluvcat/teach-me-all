@@ -9,28 +9,78 @@ import (
 	"time"
 )
 
-// Stats accumulates what Ollama reports about every call, so "the run is slow"
-// can be answered with numbers instead of a guess.
+// Stats accumulates provider-reported model-call timing where available and
+// measured request time otherwise, so "the run is slow" can be answered with
+// numbers instead of a guess.
 //
 // The two candidate explanations look identical from the outside — too many
 // calls, or each call being slow — and they have opposite fixes. Cutting gates
 // helps the first and does nothing for the second; a smaller model or more VRAM
 // helps the second and does nothing for the first.
 type Stats struct {
-	mu sync.Mutex
-	by map[string]*Bucket
+	mu        sync.Mutex
+	by        map[string]*Bucket
+	wallStart time.Time
+	wallEnd   time.Time
+	now       func() time.Time
 }
 
 // Bucket is one labelled kind of call.
 type Bucket struct {
 	Calls int
-	// Total is wall time inside Ollama, load is model-swap time, prompt is
-	// reading the input, eval is producing the output.
+	// For Ollama, Total is server-reported wall time, load is model-swap time,
+	// prompt is reading the input, and eval is producing the output. Other
+	// providers fill Total from measured HTTP request time.
 	Total, Load, Prompt, Eval time.Duration
 	PromptTokens, EvalTokens  int
 }
 
-func NewStats() *Stats { return &Stats{by: map[string]*Bucket{}} }
+func NewStats() *Stats { return &Stats{by: map[string]*Bucket{}, now: time.Now} }
+
+func (s *Stats) clock() time.Time {
+	if s.now != nil {
+		return s.now()
+	}
+	return time.Now()
+}
+
+func (s *Stats) begin() time.Time {
+	if s == nil {
+		return time.Time{}
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	now := s.clock()
+	if s.wallStart.IsZero() {
+		s.wallStart = now
+	}
+	return now
+}
+
+func (s *Stats) end() {
+	if s == nil {
+		return
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.wallEnd = s.clock()
+}
+
+func (s *Stats) addElapsed(label string, elapsed time.Duration) {
+	if s == nil {
+		return
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	b := s.by[label]
+	if b == nil {
+		b = &Bucket{}
+		s.by[label] = b
+	}
+	b.Calls++
+	b.Total += elapsed
+}
 
 // The label travels on the context rather than as a parameter. Every call site
 // already threads a context and none of them care about the label beyond
@@ -92,6 +142,13 @@ func (s *Stats) Report() string {
 	if len(labels) == 0 {
 		return ""
 	}
+	wall := s.wallEnd.Sub(s.wallStart)
+	if wall <= 0 {
+		// Keep manually-recorded Stats useful in tests and callers that do not
+		// go through the HTTP client. Instrumented client calls always provide a
+		// measured wall-clock span.
+		wall = grand
+	}
 	sort.Slice(labels, func(i, j int) bool { return s.by[labels[i]].Total > s.by[labels[j]].Total })
 
 	var w strings.Builder
@@ -100,8 +157,8 @@ func (s *Stats) Report() string {
 	for _, l := range labels {
 		b := s.by[l]
 		share := 0.0
-		if grand > 0 {
-			share = float64(b.Total) / float64(grand) * 100
+		if wall > 0 {
+			share = float64(b.Total) / float64(wall) * 100
 		}
 		rate := 0.0
 		if b.Eval > 0 {
@@ -118,6 +175,7 @@ func (s *Stats) Report() string {
 		calls += b.Calls
 	}
 	fmt.Fprintf(&w, "%-14s %6d %9s\n", "TOTAL", calls, round(grand))
+	fmt.Fprintf(&w, "model wall clock %s\n", round(wall))
 	if loads > time.Second {
 		fmt.Fprintf(&w, "model loading accounted for %s of that\n", round(loads))
 	}

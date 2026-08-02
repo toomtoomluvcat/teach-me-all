@@ -326,15 +326,39 @@ func GenerateExam(ctx context.Context, outline *Outline, lesson Lesson, chunks [
 			return nil, fmt.Errorf("generate from chunk %s: %w", c.ID, err)
 		}
 
-		for _, q := range qs {
+		// Run all cheap checks before touching the embedder. A rejected question
+		// cannot become accepted, so embedding its stem only causes an avoidable
+		// model swap. Batch the remaining stems: one chunk commonly returns two
+		// questions, and two one-item embed calls would evict and reload bge-m3
+		// twice on a small GPU.
+		cheap := make([]*GateReport, len(qs))
+		eligible := make([]Question, 0, len(qs))
+		eligibleAt := make([]int, 0, len(qs))
+		for i, q := range qs {
+			q.ChunkID = c.ID
+			cheap[i] = RunCheapGates(q, c, d.Eval)
+			if len(cheap[i].Failures()) == 0 && strings.TrimSpace(q.Stem) != "" {
+				eligible = append(eligible, q)
+				eligibleAt = append(eligibleAt, i)
+			}
+		}
+		vectors := stemVectors(ctx, eligible, d)
+		vectorsByQuestion := make([][]float32, len(qs))
+		if len(vectors) == len(eligible) {
+			for i, questionAt := range eligibleAt {
+				vectorsByQuestion[questionAt] = vectors[i]
+			}
+		}
+
+		for i, q := range qs {
 			q.ChunkID = c.ID
 
-			// Cheap checks and the duplicate check first, judges last. Embedding
-			// one stem costs milliseconds; two judge calls cost seconds. On a
-			// measured run the duplicate check alone rejected 7 of 16, and every
-			// one of those had already been through both judges.
-			rep := RunCheapGates(q, c, d.Eval)
-			vec := stemVector(ctx, q, d)
+			// Cheap checks and the duplicate check first, judges last. Two judge
+			// calls cost seconds. On a measured run the duplicate check alone
+			// rejected 7 of 16, and every one of those had already been through
+			// both judges.
+			rep := cheap[i]
+			vec := vectorsByQuestion[i]
 			rep.add(gateDistinct(q, res.Passed, vec, acceptedVecs))
 			if err := AddJudgeGates(ctx, rep, q, c, d.Judge); err != nil {
 				return nil, err
@@ -387,14 +411,29 @@ func GenerateExam(ctx context.Context, outline *Outline, lesson Lesson, chunks [
 // no embedder is configured or the call fails — the check then falls back to
 // literal text comparison rather than blocking the run.
 func stemVector(ctx context.Context, q Question, d Deps) []float32 {
-	if d.Embedder == nil || strings.TrimSpace(q.Stem) == "" {
-		return nil
-	}
-	vecs, err := d.Embedder.Embed(ctx, []string{q.Stem})
-	if err != nil || len(vecs) != 1 {
+	vecs := stemVectors(ctx, []Question{q}, d)
+	if len(vecs) != 1 {
 		return nil
 	}
 	return vecs[0]
+}
+
+func stemVectors(ctx context.Context, qs []Question, d Deps) [][]float32 {
+	if d.Embedder == nil || len(qs) == 0 {
+		return nil
+	}
+	texts := make([]string, len(qs))
+	for i, q := range qs {
+		if strings.TrimSpace(q.Stem) == "" {
+			return nil
+		}
+		texts[i] = q.Stem
+	}
+	vecs, err := d.Embedder.Embed(ctx, texts)
+	if err != nil || len(vecs) != len(texts) {
+		return nil
+	}
+	return vecs
 }
 
 // keep records a question that survived every gate, and notes when it came

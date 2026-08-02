@@ -27,36 +27,42 @@ import (
 )
 
 type config struct {
-	pdfPath     string
-	extract     string
-	model       string
-	embedModel  string
-	ocrModel    string
-	host        string
-	forceCalc   bool
-	scope       string
-	pages       string
-	budget      int
-	fresh       bool
-	extractOnly bool
-	repair      bool
-	calcTool    bool
-	parallel    int
+	provider     string
+	pdfPath      string
+	extract      string
+	model        string
+	embedModel   string
+	ocrModel     string
+	host         string
+	geminiHost   string
+	geminiAPIKey string
+	forceCalc    bool
+	scope        string
+	pages        string
+	budget       int
+	fresh        bool
+	extractOnly  bool
+	repair       bool
+	calcTool     bool
+	parallel     int
 }
 
 func main() {
 	var cfg config
+	flag.StringVar(&cfg.provider, "provider", "ollama", "model provider: ollama | gemini")
 	flag.StringVar(&cfg.pdfPath, "pdf", "", "path to the source PDF (required)")
 	flag.StringVar(&cfg.extract, "extract", "auto", "extraction mode: auto | text | poppler | ocr")
-	flag.StringVar(&cfg.model, "model", "scb10x/typhoon2.5-qwen3-4b", "generation and judge model")
+	flag.StringVar(&cfg.model, "model", "", "generation and judge model (provider default when empty)")
 	// bge-m3, not nomic-embed-text. Measured on Thai question pairs,
 	// nomic returns cosine 1.0000 for every pair in the same chapter whether
 	// they are the same question or not — no threshold separates them, and
 	// chunk ranking built on it is random. bge-m3 scores duplicates at 0.95+
 	// and different questions at 0.60, a usable gap of 0.31.
-	flag.StringVar(&cfg.embedModel, "embed-model", "bge-m3", "embedding model, empty to disable ranking")
+	flag.StringVar(&cfg.embedModel, "embed-model", "", "embedding model, empty to use the provider default")
 	flag.StringVar(&cfg.ocrModel, "ocr-model", "scb10x/typhoon-ocr1.5-3b", "vision model used by --extract=ocr")
 	flag.StringVar(&cfg.host, "host", "http://localhost:11434", "Ollama host")
+	flag.StringVar(&cfg.geminiHost, "gemini-host", "https://generativelanguage.googleapis.com", "Gemini API host")
+	flag.StringVar(&cfg.geminiAPIKey, "gemini-api-key", "", "Gemini API key (prefer GEMINI_API_KEY)")
 	flag.BoolVar(&cfg.forceCalc, "force-calc", false, "generate calculation questions only")
 	flag.StringVar(&cfg.scope, "scope", "", "free-text focus; chunks are ranked against this instead of the lesson title")
 	flag.StringVar(&cfg.pages, "pages", "", "page range, e.g. 10-40")
@@ -65,8 +71,37 @@ func main() {
 	flag.BoolVar(&cfg.extractOnly, "extract-only", false, "stop after extraction; needs no models and no Ollama")
 	flag.BoolVar(&cfg.repair, "repair", false, "send questions rejected by a deterministic gate back to the model once (measured worthless on 4B)")
 	flag.BoolVar(&cfg.calcTool, "calc-tool", true, "let the model use a calculator tool before writing calculation questions")
-	flag.IntVar(&cfg.parallel, "parallel", 4, "model calls in flight at once; needs OLLAMA_NUM_PARALLEL to match")
+	flag.IntVar(&cfg.parallel, "parallel", 4, "model calls in flight at once; Ollama also needs OLLAMA_NUM_PARALLEL to match")
 	flag.Parse()
+	if cfg.geminiAPIKey == "" {
+		cfg.geminiAPIKey = os.Getenv("GEMINI_API_KEY")
+	}
+	if cfg.provider != "ollama" && cfg.provider != "gemini" {
+		fmt.Fprintf(os.Stderr, "--provider must be ollama or gemini, got %q\n", cfg.provider)
+		os.Exit(2)
+	}
+	if cfg.model == "" {
+		if cfg.provider == "gemini" {
+			cfg.model = "gemini-2.5-flash"
+		} else {
+			cfg.model = "scb10x/typhoon2.5-qwen3-4b"
+		}
+	}
+	// An explicitly empty --embed-model still disables ranking. Only fill in a
+	// provider default when the flag was not supplied at all.
+	embedModelSet := false
+	flag.Visit(func(f *flag.Flag) {
+		if f.Name == "embed-model" {
+			embedModelSet = true
+		}
+	})
+	if !embedModelSet {
+		if cfg.provider == "gemini" {
+			cfg.embedModel = "gemini-embedding-001"
+		} else {
+			cfg.embedModel = "bge-m3"
+		}
+	}
 
 	if cfg.pdfPath == "" {
 		fmt.Fprintln(os.Stderr, "--pdf is required")
@@ -85,12 +120,32 @@ func main() {
 
 func run(ctx context.Context, cfg config) error {
 	in := bufio.NewScanner(os.Stdin)
-	client := llm.New(cfg.host)
+	var (
+		client      *llm.Client
+		modelClient llm.ModelClient
+		stats       *llm.Stats
+	)
+	if cfg.provider == "ollama" {
+		client = llm.New(cfg.host)
+		modelClient = client
+		stats = client.Stats
+	} else {
+		if cfg.extract == "ocr" {
+			return fmt.Errorf("--extract=ocr currently requires --provider ollama; Gemini text generation is supported, Gemini OCR is not wired yet")
+		}
+		if (!cfg.extractOnly || cfg.extract == "ocr") && cfg.geminiAPIKey == "" {
+			return fmt.Errorf("Gemini provider requires GEMINI_API_KEY or --gemini-api-key")
+		}
+		gemini := llm.NewGeminiAt(cfg.geminiHost, cfg.geminiAPIKey, nil)
+		modelClient = gemini
+		stats = gemini.Stats
+	}
+	defer reportStats(cfg, stats)
 
 	// Fail here rather than twenty minutes into pass 1. Skipped for
 	// --extract-only, whose whole point is to inspect extraction on a machine
 	// with no models pulled yet.
-	if !cfg.extractOnly || cfg.extract == "ocr" {
+	if cfg.provider == "ollama" && (!cfg.extractOnly || cfg.extract == "ocr") {
 		if err := preflight(ctx, client, cfg); err != nil {
 			return err
 		}
@@ -145,23 +200,23 @@ func run(ctx context.Context, cfg config) error {
 
 	// The OCR model and the generation model cannot both sit in 6 GB of VRAM,
 	// so the one we are done with is evicted before the next is loaded.
-	if cfg.extract == "ocr" {
+	if client != nil && cfg.extract == "ocr" {
 		_ = client.Unload(ctx, cfg.ocrModel)
 	}
 
 	// --- step 2: outline ----------------------------------------------------
-	gen := llm.NewGenerator(client, cfg.model)
+	gen := llm.NewGenerator(modelClient, cfg.model)
 	gen.UseCalcTool = cfg.calcTool
 
 	deps := examgen.Deps{
 		Gen:      gen,
-		Judge:    llm.NewJudge(client, cfg.model),
+		Judge:    llm.NewJudge(modelClient, cfg.model),
 		Eval:     examgen.Arith{},
 		Log:      examgen.Progress(safeProgress()),
 		Parallel: cfg.parallel,
 	}
 	if cfg.embedModel != "" {
-		deps.Embedder = llm.NewEmbedder(client, cfg.embedModel)
+		deps.Embedder = llm.NewEmbedder(modelClient, cfg.embedModel)
 	}
 
 	type outlineCache struct {
@@ -219,12 +274,19 @@ func run(ctx context.Context, cfg config) error {
 		if err := review(in, res); err != nil {
 			return err
 		}
-		if r := client.Stats.Report(); r != "" {
-			fmt.Printf("\n%swhere the time went%s\n%s", bold, reset, r)
-		}
 		if err := writeRun(cfg, res); err != nil {
 			return err
 		}
+	}
+}
+
+func reportStats(cfg config, stats *llm.Stats) {
+	if r := stats.Report(); r != "" {
+		title := "where the time went"
+		if cfg.provider == "gemini" {
+			title = "Gemini API calls and timing (cumulative for this process)"
+		}
+		fmt.Printf("\n%s%s%s\n%s", bold, title, reset, r)
 	}
 }
 

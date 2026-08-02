@@ -9,14 +9,14 @@ import (
 
 // Generator adapts the Ollama client to examgen.Generator.
 type Generator struct {
-	c     *Client
+	c     ModelClient
 	model string
 	// UseCalcTool runs the calculator tool loop before generating, so the model
 	// never has to do arithmetic in its head.
 	UseCalcTool bool
 }
 
-func NewGenerator(c *Client, model string) *Generator { return &Generator{c: c, model: model} }
+func NewGenerator(c ModelClient, model string) *Generator { return &Generator{c: c, model: model} }
 
 // genOptions keeps generation close to deterministic. A prototype whose output
 // changes every run cannot be compared against itself between prompt edits.

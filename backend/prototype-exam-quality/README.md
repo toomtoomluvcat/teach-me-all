@@ -58,13 +58,16 @@ will have to do anyway. Building it here is not throwaway work.
 
 ## Requirements
 
-- [Ollama](https://ollama.com) running on `http://localhost:11434`
-- Models:
+- Default provider: [Ollama](https://ollama.com) running on `http://localhost:11434`
+- Ollama models:
   ```
   ollama pull scb10x/typhoon2.5-qwen3-4b
-  ollama pull nomic-embed-text
+  ollama pull bge-m3
   ollama pull scb10x/typhoon-ocr1.5-3b     # only for --extract=ocr
   ```
+- Gemini is also supported through the Gemini REST API. Set `GEMINI_API_KEY`
+  before running; the default Gemini models are `gemini-2.5-flash` and
+  `gemini-embedding-001`.
 - For `--extract=ocr`: `pdftoppm` (poppler) on PATH to rasterize pages.
 
 Target machine is 6 GB VRAM, so models are loaded and unloaded one at a time.
@@ -76,15 +79,26 @@ cd backend/prototype-exam-quality
 go run . --pdf ../../samples/algebra-en.pdf
 ```
 
+Gemini example (PowerShell):
+
+```powershell
+$env:GEMINI_API_KEY = "your-key"
+go run . --provider gemini --pdf ../../samples/algebra-en.pdf
+```
+
 Flags:
 
 | Flag | Default | Meaning |
 |------|---------|---------|
 | `--pdf` | *(required)* | source PDF |
+| `--provider` | `ollama` | `ollama` or `gemini` |
 | `--extract` | `auto` | `auto` picks per document, `text` = ledongthuc/pdf, `poppler` = pdftotext, `ocr` = rasterise + typhoon-ocr |
 | `--calc-tool` | `true` | model calls a calculator before writing calculation questions. Took arithmetic failures from 5 to 0 — see VERDICT.md |
 | `--repair` | `false` | hand rejected questions back with the discrepancy. Measured worthless on 4B |
-| `--model` | `scb10x/typhoon2.5-qwen3-4b` | generation + judge model |
+| `--model` | provider default | generation + judge model; Ollama defaults to `scb10x/typhoon2.5-qwen3-4b`, Gemini to `gemini-2.5-flash` |
+| `--embed-model` | provider default | Ollama `bge-m3`, Gemini `gemini-embedding-001`; pass an explicit empty value to disable ranking |
+| `--gemini-host` | `https://generativelanguage.googleapis.com` | Gemini API host |
+| `--gemini-api-key` | `GEMINI_API_KEY` | Gemini API key; the flag is useful for one-off runs |
 | `--force-calc` | `false` | only generate calculation questions |
 | `--pages` | all | page range, e.g. `10-40` |
 | `--fresh` | `false` | ignore the cache and redo extraction/embedding |
@@ -103,6 +117,13 @@ It writes the whole extracted text to `.scratch/<hash>/extracted.txt`. Read it.
 
 Extraction and embedding are cached under `.scratch/` (gitignored) because they are
 slow and rerunning them while iterating on prompts is a waste.
+
+At the end of every process, including one that exits after an API error, the run
+prints a cumulative call report. With the Gemini provider, `TOTAL` is the exact
+number of Gemini HTTP requests attempted by the process, including retries and
+429/5xx responses. The `embed` row counts batch embedding requests, not
+individual texts; the other rows identify the pipeline stage (`outline/map`,
+`outline/reduce`, `generate`, `judge/*`, `repair`, and `calc-tool`).
 
 ## Finish line
 

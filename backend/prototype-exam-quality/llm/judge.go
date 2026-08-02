@@ -14,11 +14,11 @@ import (
 // would make a run take hours. Gates 1 and 4 are deterministic precisely
 // because gates 2 and 3 have this problem.
 type Judge struct {
-	c     *Client
+	c     ModelClient
 	model string
 }
 
-func NewJudge(c *Client, model string) *Judge { return &Judge{c: c, model: model} }
+func NewJudge(c ModelClient, model string) *Judge { return &Judge{c: c, model: model} }
 
 func (j *Judge) JudgeBlind(ctx context.Context, q examgen.Question) (examgen.BlindVerdict, error) {
 	ctx = WithLabel(ctx, "judge/blind")
@@ -54,11 +54,11 @@ func (j *Judge) JudgeAgainstSource(ctx context.Context, q examgen.Question, sour
 
 // Embedder adapts the Ollama client to examgen.Embedder.
 type Embedder struct {
-	c     *Client
+	c     ModelClient
 	model string
 }
 
-func NewEmbedder(c *Client, model string) *Embedder { return &Embedder{c: c, model: model} }
+func NewEmbedder(c ModelClient, model string) *Embedder { return &Embedder{c: c, model: model} }
 
 func (e *Embedder) Embed(ctx context.Context, texts []string) ([][]float32, error) {
 	return e.c.Embed(ctx, e.model, texts)

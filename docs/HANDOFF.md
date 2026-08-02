@@ -1,11 +1,11 @@
 # Handoff — exam-quality prototype
 
-Last updated 2026-08-02. Supersedes the earlier copy in the OS temp directory;
+Last updated 2026-08-03. Supersedes the earlier copy in the OS temp directory;
 this file is canonical, delete that one.
 
 Repo: `E:\contribute\teach-me-all`. Branch `prototype/exam-quality`, two commits
-ahead of `main`, nothing pushed — the repo has no remote. Work done after those
-commits is uncommitted; see "Uncommitted work" below.
+ahead of `main`, with `origin/prototype/exam-quality` at `5a61b8c`. Work done
+after that commit is uncommitted; see "Uncommitted work" below.
 
 ## Read these first, in this order
 
@@ -102,19 +102,26 @@ Reading the 10 passing biology questions by hand: 3 genuinely good, 3 with a tru
 distractor, 4 weak (off-topic distractors, or answerable without reading). So 45%
 still overstates it.
 
-## Uncommitted work since `9a0d935`
+## Uncommitted work since `5a61b8c`
 
 Everything below is in the working tree, builds, and `go vet` is clean. It is not
 committed.
 
-- `examgen/wellformed.go` — the nine structural checks and the duplicate gate.
-- `llm/stats.go` — per-call timing, labelled via a context value.
-- `llm/calctool.go` — the calculator tool loop.
-- Gate reordering in `gate.go` (`RunCheapGates` / `AddJudgeGates`).
-- Concurrency: `Deps.Parallel`, parallel `outline/map`, the two judges running
-  together, `safeProgress()` in `ui.go`.
-- `pdfx/poppler.go` — the poppler path and `ExtractAuto`.
-- Default embedder changed to `bge-m3`.
+- `examgen/pipeline.go` — cheap gates now run before duplicate embeddings, and
+  eligible question stems are embedded as one batch per source chunk.
+- `examgen/pipeline_test.go` — regression test for the batching and skip path.
+- `llm/stats.go` and `llm/client.go` — measured model-call wall clock, plus an
+  elapsed-time `embed` bucket for `/api/embed`; report shares now use wall clock
+  rather than the sum of overlapping call durations.
+- `llm/stats_test.go` — deterministic regression test for the timing report.
+- `llm/gemini.go`, `llm/gemini_test.go`, and `main.go` — Gemini REST provider
+  behind the same `ModelClient` interface. Use `--provider gemini` with
+  `GEMINI_API_KEY`; the report labels itself and `TOTAL` is the exact number of
+  Gemini HTTP requests attempted by the process, including retries and failed
+  responses. OCR remains Ollama-only. Live smoke testing reached 5 successful
+  `outline/map` calls before the configured Gemini free-tier quota returned 429.
+- `backend/prototype-exam-quality/README.md` — Gemini setup, flags, and call
+  report semantics.
 
 ## Findings that will not be obvious from the code
 
@@ -142,9 +149,18 @@ committed.
   4m39s of 11m54s on model loading, because the 4B generator and bge-m3 cannot
   both stay resident once KV cache is counted. Generation itself runs at 35–55
   tok/s, which is healthy and means 6 GB is not the bottleneck.
-- **The timing report's `share` column is now wrong.** It divides by the sum of
-  per-call durations, which exceeds wall clock once calls run concurrently. Wall
-  clock needs measuring separately.
+- **The timing report's `share` column was wrong.** It now divides by measured
+  model-call wall clock; live reruns still need to confirm the resulting numbers.
+- **A cached biology rerun after batching** generated 21 questions and passed 10
+  (47.6%), versus the prior 22/10 (45.5%). Its report showed 7m55s wall clock and
+  4m36s loading, versus the prior 11m54s and 4m39s. The run happened before the
+  new `embed` bucket, so it suggests a wall-clock improvement but does not yet
+  isolate embedding time.
+- **The immediate follow-up with the `embed` bucket** made 9 embedding calls
+  taking 3.007s (1% of call time), 52 total calls, 5m23s wall clock, and 3m15s
+  model loading; it generated 19 and passed 10 (52.6%). Because it followed the
+  prior run while models were still warm, this is instrumentation evidence, not
+  a clean cold-cache A/B measurement.
 
 ## Storage design, as agreed in conversation
 
@@ -212,12 +228,17 @@ Found by reading, not fixed, filed nowhere else:
 
 1. **Close the prototype.** The owner still has not compared against NotebookLM
    on the same file. Keep asking before anyone builds on the numbers.
-2. **Fix model swapping** before trying a larger model. 39% of a run went to
-   loading. A third model on 6 GB will make it worse.
-3. **Then** try a larger model on `judge/source` only — the true-distractor
+2. **If a clean performance claim matters, do one cold-cache rerun** after
+   unloading both models. The instrumentation now shows the batching path itself
+   is only 9 embed calls / 3.007s on this workload; the remaining load cost is
+   generator/judge model swapping.
+3. Run one small live Gemini generation with a real key and record the call
+   report alongside the Ollama baseline; this validates provider wiring and
+   gives the first remote quality/cost comparison.
+4. **Then** try a larger model on `judge/source` only — the true-distractor
    defect is the only thing left that a bigger model fixes.
-4. Decide the Markdown-vs-plain-text question above.
-5. Commit the uncommitted work.
+5. Decide the Markdown-vs-plain-text question above.
+6. Commit the uncommitted work.
 
 ## Suggested skills
 

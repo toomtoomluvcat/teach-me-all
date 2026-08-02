@@ -19,6 +19,16 @@ type Client struct {
 	Stats *Stats
 }
 
+// ModelClient is the small provider surface the exam pipeline needs. Both the
+// local Ollama client and the remote Gemini client implement it, so provider
+// choice does not leak into examgen or the prompt adapters.
+type ModelClient interface {
+	ChatJSON(ctx context.Context, model string, msgs []Message, schema any, opt *Options, out any) error
+	Chat(ctx context.Context, model string, msgs []Message, opt *Options) (string, error)
+	ChatTools(ctx context.Context, model string, msgs []Message, tools []Tool, opt *Options) (Message, error)
+	Embed(ctx context.Context, model string, texts []string) ([][]float32, error)
+}
+
 // New builds a client with a timeout long enough for CPU-assisted generation on
 // a laptop, which is the machine this prototype targets.
 func New(host string) *Client {
@@ -160,6 +170,8 @@ func (c *Client) Chat(ctx context.Context, model string, msgs []Message, opt *Op
 // with both set it produced schema-valid JSON and never called the tool. Any
 // design that needs both has to run them as two separate turns.
 func (c *Client) ChatTools(ctx context.Context, model string, msgs []Message, tools []Tool, opt *Options) (Message, error) {
+	c.Stats.begin()
+	defer c.Stats.end()
 	off := false
 	req := chatRequest{
 		Model:     model,
@@ -182,6 +194,8 @@ func (c *Client) ChatTools(ctx context.Context, model string, msgs []Message, to
 }
 
 func (c *Client) chat(ctx context.Context, model string, msgs []Message, schema any, opt *Options) (string, error) {
+	c.Stats.begin()
+	defer c.Stats.end()
 	// Reasoning models burn minutes on a task that has a fixed output shape.
 	off := false
 	req := chatRequest{
@@ -218,6 +232,13 @@ type embedResponse struct {
 
 // Embed returns one vector per input string.
 func (c *Client) Embed(ctx context.Context, model string, texts []string) ([][]float32, error) {
+	started := c.Stats.begin()
+	defer func() {
+		if !started.IsZero() {
+			c.Stats.addElapsed("embed", time.Since(started))
+		}
+		c.Stats.end()
+	}()
 	var resp embedResponse
 	if err := c.post(ctx, "/api/embed", embedRequest{Model: model, Input: texts, KeepAlive: "10m"}, &resp); err != nil {
 		return nil, err
