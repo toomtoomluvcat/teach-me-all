@@ -1,0 +1,310 @@
+package examgen
+
+import (
+	"context"
+	"fmt"
+	"math"
+	"strings"
+)
+
+// BlindVerdict is what a judge reports when it sees only the question — no
+// source material.
+type BlindVerdict struct {
+	// Interpretable answers "reading only this, is it clear what is being
+	// asked?". This is the vagueness detector and the reason gate 2 exists.
+	Interpretable bool   `json:"interpretable"`
+	Reason        string `json:"reason"`
+
+	// GuessedIndex and GuessConfidence answer a different question: could this
+	// be answered without reading the source at all? A confident correct guess
+	// means the question tests recall of general knowledge, or one choice is
+	// obviously the odd one out. Recorded as a signal, never used to fail a
+	// question — random guessing is right 25% of the time.
+	GuessedIndex    int    `json:"guessed_index"`
+	GuessConfidence string `json:"guess_confidence"`
+}
+
+// SourcedVerdict is what a judge reports when it can see the source chunk.
+type SourcedVerdict struct {
+	BestIndex      int    `json:"best_index"`
+	AlsoDefensible []int  `json:"also_defensible"`
+	Reason         string `json:"reason"`
+}
+
+// Judge is the model-backed half of the gates. Two calls, both on the question
+// only — the pipeline never lets the judge see the generator's reasoning.
+type Judge interface {
+	JudgeBlind(ctx context.Context, q Question) (BlindVerdict, error)
+	JudgeAgainstSource(ctx context.Context, q Question, source string) (SourcedVerdict, error)
+}
+
+// Evaluator evaluates an arithmetic expression. Implemented in calc.go.
+type Evaluator interface {
+	Eval(expr string) (float64, error)
+}
+
+// minQuoteRunes stops a model from satisfying gate 1 with a quote so short it
+// matches by accident. Anything shorter is not evidence of grounding.
+const minQuoteRunes = 25
+
+// minNumericQuoteRunes is the floor for a quote carrying numbers. A worked
+// calculation cites itself in very few characters — "1200 * 0.07 = 84 baht" is
+// 22 runes and is more specific evidence than any sentence of prose. Holding
+// numeric citations to the prose floor threw away good questions.
+const minNumericQuoteRunes = 12
+
+// quoteFloor picks the length floor for a quote. Two or more digits means the
+// quote points at particular numbers, which cannot match by accident.
+func quoteFloor(quote string) int {
+	digits := 0
+	for _, r := range quote {
+		if r >= '0' && r <= '9' {
+			digits++
+			if digits >= 2 {
+				return minNumericQuoteRunes
+			}
+		}
+	}
+	return minQuoteRunes
+}
+
+// arithmeticTolerance is relative; expressions producing money or physical
+// quantities get rounded by the model in the choice text.
+const arithmeticTolerance = 1e-6
+
+// RunGates applies all four checks to one question and returns the report.
+// It never returns an error for a failing question — failure is data. It
+// returns an error only when the judge itself is unreachable.
+func RunGates(ctx context.Context, q Question, chunk Chunk, j Judge, ev Evaluator) (*GateReport, error) {
+	rep := &GateReport{}
+
+	rep.add(gateQuote(q, chunk))
+	rep.add(gateArithmetic(q, ev))
+
+	// A judge that fails to answer costs the question, not the run. Twenty
+	// minutes of generation should not be lost because one reply came back
+	// malformed; the failure is recorded on the question where it can be read.
+	blind, err := j.JudgeBlind(ctx, q)
+	if err != nil {
+		rep.add(GateResult{Gate: GateBlindAnswer, Reason: "judge did not answer: " + err.Error()})
+	} else {
+		rep.add(gateInterpretable(q, blind))
+	}
+
+	sourced, err := j.JudgeAgainstSource(ctx, q, chunk.Text)
+	if err != nil {
+		rep.add(GateResult{Gate: GateSingleValid, Reason: "judge did not answer: " + err.Error()})
+	} else {
+		rep.add(gateSingleDefensible(q, sourced))
+	}
+
+	return rep, nil
+}
+
+// gateQuote is deterministic: the quote the model attributed to the source has
+// to actually be in the source.
+//
+// Whitespace is removed from both sides before comparing, not merely collapsed.
+// PDF extraction sprinkles spaces between Thai syllables — Thai does not put
+// spaces between words, so every one of those is an artefact — and the model
+// writes the same sentence without them. Measured on a real Thai handout, that
+// alone failed 12 of 15 otherwise-correct quotes.
+//
+// Nothing else is normalised. Characters and their order must still match
+// exactly, so a model that transcribes "Creativity" as "Cretivity" still fails,
+// which is the case this gate exists to catch.
+func gateQuote(q Question, chunk Chunk) GateResult {
+	res := GateResult{Gate: GateQuote, Deterministic: true}
+
+	quote := stripQuoteMarks(q.SourceQuote)
+	floor := quoteFloor(quote)
+	if n := RuneLen(collapseWS(quote)); n < floor {
+		res.Reason = fmt.Sprintf("quote is %d runes, minimum is %d — too short to be evidence", n, floor)
+		return res
+	}
+	if !strings.Contains(squeeze(chunk.Text), squeeze(quote)) {
+		res.Reason = fmt.Sprintf("quote not found verbatim in chunk %s (page %d)", chunk.ID, chunk.Page)
+		return res
+	}
+
+	res.Pass = true
+	res.Reason = fmt.Sprintf("verbatim in chunk %s, page %d", chunk.ID, chunk.Page)
+	return res
+}
+
+// gateArithmetic is deterministic: Go evaluates the expression, not the model.
+// Questions with no calculation pass trivially.
+func gateArithmetic(q Question, ev Evaluator) GateResult {
+	res := GateResult{Gate: GateArithmetic, Deterministic: true}
+
+	if q.Calculation == nil {
+		res.Pass = true
+		res.Reason = "no arithmetic in this question"
+		return res
+	}
+	if ev == nil {
+		res.Reason = "calculation present but no evaluator configured"
+		return res
+	}
+
+	got, err := ev.Eval(q.Calculation.Expression)
+	if err != nil {
+		res.Reason = fmt.Sprintf("expression %q did not evaluate: %v", q.Calculation.Expression, err)
+		return res
+	}
+	if !nearlyEqual(got, q.Calculation.Expected) {
+		res.Reason = fmt.Sprintf("expression %q evaluates to %g but the model stated %g",
+			q.Calculation.Expression, got, q.Calculation.Expected)
+		return res
+	}
+
+	// The stated value also has to be the choice marked correct, otherwise the
+	// arithmetic is right and the answer key is still wrong.
+	idx := q.CorrectIndex()
+	if idx < 0 {
+		res.Reason = "cannot check the answer key: question does not have exactly one correct choice"
+		return res
+	}
+	if !choiceMentionsNumber(q.Choices[idx].Content, got) {
+		res.Reason = fmt.Sprintf("expression evaluates to %g but the correct choice reads %q",
+			got, q.Choices[idx].Content)
+		return res
+	}
+
+	res.Pass = true
+	res.Reason = fmt.Sprintf("%s = %g, matches the correct choice", q.Calculation.Expression, got)
+	return res
+}
+
+// gateInterpretable is the vagueness check. It asks whether a reader can tell
+// what is being asked without the source in front of them — not whether they
+// could answer it.
+func gateInterpretable(q Question, v BlindVerdict) GateResult {
+	res := GateResult{Gate: GateBlindAnswer}
+
+	if !v.Interpretable {
+		res.Reason = "judge could not tell what is being asked: " + v.Reason
+		return res
+	}
+
+	res.Pass = true
+	res.Reason = "question is self-contained"
+	if v.GuessedIndex == q.CorrectIndex() && strings.EqualFold(v.GuessConfidence, "high") {
+		// Advisory only. Surfaced so a human can spot a pattern of trivial
+		// questions, but a question is not failed for it.
+		res.Reason += " (note: judge guessed it correctly with high confidence without the source — may not be testing comprehension)"
+	}
+	return res
+}
+
+// gateSingleDefensible checks the answer key against a judge that can see the
+// source: the judge's pick has to match, and no other choice may be arguable.
+func gateSingleDefensible(q Question, v SourcedVerdict) GateResult {
+	res := GateResult{Gate: GateSingleValid}
+
+	idx := q.CorrectIndex()
+	if idx < 0 {
+		res.Reason = "question does not mark exactly one choice correct"
+		return res
+	}
+	if v.BestIndex != idx {
+		res.Reason = fmt.Sprintf("answer key says choice %d, judge reading the source says choice %d: %s",
+			idx+1, v.BestIndex+1, v.Reason)
+		return res
+	}
+	if len(v.AlsoDefensible) > 0 {
+		var others []string
+		for _, i := range v.AlsoDefensible {
+			if i == idx {
+				continue
+			}
+			others = append(others, fmt.Sprintf("%d", i+1))
+		}
+		if len(others) > 0 {
+			res.Reason = fmt.Sprintf("choice %s also defensible from the source: %s",
+				strings.Join(others, ", "), v.Reason)
+			return res
+		}
+	}
+
+	res.Pass = true
+	res.Reason = "exactly one choice holds up against the source"
+	return res
+}
+
+func collapseWS(s string) string {
+	return strings.Join(strings.Fields(s), " ")
+}
+
+// squeeze removes every whitespace character. See gateQuote for why this is
+// the right comparison and what it deliberately does not forgive.
+func squeeze(s string) string {
+	return strings.Join(strings.Fields(s), "")
+}
+
+// stripQuoteMarks removes wrapping quotation marks. Models like to hand back
+// the quote already quoted, and the marks are not part of the source.
+func stripQuoteMarks(s string) string {
+	s = strings.TrimSpace(s)
+	for {
+		r := []rune(s)
+		if len(r) < 2 {
+			return s
+		}
+		first, last := r[0], r[len(r)-1]
+		if isQuoteMark(first) && isQuoteMark(last) {
+			s = strings.TrimSpace(string(r[1 : len(r)-1]))
+			continue
+		}
+		return s
+	}
+}
+
+func isQuoteMark(r rune) bool {
+	switch r {
+	case '"', '\'', '“', '”', '‘', '’', '«', '»', '「', '」':
+		return true
+	}
+	return false
+}
+
+func nearlyEqual(a, b float64) bool {
+	if a == b {
+		return true
+	}
+	scale := math.Max(math.Abs(a), math.Abs(b))
+	if scale == 0 {
+		return true
+	}
+	return math.Abs(a-b)/scale < arithmeticTolerance
+}
+
+// choiceMentionsNumber checks the correct choice actually contains the computed
+// value. Choices are written by the model as prose ("about 7 บาทต่อเดือน"), so
+// this compares against several roundings rather than demanding an exact string.
+func choiceMentionsNumber(choice string, v float64) bool {
+	candidates := []string{
+		trimZeros(fmt.Sprintf("%.6f", v)),
+		trimZeros(fmt.Sprintf("%.4f", v)),
+		trimZeros(fmt.Sprintf("%.2f", v)),
+		trimZeros(fmt.Sprintf("%.1f", v)),
+		fmt.Sprintf("%.0f", v),
+		fmt.Sprintf("%g", v),
+	}
+	// Strip thousands separators so "1,234" matches "1234".
+	haystack := strings.ReplaceAll(choice, ",", "")
+	for _, c := range candidates {
+		if c != "" && strings.Contains(haystack, c) {
+			return true
+		}
+	}
+	return false
+}
+
+func trimZeros(s string) string {
+	if !strings.Contains(s, ".") {
+		return s
+	}
+	s = strings.TrimRight(s, "0")
+	return strings.TrimSuffix(s, ".")
+}

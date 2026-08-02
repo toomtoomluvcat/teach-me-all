@@ -1,0 +1,352 @@
+package examgen
+
+import (
+	"fmt"
+	"strings"
+)
+
+// Schemas are plain Go maps so they can be handed straight to Ollama's
+// structured-output `format` field without a round trip through a struct tag
+// reflector. Keeping them next to the prompt that references them is
+// deliberate: when a prompt changes, its schema usually has to change too.
+
+// obj is a small helper to keep the schema literals readable.
+func obj(props map[string]any, required ...string) map[string]any {
+	return map[string]any{
+		"type":                 "object",
+		"properties":           props,
+		"required":             required,
+		"additionalProperties": false,
+	}
+}
+
+func str(desc string) map[string]any {
+	return map[string]any{"type": "string", "description": desc}
+}
+
+func enum(desc string, values ...string) map[string]any {
+	vals := make([]any, len(values))
+	for i, v := range values {
+		vals[i] = v
+	}
+	return map[string]any{"type": "string", "description": desc, "enum": vals}
+}
+
+// --- pass 1: map ------------------------------------------------------------
+
+// TopicSchema is what the model returns for a single chunk during the map step.
+func TopicSchema() map[string]any {
+	return obj(map[string]any{
+		"topics": map[string]any{
+			"type":        "array",
+			"minItems":    1,
+			"maxItems":    3,
+			"description": "the distinct teaching topics this passage covers",
+			"items":       str("a short topic title, in the same language as the passage"),
+		},
+	}, "topics")
+}
+
+const topicSystem = `You are indexing a textbook so it can be split into lessons.
+
+Read the passage and name the teaching topics it covers. Rules:
+- Name only topics the passage actually teaches. Do not infer topics from a
+  heading that has no content under it.
+- Write the titles in the same language as the passage.
+- A title is a noun phrase, not a sentence, and not a question.
+- If the passage is front matter, a table of contents, a page header, or an
+  index, return the single topic "NON_CONTENT".`
+
+// TopicPrompt builds the map-step user message.
+func TopicPrompt(c Chunk) string {
+	return fmt.Sprintf("Passage (page %d):\n\n%s", c.Page, c.Text)
+}
+
+func TopicSystem() string { return topicSystem }
+
+// --- pass 1: reduce ---------------------------------------------------------
+
+// OutlineSchema is what the model returns when folding topics into lessons.
+func OutlineSchema() map[string]any {
+	return obj(map[string]any{
+		"course_title": str("a title for the whole course, in the source language"),
+		"lessons": map[string]any{
+			"type":     "array",
+			"minItems": 1,
+			"items": obj(map[string]any{
+				"title":   str("lesson title, in the source language"),
+				"summary": str("one sentence on what this lesson teaches"),
+				"question_budget": map[string]any{
+					"type":        "integer",
+					"minimum":     1,
+					"maximum":     20,
+					"description": "how many exam questions this lesson genuinely supports, based on how much distinct material it contains. Be honest: a thin lesson gets a small number.",
+				},
+				"topics": map[string]any{
+					"type":        "array",
+					"minItems":    1,
+					"description": "the topic titles from the input that belong to this lesson, copied verbatim",
+					"items":       str("a topic title, copied exactly from the input list"),
+				},
+			}, "title", "summary", "question_budget", "topics"),
+		},
+	}, "course_title", "lessons")
+}
+
+const outlineSystem = `You are turning a flat list of topics from a textbook into a course outline.
+
+Rules:
+- Group related topics into lessons that could each be taught in one sitting.
+- Keep the original order of the material. Do not reorder topics to make
+  tidier groups.
+- Every topic in the input must appear in exactly one lesson, except topics
+  named "NON_CONTENT", which you drop entirely.
+- Copy topic titles verbatim. Do not reword them — they are used as keys.
+- Write lesson titles and summaries in the same language as the topics.
+- Prefer fewer, substantial lessons over many thin ones.
+- Set question_budget to the number of exam questions the lesson honestly
+  supports. Do not pad it to look generous — a lesson covering one definition
+  supports one or two questions, not ten.`
+
+func OutlineSystem() string { return outlineSystem }
+
+// --- pass 2: question generation --------------------------------------------
+
+// QuestionSchema constrains generation. forceCalc drops the non-calculation
+// escape hatch, implementing the --force-calc flag at the schema level rather
+// than by asking nicely in the prompt.
+func QuestionSchema(forceCalc bool) map[string]any {
+	calc := obj(map[string]any{
+		"expression": str("the arithmetic to solve this question, as a plain expression using only numbers, + - * / ( ) and decimal points. No variables, no functions, no units. Example: (1200*0.07)/12"),
+		"expected":   map[string]any{"type": "number", "description": "the value that expression produces"},
+	}, "expression", "expected")
+
+	question := map[string]any{
+		"kind":         enum("question shape", string(KindMCQSingle)),
+		"stem":         str("the question itself, understandable on its own without seeing the passage"),
+		"explanation":  str("why the correct choice is correct, in the source language"),
+		"source_quote": str("a sentence copied CHARACTER FOR CHARACTER from the passage that makes the correct answer true. Must appear in the passage exactly."),
+		"difficulty":   enum("how hard this is for someone who has read the passage once", "easy", "medium", "hard"),
+		"skill":        enum("what the question tests", "recall", "understanding", "application", "calculation"),
+		"choices": map[string]any{
+			"type":     "array",
+			"minItems": 4,
+			"maxItems": 4,
+			"items": obj(map[string]any{
+				"content":    str("the choice text"),
+				"is_correct": map[string]any{"type": "boolean"},
+			}, "content", "is_correct"),
+		},
+	}
+
+	required := []string{"kind", "stem", "choices", "explanation", "source_quote", "difficulty", "skill"}
+	question["calculation"] = calc
+	if forceCalc {
+		required = append(required, "calculation")
+	}
+
+	return obj(map[string]any{
+		"questions": map[string]any{
+			"type":     "array",
+			"minItems": 1,
+			"items":    obj(question, required...),
+		},
+	}, "questions")
+}
+
+const questionSystem = `You write multiple-choice exam questions from a passage of a textbook.
+
+The single most important rule: a student must be able to read your question,
+understand exactly what is being asked, and answer it — without the passage in
+front of them and without guessing what you meant.
+
+Hard requirements for every question:
+- The stem stands alone. Never write "according to the passage", "in the text
+  above", "this value", "the diagram", or anything that points at material the
+  student cannot see. Name the thing you are asking about.
+- Exactly one choice is correct. The other three must be wrong for a reason a
+  student could articulate — not wrong because they are nonsense.
+- All four choices are the same kind of thing and roughly the same length. Do
+  not make the correct answer the longest or the most detailed.
+- "All of the above", "none of the above", and "both A and B" are forbidden.
+- source_quote is copied character for character from the passage. Do not
+  paraphrase it, do not fix its punctuation, do not translate it. If nothing in
+  the passage supports your question, do not write the question.
+- Write in the same language as the passage.
+
+For calculation questions:
+- Do not do the arithmetic yourself. Put the arithmetic in
+  calculation.expression as a plain expression and put the result you believe
+  it produces in calculation.expected. The expression will be evaluated
+  independently and your question is discarded if it disagrees.
+- The correct choice must contain that computed number.
+- Every number in the expression must come from the passage or from the stem.
+  Do not invent inputs.
+
+Write fewer, better questions. A passage that supports two good questions gets
+two questions, not six padded ones.`
+
+func QuestionSystem() string { return questionSystem }
+
+// QuestionPrompt builds the generation message.
+func QuestionPrompt(lessonTitle string, c Chunk, want int, forceCalc bool) string {
+	s := fmt.Sprintf("Lesson: %s\n\nPassage (page %d):\n\n%s\n\n", lessonTitle, c.Page, c.Text)
+	s += fmt.Sprintf("Write up to %d question(s) from this passage. ", want)
+	s += "If the passage only supports fewer, write fewer. "
+	if forceCalc {
+		s += "Every question must be a calculation question with a calculation expression. " +
+			"If this passage contains no numbers to compute with, return an empty list."
+	} else {
+		s += "Include a calculation only when the passage contains numbers worth computing with."
+	}
+	return s
+}
+
+// --- repair -----------------------------------------------------------------
+
+const repairSystem = `A question you wrote failed an automatic check. Fix it.
+
+The checks that rejected it are not opinions. They are arithmetic done
+independently and a character-by-character search of the passage. If a check
+says your expression evaluates to a different number than you claimed, the
+check is right and you are wrong.
+
+Rules for the fix:
+- Keep the question if it is salvageable. Change only what the check objected
+  to. Do not write a different question because it is easier.
+- If the arithmetic disagrees, work out which is actually wrong — the
+  expression or the answer. Both are your own; one of them does not match the
+  passage. Rewrite whichever is wrong and make the correct choice contain the
+  value the expression really produces.
+- If the quote was not found in the passage, copy a different sentence
+  character for character from the passage below. Do not retype it from memory.
+  Do not paraphrase. Do not fix its spelling or spacing.
+- If nothing in the passage supports the question, say so by returning an empty
+  questions list rather than inventing support.
+
+Return the whole question, not a patch.`
+
+func RepairSystem() string { return repairSystem }
+
+// RepairPrompt hands the model its own question back with the exact objection.
+func RepairPrompt(q Question, c Chunk, failures []GateResult) string {
+	var b strings.Builder
+
+	b.WriteString("Passage (page ")
+	fmt.Fprintf(&b, "%d):\n\n%s\n\n", c.Page, c.Text)
+
+	b.WriteString("Your question:\n")
+	fmt.Fprintf(&b, "  stem: %s\n", q.Stem)
+	for i, ch := range q.Choices {
+		mark := " "
+		if ch.IsCorrect {
+			mark = "*"
+		}
+		fmt.Fprintf(&b, "  %s %d. %s\n", mark, i, ch.Content)
+	}
+	fmt.Fprintf(&b, "  source_quote: %q\n", q.SourceQuote)
+	if q.Calculation != nil {
+		fmt.Fprintf(&b, "  calculation: %s  (you said this equals %g)\n",
+			q.Calculation.Expression, q.Calculation.Expected)
+	}
+
+	b.WriteString("\nWhat failed:\n")
+	for _, f := range failures {
+		fmt.Fprintf(&b, "  - %s: %s\n", f.Gate, f.Reason)
+	}
+
+	return b.String()
+}
+
+// --- gates 2 and 3 ----------------------------------------------------------
+
+// BlindSchema constrains the judge that sees no source.
+func BlindSchema(numChoices int) map[string]any {
+	return obj(map[string]any{
+		"interpretable": map[string]any{
+			"type":        "boolean",
+			"description": "true if it is clear what the question is asking",
+		},
+		"reason": str("at most 20 words. If not interpretable, say exactly what is missing or ambiguous. Do not restate the question and do not solve it."),
+		"guessed_index": map[string]any{
+			"type":        "integer",
+			"minimum":     0,
+			"maximum":     numChoices - 1,
+			"description": "which choice you would pick, 0-based, guessing if you must",
+		},
+		"guess_confidence": enum("how sure you are of that guess without any source material", "low", "medium", "high"),
+	}, "interpretable", "reason", "guessed_index", "guess_confidence")
+}
+
+const blindSystem = `You are checking whether an exam question is written clearly. You cannot see
+the material it came from, and that is intentional.
+
+Decide one thing: reading only the question and its choices, is it clear what is
+being asked?
+
+Mark it NOT interpretable when the question:
+- refers to something you cannot see ("the passage", "the figure above", "this
+  process", "the value given")
+- is so general that several different answers would all be reasonable
+- is missing information needed to even understand the task
+- asks about "it" or "they" without ever saying what
+
+Mark it interpretable when a knowledgeable person would understand the task,
+even if they would need to have studied the material to know the answer. Needing
+knowledge is fine. Needing context you were not given is not.
+
+Then, separately, guess which choice is correct and say how confident you are.
+A high-confidence guess with no source material is worth knowing about.`
+
+func BlindSystem() string { return blindSystem }
+
+// SourcedSchema constrains the judge that can read the source.
+func SourcedSchema(numChoices int) map[string]any {
+	return obj(map[string]any{
+		"best_index": map[string]any{
+			"type":        "integer",
+			"minimum":     0,
+			"maximum":     numChoices - 1,
+			"description": "the choice best supported by the passage, 0-based",
+		},
+		"also_defensible": map[string]any{
+			"type":        "array",
+			"description": "0-based indices of any OTHER choices a careful student could also defend from the passage. Empty if there are none.",
+			"items":       map[string]any{"type": "integer", "minimum": 0, "maximum": numChoices - 1},
+		},
+		"reason": str("at most 20 words explaining your pick, and if any other choice is defensible, why. Do not show your working."),
+	}, "best_index", "also_defensible", "reason")
+}
+
+const sourcedSystem = `You are checking an exam question against the passage it was written from.
+
+Do two things:
+1. Using only the passage, pick the choice it best supports.
+2. List any OTHER choices that a careful student could also argue for from the
+   same passage. Be strict here — a question with two defensible answers is a
+   broken question, and finding that is the point of this check. But do not
+   invent objections: if the other three choices are clearly contradicted by the
+   passage, return an empty list.
+
+You are not told which choice the question's author marked correct. Do not try
+to guess it. Judge only against the passage.`
+
+func SourcedSystem() string { return sourcedSystem }
+
+// BlindPrompt renders a question with its source deliberately withheld.
+func BlindPrompt(q Question) string {
+	s := "Question: " + q.Stem + "\n\nChoices:\n"
+	for i, c := range q.Choices {
+		s += fmt.Sprintf("%d. %s\n", i, c.Content)
+	}
+	return s
+}
+
+// SourcedPrompt renders a question together with the chunk it came from.
+func SourcedPrompt(q Question, source string) string {
+	s := "Passage:\n\n" + source + "\n\nQuestion: " + q.Stem + "\n\nChoices:\n"
+	for i, c := range q.Choices {
+		s += fmt.Sprintf("%d. %s\n", i, c.Content)
+	}
+	return s
+}
