@@ -69,11 +69,12 @@ type Fact struct {
 // ComputeFacts runs the tool loop over a chunk and returns the arithmetic that
 // actually checked out. Expressions the evaluator rejects are dropped — the
 // model is told so, and can try again within the remaining rounds.
-func (g *Generator) ComputeFacts(ctx context.Context, c examgen.Chunk) ([]Fact, error) {
-	if !hasDigits(c.Text) {
+func (g *Generator) ComputeFacts(ctx context.Context, c examgen.Chunk, forceCalc bool) ([]Fact, error) {
+	if !forceCalc && !worthCalculating(c.Text) {
 		return nil, nil
 	}
 
+	ctx = WithLabel(ctx, "calc-tool")
 	var arith examgen.Arith
 	msgs := []Message{
 		{Role: "system", Content: factsSystem},
@@ -135,14 +136,38 @@ func FactsBlock(facts []Fact) string {
 	return b.String()
 }
 
-func hasDigits(s string) bool {
-	n := 0
+// worthCalculating decides whether a chunk has arithmetic in it at all.
+//
+// The earlier test — three digits anywhere — passed essentially every page,
+// because page numbers, section numbers and years are digits. The tool loop
+// then spent 40 seconds across a prose document re-reading chunks to produce 16
+// output tokens, all of them "DONE". Requiring several distinct numbers, at
+// least one of which is not a small integer, separates a worked example from a
+// page that merely has "หน้า 3" in the header.
+func worthCalculating(s string) bool {
+	var numbers []string
+	cur := strings.Builder{}
+	flush := func() {
+		if cur.Len() > 0 {
+			numbers = append(numbers, cur.String())
+			cur.Reset()
+		}
+	}
 	for _, r := range s {
-		if unicode.IsDigit(r) {
-			n++
-			if n >= 3 {
-				return true
-			}
+		if unicode.IsDigit(r) || (r == '.' && cur.Len() > 0) {
+			cur.WriteRune(r)
+			continue
+		}
+		flush()
+	}
+	flush()
+
+	if len(numbers) < 3 {
+		return false
+	}
+	for _, n := range numbers {
+		if strings.Contains(n, ".") || len(strings.TrimLeft(n, "0")) >= 3 {
+			return true
 		}
 	}
 	return false

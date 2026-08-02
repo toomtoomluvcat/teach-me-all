@@ -102,10 +102,12 @@ func (q Question) CorrectIndex() int {
 type GateName string
 
 const (
+	GateWellFormed  GateName = "well_formed"
 	GateQuote       GateName = "quote_verbatim"
 	GateBlindAnswer GateName = "answerable_blind"
 	GateSingleValid GateName = "single_defensible"
 	GateArithmetic  GateName = "arithmetic"
+	GateDistinct    GateName = "not_a_duplicate"
 )
 
 // GateResult is the outcome of one check.

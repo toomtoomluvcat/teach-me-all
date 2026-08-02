@@ -105,6 +105,15 @@ func ExtractAuto(path string, from, to int) ([]examgen.Page, string, error) {
 		return popPages, "poppler", nil
 	}
 
+	// Rule 1b — the Go path recovered the letters but lost the spaces between
+	// them. Counting letters cannot see this: "the energy stored" and
+	// "theenergystored" have identical letter counts, so the tie went to the Go
+	// path and a whole textbook came out as one word per paragraph. Word length
+	// is the signal that separates them.
+	if popScore > 0 && spacingBroken(goPages) && !spacingBroken(popPages) {
+		return popPages, "poppler", nil
+	}
+
 	// Rule 2 — Thai belongs to the repairable extractor.
 	if thaiRatio(goPages) > 0.2 || thaiRatio(popPages) > 0.2 {
 		return goPages, "text (thai)", nil
@@ -126,6 +135,33 @@ func letterCount(pages []examgen.Page) int {
 		}
 	}
 	return n
+}
+
+// spacingBroken reports that a mostly-Latin extraction has lost its word
+// breaks. English prose averages around five letters between spaces; text with
+// the spaces stripped out averages far more.
+//
+// Thai is exempt, and must be: it does not put spaces between words at all, so
+// every Thai page would score as broken.
+func spacingBroken(pages []examgen.Page) bool {
+	if len(pages) == 0 || thaiRatio(pages) > 0.2 {
+		return false
+	}
+	var letters, breaks int
+	for _, p := range pages {
+		for _, r := range p.Text {
+			switch {
+			case unicode.IsSpace(r):
+				breaks++
+			case unicode.IsLetter(r):
+				letters++
+			}
+		}
+	}
+	if letters < 200 {
+		return false
+	}
+	return float64(letters)/float64(breaks+1) > 20
 }
 
 func thaiRatio(pages []examgen.Page) float64 {

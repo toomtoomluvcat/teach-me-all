@@ -6,6 +6,7 @@ import (
 	"math"
 	"sort"
 	"strings"
+	"sync"
 )
 
 // Generator is the model-backed half of generation. Kept separate from Judge so
@@ -49,6 +50,18 @@ type Deps struct {
 	Eval     Evaluator
 	Embedder Embedder
 	Log      Progress
+	// Parallel is how many model calls may be in flight at once. Ollama serves
+	// concurrent requests from one loaded model when OLLAMA_NUM_PARALLEL allows
+	// it, and the calls this pipeline makes are independent of each other, so
+	// the wall clock drops without changing a single verdict. 1 disables it.
+	Parallel int
+}
+
+func (d Deps) slots() int {
+	if d.Parallel < 1 {
+		return 1
+	}
+	return d.Parallel
 }
 
 // nonContent is the sentinel the map-step prompt asks for on front matter,
@@ -66,16 +79,50 @@ func BuildOutline(ctx context.Context, chunks []Chunk, d Deps) (*Outline, []Chun
 	}
 
 	// map: chunk -> topics, remembering which chunks produced each topic.
+	//
+	// Every chunk is independent, so this is the easiest place in the pipeline
+	// to run concurrently. Results are collected by index and merged in document
+	// order afterwards, because lesson ordering depends on it.
+	perChunk := make([][]string, len(chunks))
+	var (
+		wg       sync.WaitGroup
+		sem      = make(chan struct{}, d.slots())
+		mu       sync.Mutex
+		done     int
+		firstErr error
+	)
+	for i, c := range chunks {
+		wg.Add(1)
+		go func(i int, c Chunk) {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+
+			topics, err := d.Gen.Topics(ctx, c)
+
+			mu.Lock()
+			defer mu.Unlock()
+			done++
+			if err != nil {
+				if firstErr == nil {
+					firstErr = fmt.Errorf("topics for chunk %s: %w", c.ID, err)
+				}
+				return
+			}
+			perChunk[i] = topics
+			d.Log.report("outline/map", done, len(chunks), fmt.Sprintf("page %d", c.Page))
+		}(i, c)
+	}
+	wg.Wait()
+	if firstErr != nil {
+		return nil, nil, firstErr
+	}
+
 	owners := map[string][]string{} // topic -> chunk IDs
 	var order []string              // topics in first-seen order
 
 	for i, c := range chunks {
-		d.Log.report("outline/map", i+1, len(chunks), fmt.Sprintf("page %d", c.Page))
-		topics, err := d.Gen.Topics(ctx, c)
-		if err != nil {
-			return nil, nil, fmt.Errorf("topics for chunk %s: %w", c.ID, err)
-		}
-		for _, t := range topics {
+		for _, t := range perChunk[i] {
 			t = strings.TrimSpace(t)
 			if t == "" || strings.EqualFold(t, nonContent) {
 				continue
@@ -258,6 +305,10 @@ func GenerateExam(ctx context.Context, outline *Outline, lesson Lesson, chunks [
 	pool := append(append([]Chunk{}, primary...), siblings...)
 	toppedUp := map[string]bool{}
 
+	// acceptedVecs runs in lockstep with res.Passed so the duplicate check can
+	// compare against everything already in the exam.
+	var acceptedVecs [][]float32
+
 	for _, c := range pool {
 		if len(res.Passed) >= budget || res.ChunkVisits >= opt.MaxChunkVisits {
 			break
@@ -277,13 +328,20 @@ func GenerateExam(ctx context.Context, outline *Outline, lesson Lesson, chunks [
 
 		for _, q := range qs {
 			q.ChunkID = c.ID
-			rep, err := RunGates(ctx, q, c, d.Judge, d.Eval)
-			if err != nil {
+
+			// Cheap checks and the duplicate check first, judges last. Embedding
+			// one stem costs milliseconds; two judge calls cost seconds. On a
+			// measured run the duplicate check alone rejected 7 of 16, and every
+			// one of those had already been through both judges.
+			rep := RunCheapGates(q, c, d.Eval)
+			vec := stemVector(ctx, q, d)
+			rep.add(gateDistinct(q, res.Passed, vec, acceptedVecs))
+			if err := AddJudgeGates(ctx, rep, q, c, d.Judge); err != nil {
 				return nil, err
 			}
 			q.Report = rep
 			res.Questions = append(res.Questions, q)
-			keep(res, q, c, lesson, lessonName, toppedUp)
+			keep(res, q, c, lesson, lessonName, toppedUp, vec, &acceptedVecs)
 			d.Log.report("gate", len(res.Passed), budget, gateNote(rep))
 
 			// A question rejected only by Go — a misquote or arithmetic that
@@ -305,8 +363,10 @@ func GenerateExam(ctx context.Context, outline *Outline, lesson Lesson, chunks [
 			}
 			fixed.ChunkID = c.ID
 			fixed.Attempt = q.Attempt + 1
-			frep, err := RunGates(ctx, fixed, c, d.Judge, d.Eval)
-			if err != nil {
+			frep := RunCheapGates(fixed, c, d.Eval)
+			fvec := stemVector(ctx, fixed, d)
+			frep.add(gateDistinct(fixed, res.Passed, fvec, acceptedVecs))
+			if err := AddJudgeGates(ctx, frep, fixed, c, d.Judge); err != nil {
 				return nil, err
 			}
 			fixed.Report = frep
@@ -314,7 +374,7 @@ func GenerateExam(ctx context.Context, outline *Outline, lesson Lesson, chunks [
 			if frep.Passed() {
 				res.RepairsAccepted++
 			}
-			keep(res, fixed, c, lesson, lessonName, toppedUp)
+			keep(res, fixed, c, lesson, lessonName, toppedUp, fvec, &acceptedVecs)
 			d.Log.report("repair", len(res.Passed), budget, gateNote(frep))
 		}
 	}
@@ -323,13 +383,28 @@ func GenerateExam(ctx context.Context, outline *Outline, lesson Lesson, chunks [
 	return res, nil
 }
 
+// stemVector embeds a question stem for the duplicate check. Returns nil when
+// no embedder is configured or the call fails — the check then falls back to
+// literal text comparison rather than blocking the run.
+func stemVector(ctx context.Context, q Question, d Deps) []float32 {
+	if d.Embedder == nil || strings.TrimSpace(q.Stem) == "" {
+		return nil
+	}
+	vecs, err := d.Embedder.Embed(ctx, []string{q.Stem})
+	if err != nil || len(vecs) != 1 {
+		return nil
+	}
+	return vecs[0]
+}
+
 // keep records a question that survived every gate, and notes when it came
 // from a lesson other than the one being generated for.
-func keep(res *ExamResult, q Question, c Chunk, lesson Lesson, lessonName map[string]string, toppedUp map[string]bool) {
+func keep(res *ExamResult, q Question, c Chunk, lesson Lesson, lessonName map[string]string, toppedUp map[string]bool, vec []float32, vecs *[][]float32) {
 	if q.Report == nil || !q.Report.Passed() {
 		return
 	}
 	res.Passed = append(res.Passed, q)
+	*vecs = append(*vecs, vec)
 
 	if c.LessonID == lesson.ID || toppedUp[c.LessonID] {
 		return

@@ -82,7 +82,7 @@ func ExtractOCR(ctx context.Context, c *llm.Client, model, path string, from, to
 		// document structure.
 		opt := &llm.Options{NumCtx: 8192, Temperature: 0.1, TopP: 0.6, RepeatPenalty: 1.1}
 
-		text, err := c.Chat(ctx, model, msgs, opt)
+		text, err := c.Chat(llm.WithLabel(ctx, "ocr"), model, msgs, opt)
 		if err != nil {
 			return nil, fmt.Errorf("ocr page %d: %w", i, err)
 		}

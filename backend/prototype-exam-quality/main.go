@@ -41,6 +41,7 @@ type config struct {
 	extractOnly bool
 	repair      bool
 	calcTool    bool
+	parallel    int
 }
 
 func main() {
@@ -48,7 +49,12 @@ func main() {
 	flag.StringVar(&cfg.pdfPath, "pdf", "", "path to the source PDF (required)")
 	flag.StringVar(&cfg.extract, "extract", "auto", "extraction mode: auto | text | poppler | ocr")
 	flag.StringVar(&cfg.model, "model", "scb10x/typhoon2.5-qwen3-4b", "generation and judge model")
-	flag.StringVar(&cfg.embedModel, "embed-model", "nomic-embed-text", "embedding model, empty to disable ranking")
+	// bge-m3, not nomic-embed-text. Measured on Thai question pairs,
+	// nomic returns cosine 1.0000 for every pair in the same chapter whether
+	// they are the same question or not — no threshold separates them, and
+	// chunk ranking built on it is random. bge-m3 scores duplicates at 0.95+
+	// and different questions at 0.60, a usable gap of 0.31.
+	flag.StringVar(&cfg.embedModel, "embed-model", "bge-m3", "embedding model, empty to disable ranking")
 	flag.StringVar(&cfg.ocrModel, "ocr-model", "scb10x/typhoon-ocr1.5-3b", "vision model used by --extract=ocr")
 	flag.StringVar(&cfg.host, "host", "http://localhost:11434", "Ollama host")
 	flag.BoolVar(&cfg.forceCalc, "force-calc", false, "generate calculation questions only")
@@ -59,6 +65,7 @@ func main() {
 	flag.BoolVar(&cfg.extractOnly, "extract-only", false, "stop after extraction; needs no models and no Ollama")
 	flag.BoolVar(&cfg.repair, "repair", false, "send questions rejected by a deterministic gate back to the model once (measured worthless on 4B)")
 	flag.BoolVar(&cfg.calcTool, "calc-tool", true, "let the model use a calculator tool before writing calculation questions")
+	flag.IntVar(&cfg.parallel, "parallel", 4, "model calls in flight at once; needs OLLAMA_NUM_PARALLEL to match")
 	flag.Parse()
 
 	if cfg.pdfPath == "" {
@@ -147,10 +154,11 @@ func run(ctx context.Context, cfg config) error {
 	gen.UseCalcTool = cfg.calcTool
 
 	deps := examgen.Deps{
-		Gen:   gen,
-		Judge: llm.NewJudge(client, cfg.model),
-		Eval:  examgen.Arith{},
-		Log:   examgen.Progress(renderProgress),
+		Gen:      gen,
+		Judge:    llm.NewJudge(client, cfg.model),
+		Eval:     examgen.Arith{},
+		Log:      examgen.Progress(safeProgress()),
+		Parallel: cfg.parallel,
 	}
 	if cfg.embedModel != "" {
 		deps.Embedder = llm.NewEmbedder(client, cfg.embedModel)
@@ -210,6 +218,9 @@ func run(ctx context.Context, cfg config) error {
 
 		if err := review(in, res); err != nil {
 			return err
+		}
+		if r := client.Stats.Report(); r != "" {
+			fmt.Printf("\n%swhere the time went%s\n%s", bold, reset, r)
 		}
 		if err := writeRun(cfg, res); err != nil {
 			return err

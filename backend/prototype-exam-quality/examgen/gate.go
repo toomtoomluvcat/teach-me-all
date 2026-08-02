@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 	"strings"
+	"sync"
 )
 
 // BlindVerdict is what a judge reports when it sees only the question — no
@@ -76,29 +77,67 @@ const arithmeticTolerance = 1e-6
 // It never returns an error for a failing question — failure is data. It
 // returns an error only when the judge itself is unreachable.
 func RunGates(ctx context.Context, q Question, chunk Chunk, j Judge, ev Evaluator) (*GateReport, error) {
-	rep := &GateReport{}
+	rep := RunCheapGates(q, chunk, ev)
+	if err := AddJudgeGates(ctx, rep, q, chunk, j); err != nil {
+		return nil, err
+	}
+	return rep, nil
+}
 
+// RunCheapGates runs everything Go can decide by itself. No model, no network,
+// microseconds.
+func RunCheapGates(q Question, chunk Chunk, ev Evaluator) *GateReport {
+	rep := &GateReport{}
+	rep.add(gateWellFormed(q))
 	rep.add(gateQuote(q, chunk))
 	rep.add(gateArithmetic(q, ev))
+	return rep
+}
+
+// AddJudgeGates appends the two model-backed verdicts — but only if nothing
+// deterministic has already rejected the question.
+//
+// This ordering is the cheapest optimisation available. The judges are 45% of
+// wall clock, and on a measured run 7 questions were duplicates and 4 misquoted
+// the source; every one of those was sent to two judges anyway, purely to
+// confirm a verdict Go had already reached. A question that fails a check Go is
+// certain about cannot be rescued by a judge that likes it.
+func AddJudgeGates(ctx context.Context, rep *GateReport, q Question, chunk Chunk, j Judge) error {
+	if len(rep.Failures()) > 0 {
+		rep.add(GateResult{Gate: GateBlindAnswer, Pass: true, Reason: "not asked — already rejected by a deterministic check"})
+		rep.add(GateResult{Gate: GateSingleValid, Pass: true, Reason: "not asked — already rejected by a deterministic check"})
+		return nil
+	}
+
+	// The two judges answer different questions from different inputs — one is
+	// deliberately blind to the source — so neither depends on the other and
+	// they run at the same time. Ollama serves both from the one loaded model.
+	var (
+		wg               sync.WaitGroup
+		blind            BlindVerdict
+		sourced          SourcedVerdict
+		blindErr, srcErr error
+	)
+	wg.Add(2)
+	go func() { defer wg.Done(); blind, blindErr = j.JudgeBlind(ctx, q) }()
+	go func() { defer wg.Done(); sourced, srcErr = j.JudgeAgainstSource(ctx, q, chunk.Text) }()
+	wg.Wait()
 
 	// A judge that fails to answer costs the question, not the run. Twenty
 	// minutes of generation should not be lost because one reply came back
 	// malformed; the failure is recorded on the question where it can be read.
-	blind, err := j.JudgeBlind(ctx, q)
-	if err != nil {
-		rep.add(GateResult{Gate: GateBlindAnswer, Reason: "judge did not answer: " + err.Error()})
+	if blindErr != nil {
+		rep.add(GateResult{Gate: GateBlindAnswer, Reason: "judge did not answer: " + blindErr.Error()})
 	} else {
 		rep.add(gateInterpretable(q, blind))
 	}
-
-	sourced, err := j.JudgeAgainstSource(ctx, q, chunk.Text)
-	if err != nil {
-		rep.add(GateResult{Gate: GateSingleValid, Reason: "judge did not answer: " + err.Error()})
+	if srcErr != nil {
+		rep.add(GateResult{Gate: GateSingleValid, Reason: "judge did not answer: " + srcErr.Error()})
 	} else {
 		rep.add(gateSingleDefensible(q, sourced))
 	}
 
-	return rep, nil
+	return nil
 }
 
 // gateQuote is deterministic: the quote the model attributed to the source has

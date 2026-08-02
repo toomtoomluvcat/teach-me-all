@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"sync"
 
 	"protoexam/examgen"
 )
@@ -174,6 +175,20 @@ func renderSummary(res *examgen.ExamResult) {
 	failures := res.FailuresByGate()
 	if len(failures) > 0 {
 		fmt.Printf("\n%sfailures by gate%s  %s(aim the next prompt change at the biggest one)%s\n", bold, reset, dim, reset)
+		// Read determinism off the results rather than keeping a second list of
+		// which gates are which — that list drifts the moment a gate is added.
+		deterministic := map[examgen.GateName]bool{}
+		for _, q := range res.Questions {
+			if q.Report == nil {
+				continue
+			}
+			for _, r := range q.Report.Results {
+				if r.Deterministic {
+					deterministic[r.Gate] = true
+				}
+			}
+		}
+
 		names := make([]examgen.GateName, 0, len(failures))
 		for g := range failures {
 			names = append(names, g)
@@ -181,7 +196,7 @@ func renderSummary(res *examgen.ExamResult) {
 		sort.Slice(names, func(a, b int) bool { return failures[names[a]] > failures[names[b]] })
 		for _, g := range names {
 			trust := dim + "judge — advisory" + reset
-			if g == examgen.GateQuote || g == examgen.GateArithmetic {
+			if deterministic[g] {
 				trust = dim + "go — deterministic" + reset
 			}
 			fmt.Printf("  %-20s %3d   %s\n", g, failures[g], trust)
@@ -192,6 +207,17 @@ func renderSummary(res *examgen.ExamResult) {
 	fmt.Printf("%sWrite what you conclude into VERDICT.md — that is what closes this prototype.%s\n", dim, reset)
 
 	keys("enter", "back to questions", "q", "quit")
+}
+
+// safeProgress serialises progress writes. Once the pipeline runs calls
+// concurrently, several goroutines reach for the same terminal line.
+func safeProgress() examgen.Progress {
+	var mu sync.Mutex
+	return func(stage string, done, total int, note string) {
+		mu.Lock()
+		defer mu.Unlock()
+		renderProgress(stage, done, total, note)
+	}
 }
 
 func renderProgress(stage string, done, total int, note string) {

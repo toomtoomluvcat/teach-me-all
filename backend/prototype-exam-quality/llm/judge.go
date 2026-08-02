@@ -21,25 +21,34 @@ type Judge struct {
 func NewJudge(c *Client, model string) *Judge { return &Judge{c: c, model: model} }
 
 func (j *Judge) JudgeBlind(ctx context.Context, q examgen.Question) (examgen.BlindVerdict, error) {
+	ctx = WithLabel(ctx, "judge/blind")
 	var v examgen.BlindVerdict
 	msgs := []Message{
 		{Role: "system", Content: examgen.BlindSystem()},
 		{Role: "user", Content: examgen.BlindPrompt(q)},
 	}
-	// 8192 rather than 4096: a 4B model narrates its reasoning into the reason
-	// field even when told not to, and a truncated reply is unparseable JSON
-	// rather than a bad verdict — the run dies instead of the question failing.
-	err := j.c.ChatJSON(ctx, j.model, msgs, examgen.BlindSchema(len(q.Choices)), genOptions(8192, 0), &v)
+	// This judge never sees the source, so its prompt is a few hundred tokens
+	// and 4096 is ample. The cap on output is what matters here: unbounded, the
+	// model writes an essay into the reason field and the reply overruns.
+	opt := genOptions(4096, 0)
+	opt.NumPredict = 400
+	err := j.c.ChatJSON(ctx, j.model, msgs, examgen.BlindSchema(len(q.Choices)), opt, &v)
 	return v, err
 }
 
 func (j *Judge) JudgeAgainstSource(ctx context.Context, q examgen.Question, source string) (examgen.SourcedVerdict, error) {
+	ctx = WithLabel(ctx, "judge/source")
 	var v examgen.SourcedVerdict
 	msgs := []Message{
 		{Role: "system", Content: examgen.SourcedSystem()},
 		{Role: "user", Content: examgen.SourcedPrompt(q, source)},
 	}
-	err := j.c.ChatJSON(ctx, j.model, msgs, examgen.SourcedSchema(len(q.Choices)), genOptions(12288, 0), &v)
+	// 8192 covers a chunk plus the question. 12288 was oversized: a larger
+	// window costs KV cache on a 6 GB card and buys nothing when the prompt
+	// measures a couple of thousand tokens.
+	opt := genOptions(8192, 0)
+	opt.NumPredict = 400
+	err := j.c.ChatJSON(ctx, j.model, msgs, examgen.SourcedSchema(len(q.Choices)), opt, &v)
 	return v, err
 }
 

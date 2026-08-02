@@ -14,16 +14,18 @@ import (
 
 // Client talks to a local Ollama server.
 type Client struct {
-	Host string
-	HTTP *http.Client
+	Host  string
+	HTTP  *http.Client
+	Stats *Stats
 }
 
 // New builds a client with a timeout long enough for CPU-assisted generation on
 // a laptop, which is the machine this prototype targets.
 func New(host string) *Client {
 	return &Client{
-		Host: strings.TrimRight(host, "/"),
-		HTTP: &http.Client{Timeout: 10 * time.Minute},
+		Host:  strings.TrimRight(host, "/"),
+		HTTP:  &http.Client{Timeout: 10 * time.Minute},
+		Stats: NewStats(),
 	}
 }
 
@@ -61,7 +63,11 @@ type ToolFunction struct {
 // Options are the sampling and context knobs. Left as a struct rather than a
 // map so a typo is a compile error.
 type Options struct {
-	NumCtx        int     `json:"num_ctx,omitempty"`
+	NumCtx int `json:"num_ctx,omitempty"`
+	// NumPredict bounds the reply. A small model asked for a one-line verdict
+	// will narrate its whole reasoning into the field unless stopped; measured,
+	// the blind judge averaged 193 output tokens for a verdict needing about 30.
+	NumPredict    int     `json:"num_predict,omitempty"`
 	Temperature   float64 `json:"temperature"`
 	TopP          float64 `json:"top_p,omitempty"`
 	RepeatPenalty float64 `json:"repeat_penalty,omitempty"`
@@ -85,6 +91,14 @@ type chatResponse struct {
 	Message Message `json:"message"`
 	Done    bool    `json:"done"`
 	Error   string  `json:"error"`
+
+	// All durations are nanoseconds.
+	TotalDuration      int64 `json:"total_duration"`
+	LoadDuration       int64 `json:"load_duration"`
+	PromptEvalCount    int   `json:"prompt_eval_count"`
+	PromptEvalDuration int64 `json:"prompt_eval_duration"`
+	EvalCount          int   `json:"eval_count"`
+	EvalDuration       int64 `json:"eval_duration"`
 }
 
 // ChatJSON runs one non-streaming chat turn constrained to a JSON schema and
@@ -160,6 +174,7 @@ func (c *Client) ChatTools(ctx context.Context, model string, msgs []Message, to
 	if err := c.post(ctx, "/api/chat", req, &resp); err != nil {
 		return Message{}, err
 	}
+	c.Stats.add(labelOf(ctx), &resp)
 	if resp.Error != "" {
 		return Message{}, fmt.Errorf("ollama: %s", resp.Error)
 	}
@@ -183,6 +198,7 @@ func (c *Client) chat(ctx context.Context, model string, msgs []Message, schema 
 	if err := c.post(ctx, "/api/chat", req, &resp); err != nil {
 		return "", err
 	}
+	c.Stats.add(labelOf(ctx), &resp)
 	if resp.Error != "" {
 		return "", fmt.Errorf("ollama: %s", resp.Error)
 	}

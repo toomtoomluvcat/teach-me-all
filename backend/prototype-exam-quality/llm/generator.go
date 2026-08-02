@@ -31,6 +31,7 @@ func genOptions(numCtx int, temp float64) *Options {
 }
 
 func (g *Generator) Topics(ctx context.Context, c examgen.Chunk) ([]string, error) {
+	ctx = WithLabel(ctx, "outline/map")
 	var out struct {
 		Topics []string `json:"topics"`
 	}
@@ -45,6 +46,7 @@ func (g *Generator) Topics(ctx context.Context, c examgen.Chunk) ([]string, erro
 }
 
 func (g *Generator) Outline(ctx context.Context, topics []string) (*examgen.Outline, []examgen.LessonTopics, error) {
+	ctx = WithLabel(ctx, "outline/reduce")
 	var out struct {
 		CourseTitle string `json:"course_title"`
 		Lessons     []struct {
@@ -89,11 +91,13 @@ func (g *Generator) Questions(ctx context.Context, lessonTitle string, c examgen
 	var out struct {
 		Questions []examgen.Question `json:"questions"`
 	}
+	genCtx := WithLabel(ctx, "generate")
+
 	// Phase A: let the model do its arithmetic with a real calculator before it
 	// writes anything. See calctool.go for why this beats correcting it after.
 	user := examgen.QuestionPrompt(lessonTitle, c, want, forceCalc)
 	if g.UseCalcTool {
-		facts, err := g.ComputeFacts(ctx, c)
+		facts, err := g.ComputeFacts(ctx, c, forceCalc)
 		if err != nil {
 			return nil, fmt.Errorf("calc tool: %w", err)
 		}
@@ -108,7 +112,7 @@ func (g *Generator) Questions(ctx context.Context, lessonTitle string, c examgen
 	}
 	// A little temperature here: at 0 the model writes the same question from
 	// every chunk that looks alike.
-	if err := g.c.ChatJSON(ctx, g.model, msgs, examgen.QuestionSchema(forceCalc), genOptions(8192, 0.3), &out); err != nil {
+	if err := g.c.ChatJSON(genCtx, g.model, msgs, examgen.QuestionSchema(forceCalc), genOptions(8192, 0.3), &out); err != nil {
 		return nil, err
 	}
 
@@ -122,6 +126,7 @@ func (g *Generator) Questions(ctx context.Context, lessonTitle string, c examgen
 }
 
 func (g *Generator) Repair(ctx context.Context, q examgen.Question, c examgen.Chunk, failures []examgen.GateResult, forceCalc bool) (examgen.Question, bool, error) {
+	ctx = WithLabel(ctx, "repair")
 	var out struct {
 		Questions []examgen.Question `json:"questions"`
 	}

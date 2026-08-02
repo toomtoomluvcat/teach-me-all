@@ -149,6 +149,71 @@ The arithmetic gate stays either way. It costs nothing, and an expression stored
 in the database can be re-verified in five years, which a tool call that already
 happened cannot.
 
+## Reading the questions changed the number
+
+14 questions that passed all four original gates were read by hand. Five were
+outright broken: a stem truncated mid-word with no question in it, a correct
+choice that was the stem repeated verbatim, a corrupted token inside a Thai word
+("สร้างสรningerช่วย"), two questions with two defensible answers, and a
+calculation question whose four options each restated the scenario so the answer
+could be found by matching numbers. **By eye, 3 of 14 were good.** The blind
+judge had called every one of them interpretable.
+
+So seven deterministic checks were added — no model call, all of them string
+work: stem must contain a question word, no choice may repeat the stem, no
+mojibake, choices must be distinct, choice lengths must be comparable, no
+"according to the passage", and no set of choices that all restate the question.
+Replayed over those same 14, they reject exactly the five broken ones plus two
+using forbidden self-reference, and leave the seven reasonable ones alone.
+
+Getting there required backing out one bad rule of my own: "all choices share a
+long substring" flagged two *well-written* questions whose Thai options all
+began "ความสามารถในการ". That is parallel construction, which is good practice.
+The discriminating property is choices echoing the **stem**, not resembling each
+other.
+
+## The embedding model could not read Thai at all
+
+The duplicate-question check rejected 7 of 16 on its first live run, which looked
+like a great catch until the reasons were read: it was scoring completely
+unrelated Thai questions at 95% similarity. Measured directly, one pair per row:
+
+| pair | nomic-embed-text | bge-m3 |
+|---|---|---|
+| identical wording | 1.0000 | 1.0000 |
+| same question, reworded | 1.0000 | 0.9527 |
+| different questions, same chapter | **1.0000** | 0.5953 |
+| different questions, same chapter (2) | **1.0000** | 0.6388 |
+| unrelated topics | 0.5311 | 0.2925 |
+| English control, different | 0.4249 | 0.3251 |
+| **usable gap** | **0.0000** | **+0.3140** |
+
+`nomic-embed-text` returns 1.0000 for every pair of Thai sentences from the same
+chapter regardless of meaning. No threshold can work against that.
+
+This mattered well beyond the duplicate gate: the same embedder ranks chunks
+before generation and backs `--scope`. **Chunk ranking on Thai had been random
+this whole time.** Default is now `bge-m3`.
+
+## Where the time goes — it is the call count, not the GPU
+
+| call | count | total | share | out tok | tok/s |
+|---|---|---|---|---|---|
+| generate | 8 | 2m15s | 42% | 6978 | 53.4 |
+| judge/source | 8 | 1m29s | 28% | 1093 | 41.2 |
+| judge/blind | 9 | 55s | 17% | 1738 | 54.3 |
+| calc-tool | 8 | 40s | 13% | 16 | 75.9 |
+| **total** | **33** | **5m19s** | | | |
+
+53 tok/s is what a 4B Q4 does when it is entirely in VRAM; a model spilling to
+system RAM runs in the low single digits. There was no model-load time either.
+So 6 GB is not the constraint — the two judges are, at 45% of wall clock
+combined.
+
+Running the structural checks first and returning early already halves that:
+16 questions produced only 8–9 judge pairs instead of 16, because the broken
+ones never reach a model.
+
 ## Still open
 
 1. **The human half.** Nobody has read 20 passing questions and judged them, and
