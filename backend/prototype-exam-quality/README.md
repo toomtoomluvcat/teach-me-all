@@ -68,6 +68,12 @@ will have to do anyway. Building it here is not throwaway work.
 - Gemini is also supported through the Gemini REST API. Set `GEMINI_API_KEY`
   before running; the default Gemini models are `gemini-2.5-flash` and
   `gemini-embedding-001`.
+- DeepSeek is supported through its OpenAI-compatible chat API. Set
+  `DEEPSEEK_API_KEY` before running; the default model is `deepseek-chat`.
+  DeepSeek has no embeddings endpoint here, so duplicate/ranking embeddings are
+  disabled for this provider.
+- The CLI also loads the nearest `.env` from the working directory or its
+  parents. Already-exported environment variables take precedence.
 - For `--extract=ocr`: `pdftoppm` (poppler) on PATH to rasterize pages.
 
 Target machine is 6 GB VRAM, so models are loaded and unloaded one at a time.
@@ -82,8 +88,13 @@ go run . --pdf ../../samples/algebra-en.pdf
 Gemini example (PowerShell):
 
 ```powershell
-$env:GEMINI_API_KEY = "your-key"
 go run . --provider gemini --pdf ../../samples/algebra-en.pdf
+```
+
+DeepSeek example:
+
+```powershell
+.\protoexam.exe --provider deepseek --pdf ..\..\samples\algebra-en.pdf
 ```
 
 Flags:
@@ -91,14 +102,17 @@ Flags:
 | Flag | Default | Meaning |
 |------|---------|---------|
 | `--pdf` | *(required)* | source PDF |
-| `--provider` | `ollama` | `ollama` or `gemini` |
+| `--provider` | `ollama` | `ollama`, `gemini`, or `deepseek` |
 | `--extract` | `auto` | `auto` picks per document, `text` = ledongthuc/pdf, `poppler` = pdftotext, `ocr` = rasterise + typhoon-ocr |
 | `--calc-tool` | `true` | model calls a calculator before writing calculation questions. Took arithmetic failures from 5 to 0 — see VERDICT.md |
 | `--repair` | `false` | hand rejected questions back with the discrepancy. Measured worthless on 4B |
-| `--model` | provider default | generation + judge model; Ollama defaults to `scb10x/typhoon2.5-qwen3-4b`, Gemini to `gemini-2.5-flash` |
-| `--embed-model` | provider default | Ollama `bge-m3`, Gemini `gemini-embedding-001`; pass an explicit empty value to disable ranking |
+| `--model` | provider default | generation + judge model; Ollama defaults to `scb10x/typhoon2.5-qwen3-4b`, Gemini to `gemini-2.5-flash`, DeepSeek to `deepseek-chat` |
+| `--embed-model` | provider default | Ollama `bge-m3`, Gemini `gemini-embedding-001`, DeepSeek disabled; pass an explicit empty value to disable ranking |
 | `--gemini-host` | `https://generativelanguage.googleapis.com` | Gemini API host |
 | `--gemini-api-key` | `GEMINI_API_KEY` | Gemini API key; the flag is useful for one-off runs |
+| `--gemini-min-interval` | `13s` | minimum delay between Gemini requests; conservative for a 5-RPM free-tier project, pass `0s` to disable |
+| `--deepseek-host` | `https://api.deepseek.com` | DeepSeek API host |
+| `--deepseek-api-key` | `DEEPSEEK_API_KEY` | DeepSeek API key; the flag is useful for one-off runs |
 | `--force-calc` | `false` | only generate calculation questions |
 | `--pages` | all | page range, e.g. `10-40` |
 | `--fresh` | `false` | ignore the cache and redo extraction/embedding |
@@ -118,9 +132,16 @@ It writes the whole extracted text to `.scratch/<hash>/extracted.txt`. Read it.
 Extraction and embedding are cached under `.scratch/` (gitignored) because they are
 slow and rerunning them while iterating on prompts is a waste.
 
+For Gemini and DeepSeek, pass 1 maps all chunks in one structured request, then
+uses one reduce request. This changes `outline/map` from one call per chunk to
+one call for the whole document; if a provider omits a chunk, only that chunk
+is retried individually. The rest of the pipeline still reports its own calls.
+The default 13-second spacing is only applied to Gemini. Use `--fresh` when you
+want to regenerate a cached outline after changing provider or prompts.
+
 At the end of every process, including one that exits after an API error, the run
-prints a cumulative call report. With the Gemini provider, `TOTAL` is the exact
-number of Gemini HTTP requests attempted by the process, including retries and
+prints a cumulative call report. With Gemini or DeepSeek, `TOTAL` is the exact
+number of provider HTTP requests attempted by the process, including retries and
 429/5xx responses. The `embed` row counts batch embedding requests, not
 individual texts; the other rows identify the pipeline stage (`outline/map`,
 `outline/reduce`, `generate`, `judge/*`, `repair`, and `calc-tool`).

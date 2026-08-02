@@ -19,9 +19,9 @@ type Client struct {
 	Stats *Stats
 }
 
-// ModelClient is the small provider surface the exam pipeline needs. Both the
-// local Ollama client and the remote Gemini client implement it, so provider
-// choice does not leak into examgen or the prompt adapters.
+// ModelClient is the small provider surface the exam pipeline needs. Ollama,
+// Gemini, and DeepSeek implement it, so provider choice does not leak into
+// examgen or the prompt adapters.
 type ModelClient interface {
 	ChatJSON(ctx context.Context, model string, msgs []Message, schema any, opt *Options, out any) error
 	Chat(ctx context.Context, model string, msgs []Message, opt *Options) (string, error)
@@ -42,15 +42,17 @@ func New(host string) *Client {
 // Message is one chat turn. Images carry base64-encoded image data for vision
 // models and is omitted for text models.
 type Message struct {
-	Role      string     `json:"role"`
-	Content   string     `json:"content"`
-	Images    []string   `json:"images,omitempty"`
-	ToolCalls []ToolCall `json:"tool_calls,omitempty"`
-	ToolName  string     `json:"tool_name,omitempty"`
+	Role       string     `json:"role"`
+	Content    string     `json:"content"`
+	Images     []string   `json:"images,omitempty"`
+	ToolCalls  []ToolCall `json:"tool_calls,omitempty"`
+	ToolName   string     `json:"tool_name,omitempty"`
+	ToolCallID string     `json:"tool_call_id,omitempty"`
 }
 
 // ToolCall is one function invocation the model asked for.
 type ToolCall struct {
+	ID       string `json:"id,omitempty"`
 	Function struct {
 		Name      string         `json:"name"`
 		Arguments map[string]any `json:"arguments"`

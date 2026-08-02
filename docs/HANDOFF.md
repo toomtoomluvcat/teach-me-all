@@ -118,8 +118,21 @@ committed.
   behind the same `ModelClient` interface. Use `--provider gemini` with
   `GEMINI_API_KEY`; the report labels itself and `TOTAL` is the exact number of
   Gemini HTTP requests attempted by the process, including retries and failed
-  responses. OCR remains Ollama-only. Live smoke testing reached 5 successful
-  `outline/map` calls before the configured Gemini free-tier quota returned 429.
+  responses. OCR remains Ollama-only. Live smoke testing completed the map pass
+  before the configured Gemini free-tier quota returned 429 on reduce.
+- `examgen/pipeline.go`, `examgen/prompt.go`, and `llm/topic_batch.go` — Gemini
+  maps all chunks in one structured pass-1 request instead of one request per
+  chunk. The CLI also spaces Gemini requests by 13 seconds by default and
+  retries one 429 using the server's retry hint; Ollama is unchanged.
+- `llm/deepseek.go`, `llm/topic_batch.go`, and `llm/deepseek_test.go` — added
+  DeepSeek's OpenAI-compatible chat provider (`--provider deepseek`) with JSON
+  mode, function calling, batched pass-1 mapping, and call-count reporting.
+  DeepSeek embeddings are intentionally disabled; set `DEEPSEEK_API_KEY` in
+  `.env`. Because DeepSeek JSON mode does not enforce the supplied schema, the
+  batch mapper now retries only omitted chunks individually and the prompts
+  spell out the exact JSON shape for both mapping and question generation.
+  `Calculation.Expected` also accepts a strictly numeric quoted value from a
+  hosted model, but rejects units and other prose before the arithmetic gate.
 - `backend/prototype-exam-quality/README.md` — Gemini setup, flags, and call
   report semantics.
 
@@ -142,6 +155,12 @@ committed.
 - **Tools and a `format` JSON schema are mutually exclusive in Ollama.** With
   both set the grammar wins, no tool call is emitted, and the model quietly
   answers from its own head. Generation is two turns because of this.
+- **DeepSeek JSON mode is syntax-only.** On the first live run it omitted map
+  results and returned legacy question fields (`question`, `correct_index`, and
+  string choices); explicit shape instructions fixed the next run. The second
+  live run mapped 13 chunks in one `outline/map` call, reduced in one call, and
+  completed the selected lesson with 6 total provider calls (one generation
+  retry was needed). The fallback remains for regressions in provider output.
 - **Correcting a 4B model does not work; preventing the error does.** The repair
   loop repaired 0 of 4, twice. The calculator tool took arithmetic failures from
   5 to 0 on the same document.

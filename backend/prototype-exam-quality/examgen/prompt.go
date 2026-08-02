@@ -34,16 +34,20 @@ func enum(desc string, values ...string) map[string]any {
 
 // --- pass 1: map ------------------------------------------------------------
 
+func topicListSchema() map[string]any {
+	return map[string]any{
+		"type":        "array",
+		"minItems":    1,
+		"maxItems":    3,
+		"description": "the distinct teaching topics this passage covers",
+		"items":       str("a short topic title, in the same language as the passage"),
+	}
+}
+
 // TopicSchema is what the model returns for a single chunk during the map step.
 func TopicSchema() map[string]any {
 	return obj(map[string]any{
-		"topics": map[string]any{
-			"type":        "array",
-			"minItems":    1,
-			"maxItems":    3,
-			"description": "the distinct teaching topics this passage covers",
-			"items":       str("a short topic title, in the same language as the passage"),
-		},
+		"topics": topicListSchema(),
 	}, "topics")
 }
 
@@ -63,6 +67,47 @@ func TopicPrompt(c Chunk) string {
 }
 
 func TopicSystem() string { return topicSystem }
+
+// TopicBatchSchema is the batched-provider map response. Keeping chunk_id in the
+// response lets the provider return results in any order while the pipeline
+// still restores document order deterministically.
+func TopicBatchSchema() map[string]any {
+	return obj(map[string]any{
+		"chunks": map[string]any{
+			"type":     "array",
+			"minItems": 1,
+			"items": obj(map[string]any{
+				"chunk_id": str("the exact chunk ID supplied in the input"),
+				"topics":   topicListSchema(),
+			}, "chunk_id", "topics"),
+		},
+	}, "chunks")
+}
+
+func TopicBatchSystem() string {
+	return topicSystem + `
+
+You will receive multiple labelled passages in one request. Return exactly one
+result for every chunk_id. Copy each chunk_id character for character. Do not
+merge chunks, skip chunks, or put topics from one chunk under another chunk. If
+a passage has no teaching content, still return its chunk_id with topics set to
+["NON_CONTENT"]. Return exactly this JSON shape, with no other top-level keys:
+{"chunks":[{"chunk_id":"p30-c0","topics":["topic title"]}]}. This is
+only a shape example: use every actual chunk_id supplied below. Count the
+objects before answering; the number must equal the number of passages.`
+}
+
+// TopicBatchPrompt renders all map chunks into one provider request. This is
+// intentionally separate from TopicPrompt: Ollama keeps its measured one-call
+// per chunk path, while hosted providers use their larger context windows to
+// save calls.
+func TopicBatchPrompt(chunks []Chunk) string {
+	var b strings.Builder
+	for _, c := range chunks {
+		fmt.Fprintf(&b, "Chunk %s (page %d):\n\n%s\n\n", c.ID, c.Page, c.Text)
+	}
+	return b.String()
+}
 
 // --- pass 1: reduce ---------------------------------------------------------
 
@@ -179,12 +224,18 @@ For calculation questions:
   calculation.expression as a plain expression and put the result you believe
   it produces in calculation.expected. The expression will be evaluated
   independently and your question is discarded if it disagrees.
+- calculation.expected must be a bare JSON number — not a quoted string and
+  not a number with a unit.
 - The correct choice must contain that computed number.
 - Every number in the expression must come from the passage or from the stem.
   Do not invent inputs.
 
 Write fewer, better questions. A passage that supports two good questions gets
-two questions, not six padded ones.`
+two questions, not six padded ones.
+
+Return exactly this JSON shape. Do not use a field named "question" instead of
+"stem", do not use "correct_index", and do not make choices plain strings:
+{"questions":[{"kind":"mcq_single","stem":"...","choices":[{"content":"...","is_correct":true},{"content":"...","is_correct":false},{"content":"...","is_correct":false},{"content":"...","is_correct":false}],"explanation":"...","source_quote":"...","difficulty":"easy","skill":"recall"}]}`
 
 func QuestionSystem() string { return questionSystem }
 

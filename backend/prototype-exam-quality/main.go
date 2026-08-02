@@ -20,6 +20,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"protoexam/examgen"
 	"protoexam/llm"
@@ -27,29 +28,33 @@ import (
 )
 
 type config struct {
-	provider     string
-	pdfPath      string
-	extract      string
-	model        string
-	embedModel   string
-	ocrModel     string
-	host         string
-	geminiHost   string
-	geminiAPIKey string
-	forceCalc    bool
-	scope        string
-	pages        string
-	budget       int
-	fresh        bool
-	extractOnly  bool
-	repair       bool
-	calcTool     bool
-	parallel     int
+	provider          string
+	pdfPath           string
+	extract           string
+	model             string
+	embedModel        string
+	ocrModel          string
+	host              string
+	geminiHost        string
+	geminiAPIKey      string
+	deepseekHost      string
+	deepseekAPIKey    string
+	geminiMinInterval time.Duration
+	forceCalc         bool
+	scope             string
+	pages             string
+	budget            int
+	fresh             bool
+	extractOnly       bool
+	repair            bool
+	calcTool          bool
+	parallel          int
 }
 
 func main() {
+	_ = loadDotEnv()
 	var cfg config
-	flag.StringVar(&cfg.provider, "provider", "ollama", "model provider: ollama | gemini")
+	flag.StringVar(&cfg.provider, "provider", "ollama", "model provider: ollama | gemini | deepseek")
 	flag.StringVar(&cfg.pdfPath, "pdf", "", "path to the source PDF (required)")
 	flag.StringVar(&cfg.extract, "extract", "auto", "extraction mode: auto | text | poppler | ocr")
 	flag.StringVar(&cfg.model, "model", "", "generation and judge model (provider default when empty)")
@@ -63,6 +68,9 @@ func main() {
 	flag.StringVar(&cfg.host, "host", "http://localhost:11434", "Ollama host")
 	flag.StringVar(&cfg.geminiHost, "gemini-host", "https://generativelanguage.googleapis.com", "Gemini API host")
 	flag.StringVar(&cfg.geminiAPIKey, "gemini-api-key", "", "Gemini API key (prefer GEMINI_API_KEY)")
+	flag.DurationVar(&cfg.geminiMinInterval, "gemini-min-interval", 13*time.Second, "minimum delay between Gemini requests; 0 disables throttling")
+	flag.StringVar(&cfg.deepseekHost, "deepseek-host", "https://api.deepseek.com", "DeepSeek API host")
+	flag.StringVar(&cfg.deepseekAPIKey, "deepseek-api-key", "", "DeepSeek API key (prefer DEEPSEEK_API_KEY)")
 	flag.BoolVar(&cfg.forceCalc, "force-calc", false, "generate calculation questions only")
 	flag.StringVar(&cfg.scope, "scope", "", "free-text focus; chunks are ranked against this instead of the lesson title")
 	flag.StringVar(&cfg.pages, "pages", "", "page range, e.g. 10-40")
@@ -76,14 +84,20 @@ func main() {
 	if cfg.geminiAPIKey == "" {
 		cfg.geminiAPIKey = os.Getenv("GEMINI_API_KEY")
 	}
-	if cfg.provider != "ollama" && cfg.provider != "gemini" {
-		fmt.Fprintf(os.Stderr, "--provider must be ollama or gemini, got %q\n", cfg.provider)
+	if cfg.deepseekAPIKey == "" {
+		cfg.deepseekAPIKey = os.Getenv("DEEPSEEK_API_KEY")
+	}
+	if cfg.provider != "ollama" && cfg.provider != "gemini" && cfg.provider != "deepseek" {
+		fmt.Fprintf(os.Stderr, "--provider must be ollama, gemini, or deepseek, got %q\n", cfg.provider)
 		os.Exit(2)
 	}
 	if cfg.model == "" {
-		if cfg.provider == "gemini" {
+		switch cfg.provider {
+		case "gemini":
 			cfg.model = "gemini-2.5-flash"
-		} else {
+		case "deepseek":
+			cfg.model = "deepseek-chat"
+		default:
 			cfg.model = "scb10x/typhoon2.5-qwen3-4b"
 		}
 	}
@@ -96,9 +110,14 @@ func main() {
 		}
 	})
 	if !embedModelSet {
-		if cfg.provider == "gemini" {
+		switch cfg.provider {
+		case "gemini":
 			cfg.embedModel = "gemini-embedding-001"
-		} else {
+		case "deepseek":
+			// DeepSeek exposes chat completions, not embeddings. Leave ranking
+			// disabled unless a separate embedder is wired later.
+			cfg.embedModel = ""
+		default:
 			cfg.embedModel = "bge-m3"
 		}
 	}
@@ -118,6 +137,52 @@ func main() {
 	}
 }
 
+// loadDotEnv loads the nearest .env from the working directory or one of its
+// parents. It is intentionally tiny: this prototype only needs key=value
+// pairs, and an already-exported environment variable always wins.
+func loadDotEnv() error {
+	dir, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+	for {
+		path := filepath.Join(dir, ".env")
+		data, err := os.ReadFile(path)
+		if err == nil {
+			for _, line := range strings.Split(string(data), "\n") {
+				line = strings.TrimSpace(line)
+				if line == "" || strings.HasPrefix(line, "#") {
+					continue
+				}
+				line = strings.TrimPrefix(line, "export ")
+				at := strings.IndexByte(line, '=')
+				if at <= 0 {
+					continue
+				}
+				key := strings.TrimSpace(line[:at])
+				if os.Getenv(key) != "" {
+					continue
+				}
+				value := strings.TrimSpace(line[at+1:])
+				if len(value) >= 2 && value[0] == '"' && value[len(value)-1] == '"' {
+					if unquoted, unquoteErr := strconv.Unquote(value); unquoteErr == nil {
+						value = unquoted
+					}
+				} else if len(value) >= 2 && value[0] == '\'' && value[len(value)-1] == '\'' {
+					value = value[1 : len(value)-1]
+				}
+				_ = os.Setenv(key, value)
+			}
+			return nil
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return nil
+		}
+		dir = parent
+	}
+}
+
 func run(ctx context.Context, cfg config) error {
 	in := bufio.NewScanner(os.Stdin)
 	var (
@@ -131,14 +196,24 @@ func run(ctx context.Context, cfg config) error {
 		stats = client.Stats
 	} else {
 		if cfg.extract == "ocr" {
-			return fmt.Errorf("--extract=ocr currently requires --provider ollama; Gemini text generation is supported, Gemini OCR is not wired yet")
+			return fmt.Errorf("--extract=ocr currently requires --provider ollama; Gemini and DeepSeek text generation are supported, OCR is not wired for them")
 		}
-		if (!cfg.extractOnly || cfg.extract == "ocr") && cfg.geminiAPIKey == "" {
-			return fmt.Errorf("Gemini provider requires GEMINI_API_KEY or --gemini-api-key")
+		if cfg.provider == "gemini" {
+			if (!cfg.extractOnly || cfg.extract == "ocr") && cfg.geminiAPIKey == "" {
+				return fmt.Errorf("Gemini provider requires GEMINI_API_KEY or --gemini-api-key")
+			}
+			gemini := llm.NewGeminiAt(cfg.geminiHost, cfg.geminiAPIKey, nil)
+			gemini.MinInterval = cfg.geminiMinInterval
+			modelClient = gemini
+			stats = gemini.Stats
+		} else {
+			if (!cfg.extractOnly || cfg.extract == "ocr") && cfg.deepseekAPIKey == "" {
+				return fmt.Errorf("DeepSeek provider requires DEEPSEEK_API_KEY or --deepseek-api-key")
+			}
+			deepseek := llm.NewDeepSeekAt(cfg.deepseekHost, cfg.deepseekAPIKey, nil)
+			modelClient = deepseek
+			stats = deepseek.Stats
 		}
-		gemini := llm.NewGeminiAt(cfg.geminiHost, cfg.geminiAPIKey, nil)
-		modelClient = gemini
-		stats = gemini.Stats
 	}
 	defer reportStats(cfg, stats)
 
@@ -215,6 +290,9 @@ func run(ctx context.Context, cfg config) error {
 		Log:      examgen.Progress(safeProgress()),
 		Parallel: cfg.parallel,
 	}
+	if cfg.provider == "gemini" || cfg.provider == "deepseek" {
+		deps.TopicBatcher = llm.NewBatchedTopicGenerator(modelClient, cfg.model)
+	}
 	if cfg.embedModel != "" {
 		deps.Embedder = llm.NewEmbedder(modelClient, cfg.embedModel)
 	}
@@ -227,7 +305,11 @@ func run(ctx context.Context, cfg config) error {
 	oc, err := cachedT(cfg, "outline", func() (outlineCache, error) {
 		clear()
 		header("STEP 2 — reading the whole document (pass 1)")
-		fmt.Printf("%sThis is the slow part. %d chunks, one model call each.%s\n\n", dim, len(chunks), reset)
+		mapPlan := "one model call each"
+		if cfg.provider == "gemini" || cfg.provider == "deepseek" {
+			mapPlan = "one batched model call plus fallback for omitted chunks"
+		}
+		fmt.Printf("%sThis is the slow part. %d chunks, %s.%s\n\n", dim, len(chunks), mapPlan, reset)
 		o, withLessons, err := examgen.BuildOutline(ctx, chunks, deps)
 		fmt.Println()
 		return outlineCache{Outline: o, Chunks: withLessons}, err
@@ -285,6 +367,8 @@ func reportStats(cfg config, stats *llm.Stats) {
 		title := "where the time went"
 		if cfg.provider == "gemini" {
 			title = "Gemini API calls and timing (cumulative for this process)"
+		} else if cfg.provider == "deepseek" {
+			title = "DeepSeek API calls and timing (cumulative for this process)"
 		}
 		fmt.Printf("\n%s%s%s\n%s", bold, title, reset, r)
 	}

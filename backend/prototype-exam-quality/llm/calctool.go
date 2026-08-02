@@ -114,7 +114,7 @@ func (g *Generator) ComputeFacts(ctx context.Context, c examgen.Chunk, forceCalc
 				facts = append(facts, Fact{Expression: expr, Value: v})
 				result = trimNumber(v)
 			}
-			msgs = append(msgs, Message{Role: "tool", ToolName: "calc", Content: result})
+			msgs = append(msgs, Message{Role: "tool", ToolName: "calc", ToolCallID: tc.ID, Content: result})
 		}
 	}
 	return facts, nil

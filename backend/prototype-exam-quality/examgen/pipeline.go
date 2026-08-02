@@ -33,6 +33,13 @@ type Embedder interface {
 	Embed(ctx context.Context, texts []string) ([][]float32, error)
 }
 
+// TopicBatcher is an optional provider optimisation. It is deliberately not
+// part of Generator: Ollama keeps the measured one-call-per-chunk map path,
+// while Gemini can map all chunks in one larger-context request.
+type TopicBatcher interface {
+	BatchTopics(ctx context.Context, chunks []Chunk) ([][]string, error)
+}
+
 // Progress lets the TUI show what is happening during the slow parts. The logic
 // package never prints; it calls this.
 type Progress func(stage string, done, total int, note string)
@@ -45,11 +52,12 @@ func (p Progress) report(stage string, done, total int, note string) {
 
 // Deps bundles everything the pipeline needs from the outside world.
 type Deps struct {
-	Gen      Generator
-	Judge    Judge
-	Eval     Evaluator
-	Embedder Embedder
-	Log      Progress
+	Gen          Generator
+	TopicBatcher TopicBatcher
+	Judge        Judge
+	Eval         Evaluator
+	Embedder     Embedder
+	Log          Progress
 	// Parallel is how many model calls may be in flight at once. Ollama serves
 	// concurrent requests from one loaded model when OLLAMA_NUM_PARALLEL allows
 	// it, and the calls this pipeline makes are independent of each other, so
@@ -83,39 +91,54 @@ func BuildOutline(ctx context.Context, chunks []Chunk, d Deps) (*Outline, []Chun
 	// Every chunk is independent, so this is the easiest place in the pipeline
 	// to run concurrently. Results are collected by index and merged in document
 	// order afterwards, because lesson ordering depends on it.
-	perChunk := make([][]string, len(chunks))
-	var (
-		wg       sync.WaitGroup
-		sem      = make(chan struct{}, d.slots())
-		mu       sync.Mutex
-		done     int
-		firstErr error
-	)
-	for i, c := range chunks {
-		wg.Add(1)
-		go func(i int, c Chunk) {
-			defer wg.Done()
-			sem <- struct{}{}
-			defer func() { <-sem }()
+	var perChunk [][]string
+	if d.TopicBatcher != nil {
+		var err error
+		perChunk, err = d.TopicBatcher.BatchTopics(ctx, chunks)
+		if err != nil {
+			return nil, nil, fmt.Errorf("batched topics: %w", err)
+		}
+		if len(perChunk) != len(chunks) {
+			return nil, nil, fmt.Errorf("batched topics returned %d chunk results for %d chunks", len(perChunk), len(chunks))
+		}
+		for i, c := range chunks {
+			d.Log.report("outline/map", i+1, len(chunks), fmt.Sprintf("page %d", c.Page))
+		}
+	} else {
+		perChunk = make([][]string, len(chunks))
+		var (
+			wg       sync.WaitGroup
+			sem      = make(chan struct{}, d.slots())
+			mu       sync.Mutex
+			done     int
+			firstErr error
+		)
+		for i, c := range chunks {
+			wg.Add(1)
+			go func(i int, c Chunk) {
+				defer wg.Done()
+				sem <- struct{}{}
+				defer func() { <-sem }()
 
-			topics, err := d.Gen.Topics(ctx, c)
+				topics, err := d.Gen.Topics(ctx, c)
 
-			mu.Lock()
-			defer mu.Unlock()
-			done++
-			if err != nil {
-				if firstErr == nil {
-					firstErr = fmt.Errorf("topics for chunk %s: %w", c.ID, err)
+				mu.Lock()
+				defer mu.Unlock()
+				done++
+				if err != nil {
+					if firstErr == nil {
+						firstErr = fmt.Errorf("topics for chunk %s: %w", c.ID, err)
+					}
+					return
 				}
-				return
-			}
-			perChunk[i] = topics
-			d.Log.report("outline/map", done, len(chunks), fmt.Sprintf("page %d", c.Page))
-		}(i, c)
-	}
-	wg.Wait()
-	if firstErr != nil {
-		return nil, nil, firstErr
+				perChunk[i] = topics
+				d.Log.report("outline/map", done, len(chunks), fmt.Sprintf("page %d", c.Page))
+			}(i, c)
+		}
+		wg.Wait()
+		if firstErr != nil {
+			return nil, nil, firstErr
+		}
 	}
 
 	owners := map[string][]string{} // topic -> chunk IDs

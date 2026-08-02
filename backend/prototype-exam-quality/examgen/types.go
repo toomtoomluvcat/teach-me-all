@@ -5,6 +5,14 @@
 // into the real backend when the prototype has answered its question.
 package examgen
 
+import (
+	"encoding/json"
+	"fmt"
+	"math"
+	"strconv"
+	"strings"
+)
+
 // Chunk is a contiguous slice of the source document, kept with enough
 // provenance to point a reader back at the page it came from.
 type Chunk struct {
@@ -61,6 +69,47 @@ type Choice struct {
 type Calculation struct {
 	Expression string  `json:"expression"`
 	Expected   float64 `json:"expected"`
+}
+
+// UnmarshalJSON tolerates a number wrapped in JSON quotes. Some hosted models
+// emit that otherwise-valid representation despite being asked for a number.
+// It deliberately rejects units and other prose: arithmetic is a correctness
+// boundary, not a display field.
+func (c *Calculation) UnmarshalJSON(data []byte) error {
+	var wire struct {
+		Expression string          `json:"expression"`
+		Expected   json.RawMessage `json:"expected"`
+	}
+	if err := json.Unmarshal(data, &wire); err != nil {
+		return err
+	}
+
+	raw := strings.TrimSpace(string(wire.Expected))
+	if raw == "" || raw == "null" {
+		return fmt.Errorf("calculation expected is required and must be a number")
+	}
+
+	var expected float64
+	if raw[0] == '"' {
+		var quoted string
+		if err := json.Unmarshal(wire.Expected, &quoted); err != nil {
+			return fmt.Errorf("calculation expected: %w", err)
+		}
+		parsed, err := strconv.ParseFloat(strings.TrimSpace(quoted), 64)
+		if err != nil {
+			return fmt.Errorf("calculation expected %q must be a number: %w", quoted, err)
+		}
+		expected = parsed
+	} else if err := json.Unmarshal(wire.Expected, &expected); err != nil {
+		return fmt.Errorf("calculation expected must be a number: %w", err)
+	}
+	if math.IsNaN(expected) || math.IsInf(expected, 0) {
+		return fmt.Errorf("calculation expected must be finite")
+	}
+
+	c.Expression = wire.Expression
+	c.Expected = expected
+	return nil
 }
 
 // Question is what the model is asked to emit, plus what we learn about it.

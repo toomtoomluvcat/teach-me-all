@@ -8,7 +8,9 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -22,6 +24,14 @@ type GeminiClient struct {
 	APIKey string
 	HTTP   *http.Client
 	Stats  *Stats
+
+	// MinInterval serializes requests for low-RPM projects. The CLI sets this
+	// to a conservative interval for the observed free tier; tests leave it at
+	// zero.
+	MinInterval time.Duration
+	MaxRetries  int
+	rateMu      sync.Mutex
+	lastRequest time.Time
 }
 
 func NewGemini(apiKey string) *GeminiClient {
@@ -34,10 +44,11 @@ func NewGeminiAt(host, apiKey string, httpClient *http.Client) *GeminiClient {
 		httpClient = &http.Client{Timeout: 10 * time.Minute}
 	}
 	return &GeminiClient{
-		Host:   strings.TrimRight(host, "/"),
-		APIKey: strings.TrimSpace(apiKey),
-		HTTP:   httpClient,
-		Stats:  NewStats(),
+		Host:       strings.TrimRight(host, "/"),
+		APIKey:     strings.TrimSpace(apiKey),
+		HTTP:       httpClient,
+		Stats:      NewStats(),
+		MaxRetries: 1,
 	}
 }
 
@@ -324,36 +335,104 @@ func (c *GeminiClient) post(ctx context.Context, label, path string, body, out a
 	if err != nil {
 		return err
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.Host+path, bytes.NewReader(b))
-	if err != nil {
-		return err
-	}
-	started := c.Stats.begin()
-	defer func() {
-		if !started.IsZero() {
-			c.Stats.addElapsed(label, time.Since(started))
+	for attempt := 0; ; attempt++ {
+		if err := c.waitForSlot(ctx); err != nil {
+			return err
 		}
-		c.Stats.end()
-	}()
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("x-goog-api-key", c.APIKey)
-	resp, err := c.HTTP.Do(req)
-	if err != nil {
-		return fmt.Errorf("POST Gemini %s: %w", path, err)
-	}
-	defer resp.Body.Close()
-	data, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return err
-	}
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return fmt.Errorf("POST Gemini %s: %d %s: %s", path, resp.StatusCode, resp.Status, excerpt(string(data), 500))
-	}
-	if out == nil {
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.Host+path, bytes.NewReader(b))
+		if err != nil {
+			return err
+		}
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("x-goog-api-key", c.APIKey)
+
+		started := c.Stats.begin()
+		resp, err := c.HTTP.Do(req)
+		if err != nil {
+			c.finishCall(label, started)
+			return fmt.Errorf("POST Gemini %s: %w", path, err)
+		}
+		data, readErr := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		c.finishCall(label, started)
+		if readErr != nil {
+			return readErr
+		}
+		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+			if resp.StatusCode == http.StatusTooManyRequests && attempt < c.MaxRetries {
+				if err := waitContext(ctx, geminiRetryDelay(resp.Header.Get("Retry-After"), string(data), attempt)); err != nil {
+					return err
+				}
+				continue
+			}
+			return fmt.Errorf("POST Gemini %s: %d %s: %s", path, resp.StatusCode, resp.Status, excerpt(string(data), 500))
+		}
+		if out == nil {
+			return nil
+		}
+		if err := json.Unmarshal(data, out); err != nil {
+			return fmt.Errorf("POST Gemini %s: unparseable response: %w", path, err)
+		}
 		return nil
 	}
-	if err := json.Unmarshal(data, out); err != nil {
-		return fmt.Errorf("POST Gemini %s: unparseable response: %w", path, err)
+}
+
+func (c *GeminiClient) waitForSlot(ctx context.Context) error {
+	if c.MinInterval <= 0 {
+		return nil
 	}
+	c.rateMu.Lock()
+	defer c.rateMu.Unlock()
+	if !c.lastRequest.IsZero() {
+		if wait := c.MinInterval - time.Since(c.lastRequest); wait > 0 {
+			if err := waitContext(ctx, wait); err != nil {
+				return err
+			}
+		}
+	}
+	c.lastRequest = time.Now()
 	return nil
+}
+
+func (c *GeminiClient) finishCall(label string, started time.Time) {
+	if !started.IsZero() {
+		c.Stats.addElapsed(label, time.Since(started))
+	}
+	c.Stats.end()
+}
+
+func waitContext(ctx context.Context, delay time.Duration) error {
+	if delay <= 0 {
+		return nil
+	}
+	timer := time.NewTimer(delay)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+		return nil
+	}
+}
+
+func geminiRetryDelay(header, body string, attempt int) time.Duration {
+	if seconds, err := strconv.Atoi(strings.TrimSpace(header)); err == nil && seconds >= 0 {
+		return time.Duration(seconds) * time.Second
+	}
+	// Gemini often puts the retry hint in the JSON error message rather than a
+	// Retry-After header, for example: "Please retry in 35.0s".
+	lower := strings.ToLower(body)
+	if at := strings.Index(lower, "retry in "); at >= 0 {
+		value := lower[at+len("retry in "):]
+		if end := strings.IndexByte(value, 's'); end >= 0 {
+			if seconds, err := strconv.ParseFloat(strings.TrimSpace(value[:end]), 64); err == nil && seconds >= 0 {
+				return time.Duration(seconds * float64(time.Second))
+			}
+		}
+	}
+	delay := time.Duration(15*(1<<attempt)) * time.Second
+	if delay > time.Minute {
+		return time.Minute
+	}
+	return delay
 }
