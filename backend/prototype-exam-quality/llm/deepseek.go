@@ -93,6 +93,10 @@ type deepSeekResponse struct {
 	Error *struct {
 		Message string `json:"message"`
 	} `json:"error,omitempty"`
+	Usage struct {
+		PromptTokens     int `json:"prompt_tokens"`
+		CompletionTokens int `json:"completion_tokens"`
+	} `json:"usage"`
 }
 
 func (c *DeepSeekClient) ChatJSON(ctx context.Context, model string, msgs []Message, schema any, opt *Options, out any) error {
@@ -164,6 +168,7 @@ func (c *DeepSeekClient) generate(ctx context.Context, model string, msgs []Mess
 	if err := c.post(ctx, labelOf(ctx), req, &resp); err != nil {
 		return Message{}, err
 	}
+	c.Stats.addTokens(labelOf(ctx), resp.Usage.PromptTokens, resp.Usage.CompletionTokens)
 	if resp.Error != nil && resp.Error.Message != "" {
 		return Message{}, fmt.Errorf("DeepSeek: %s", resp.Error.Message)
 	}

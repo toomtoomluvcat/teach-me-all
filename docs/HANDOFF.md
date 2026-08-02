@@ -122,6 +122,19 @@ committed.
   `--extract-only` run including cache hits. Extraction reports a heartbeat with
   elapsed time while Docling runs. The preview only prints keyboard actions when
   it is actually waiting; quit is line-based (`q` then Enter).
+- Hosted pass-1 mapping no longer sends a whole textbook in one request. Gemini
+  and DeepSeek use bounded 32-chunk/36k-rune batches, parallelised by
+  `--parallel`; malformed JSON recursively splits only the failed batch and
+  terminal errors cancel pending work. The 392-chunk Thai biology benchmark
+  plans 13 map calls plus one reduce call. DeepSeek usage tokens are now included
+  in the cumulative call report.
+- The real DeepSeek rerun of that 392-chunk benchmark passed: 13 map calls plus
+  one reduce call, about 1m wall clock at `--parallel 4`, 132,003 input tokens
+  and 18,485 output tokens. It produced 273 topics and 43 lessons. The flat
+  topic-to-outline reduce left 70 chunks unassigned; this is concrete evidence
+  for the next experiment being a provenance-preserving evidence graph
+  (`concept/edge -> chunk_ids/assets`), evaluated A/B rather than adopted as a
+  database architecture up front.
 - `setup-docling.ps1` — reproducible pinned project-local runtime installation.
 - `backend/prototype-exam-quality/README.md` — extraction bundle layout and the
   reusable `protoexam.exe` workflow.

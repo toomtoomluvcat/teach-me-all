@@ -30,7 +30,7 @@ func TestDeepSeekChatJSONUsesJSONModeAndCountsCall(t *testing.T) {
 		if !strings.Contains(strings.ToLower(string(encoded)), "json") {
 			t.Fatalf("JSON instruction missing from messages: %s", encoded)
 		}
-		_, _ = w.Write([]byte(`{"choices":[{"message":{"role":"assistant","content":"{\"topics\":[\"algebra\"]}"}}]}`))
+		_, _ = w.Write([]byte(`{"choices":[{"message":{"role":"assistant","content":"{\"topics\":[\"algebra\"]}"}}],"usage":{"prompt_tokens":123,"completion_tokens":17,"total_tokens":140}}`))
 	}))
 	defer server.Close()
 
@@ -47,6 +47,9 @@ func TestDeepSeekChatJSONUsesJSONModeAndCountsCall(t *testing.T) {
 	}
 	if calls := client.Stats.by["outline/map"].Calls; calls != 1 {
 		t.Fatalf("API calls = %d, want 1", calls)
+	}
+	if bucket := client.Stats.by["outline/map"]; bucket.PromptTokens != 123 || bucket.EvalTokens != 17 {
+		t.Fatalf("recorded tokens = %d/%d, want 123/17", bucket.PromptTokens, bucket.EvalTokens)
 	}
 }
 

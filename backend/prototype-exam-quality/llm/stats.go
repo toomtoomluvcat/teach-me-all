@@ -82,6 +82,21 @@ func (s *Stats) addElapsed(label string, elapsed time.Duration) {
 	b.Total += elapsed
 }
 
+func (s *Stats) addTokens(label string, prompt, completion int) {
+	if s == nil || (prompt == 0 && completion == 0) {
+		return
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	b := s.by[label]
+	if b == nil {
+		b = &Bucket{}
+		s.by[label] = b
+	}
+	b.PromptTokens += prompt
+	b.EvalTokens += completion
+}
+
 // The label travels on the context rather than as a parameter. Every call site
 // already threads a context and none of them care about the label beyond
 // setting it once, so a parameter would be seven signature changes to carry a

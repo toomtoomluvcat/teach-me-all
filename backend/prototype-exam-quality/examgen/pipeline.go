@@ -37,7 +37,7 @@ type Embedder interface {
 // part of Generator: Ollama keeps the measured one-call-per-chunk map path,
 // while Gemini can map all chunks in one larger-context request.
 type TopicBatcher interface {
-	BatchTopics(ctx context.Context, chunks []Chunk) ([][]string, error)
+	BatchTopics(ctx context.Context, chunks []Chunk, progress Progress) ([][]string, error)
 }
 
 // Progress lets the TUI show what is happening during the slow parts. The logic
@@ -94,15 +94,12 @@ func BuildOutline(ctx context.Context, chunks []Chunk, d Deps) (*Outline, []Chun
 	var perChunk [][]string
 	if d.TopicBatcher != nil {
 		var err error
-		perChunk, err = d.TopicBatcher.BatchTopics(ctx, chunks)
+		perChunk, err = d.TopicBatcher.BatchTopics(ctx, chunks, d.Log)
 		if err != nil {
 			return nil, nil, fmt.Errorf("batched topics: %w", err)
 		}
 		if len(perChunk) != len(chunks) {
 			return nil, nil, fmt.Errorf("batched topics returned %d chunk results for %d chunks", len(perChunk), len(chunks))
-		}
-		for i, c := range chunks {
-			d.Log.report("outline/map", i+1, len(chunks), fmt.Sprintf("page %d", c.Page))
 		}
 	} else {
 		perChunk = make([][]string, len(chunks))

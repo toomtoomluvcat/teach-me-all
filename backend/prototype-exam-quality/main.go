@@ -318,7 +318,7 @@ func run(ctx context.Context, cfg config) error {
 		Parallel: cfg.parallel,
 	}
 	if cfg.provider == "gemini" || cfg.provider == "deepseek" {
-		deps.TopicBatcher = llm.NewBatchedTopicGenerator(modelClient, cfg.model)
+		deps.TopicBatcher = llm.NewBatchedTopicGenerator(modelClient, cfg.model, cfg.parallel)
 	}
 	if cfg.embedModel != "" {
 		deps.Embedder = llm.NewEmbedder(modelClient, cfg.embedModel)
@@ -334,7 +334,8 @@ func run(ctx context.Context, cfg config) error {
 		header("STEP 2 — reading the whole document (pass 1)")
 		mapPlan := "one model call each"
 		if cfg.provider == "gemini" || cfg.provider == "deepseek" {
-			mapPlan = "one batched model call plus fallback for omitted chunks"
+			mapCalls := llm.PlannedTopicBatches(chunks)
+			mapPlan = fmt.Sprintf("%d bounded map calls + 1 reduce call", mapCalls)
 		}
 		fmt.Printf("%sThis is the slow part. %d chunks, %s.%s\n\n", dim, len(chunks), mapPlan, reset)
 		o, withLessons, err := examgen.BuildOutline(ctx, chunks, deps)

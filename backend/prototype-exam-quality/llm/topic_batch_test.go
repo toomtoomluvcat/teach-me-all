@@ -3,12 +3,54 @@ package llm
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"protoexam/examgen"
 )
+
+func deepSeekTopicRequestIDs(t *testing.T, r *http.Request) []string {
+	t.Helper()
+	var body deepSeekRequest
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		t.Fatalf("decode request: %v", err)
+	}
+	var ids []string
+	for _, message := range body.Messages {
+		if message.Role != "user" {
+			continue
+		}
+		for _, line := range strings.Split(message.Content, "\n") {
+			if !strings.HasPrefix(line, "Chunk ") {
+				continue
+			}
+			id, _, _ := strings.Cut(strings.TrimPrefix(line, "Chunk "), " ")
+			ids = append(ids, id)
+		}
+	}
+	return ids
+}
+
+func writeDeepSeekTopics(t *testing.T, w http.ResponseWriter, ids []string) {
+	t.Helper()
+	chunks := make([]map[string]any, len(ids))
+	for i, id := range ids {
+		chunks[i] = map[string]any{"chunk_id": id, "topics": []string{"topic " + id}}
+	}
+	content, err := json.Marshal(map[string]any{"chunks": chunks})
+	if err != nil {
+		t.Fatalf("marshal response content: %v", err)
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]any{
+		"choices": []any{map[string]any{
+			"message": map[string]any{"content": string(content)},
+		}},
+	})
+}
 
 func TestBatchedTopicsUsesOneCallAndRestoresOrder(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -33,7 +75,7 @@ func TestBatchedTopicsUsesOneCallAndRestoresOrder(t *testing.T) {
 	got, err := batcher.BatchTopics(context.Background(), []examgen.Chunk{
 		{ID: "p1-c0", Page: 1, Text: "first passage"},
 		{ID: "p1-c1", Page: 1, Text: "second passage"},
-	})
+	}, nil)
 	if err != nil {
 		t.Fatalf("BatchTopics() error = %v", err)
 	}
@@ -63,7 +105,7 @@ func TestBatchedTopicsFallsBackForOmittedChunks(t *testing.T) {
 	got, err := batcher.BatchTopics(context.Background(), []examgen.Chunk{
 		{ID: "p1-c0", Page: 1, Text: "first passage"},
 		{ID: "p1-c1", Page: 1, Text: "second passage"},
-	})
+	}, nil)
 	if err != nil {
 		t.Fatalf("BatchTopics() error = %v", err)
 	}
@@ -75,6 +117,102 @@ func TestBatchedTopicsFallsBackForOmittedChunks(t *testing.T) {
 	}
 	if calls := client.Stats.by["outline/map"].Calls; calls != 2 {
 		t.Fatalf("recorded API calls = %d, want 2", calls)
+	}
+}
+
+func TestBatchedTopicsBoundsLargeDocumentRequests(t *testing.T) {
+	requests := 0
+	maxRequestChunks := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests++
+		ids := deepSeekTopicRequestIDs(t, r)
+		if len(ids) > maxRequestChunks {
+			maxRequestChunks = len(ids)
+		}
+		writeDeepSeekTopics(t, w, ids)
+	}))
+	defer server.Close()
+
+	chunks := make([]examgen.Chunk, 392)
+	for i := range chunks {
+		chunks[i] = examgen.Chunk{
+			ID:   fmt.Sprintf("p%d-c%d", i+1, i),
+			Page: i + 1,
+			Text: strings.Repeat("ก", 1200),
+		}
+	}
+	wantCalls := PlannedTopicBatches(chunks)
+	client := NewDeepSeekAt(server.URL, "test-key", server.Client())
+	batcher := NewBatchedTopicGenerator(client, "deepseek-chat")
+	got, err := batcher.BatchTopics(context.Background(), chunks, nil)
+	if err != nil {
+		t.Fatalf("BatchTopics() error = %v", err)
+	}
+	if len(got) != len(chunks) {
+		t.Fatalf("topics = %d chunks, want %d", len(got), len(chunks))
+	}
+	if wantCalls <= 1 || requests != wantCalls {
+		t.Fatalf("provider requests = %d, planned = %d; want multiple bounded requests", requests, wantCalls)
+	}
+	if maxRequestChunks > topicBatchMaxChunks {
+		t.Fatalf("largest request = %d chunks, limit = %d", maxRequestChunks, topicBatchMaxChunks)
+	}
+}
+
+func TestBatchedTopicsSplitsOnlyMalformedBatch(t *testing.T) {
+	requests := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests++
+		ids := deepSeekTopicRequestIDs(t, r)
+		if len(ids) > topicBatchMaxChunks/2 {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"choices":[{"message":{"content":"{\"chunks\":["}}]}`))
+			return
+		}
+		writeDeepSeekTopics(t, w, ids)
+	}))
+	defer server.Close()
+
+	chunks := make([]examgen.Chunk, topicBatchMaxChunks+1)
+	for i := range chunks {
+		chunks[i] = examgen.Chunk{ID: fmt.Sprintf("p1-c%d", i), Page: 1, Text: "passage"}
+	}
+	client := NewDeepSeekAt(server.URL, "test-key", server.Client())
+	batcher := NewBatchedTopicGenerator(client, "deepseek-chat")
+	got, err := batcher.BatchTopics(context.Background(), chunks, nil)
+	if err != nil {
+		t.Fatalf("BatchTopics() error = %v", err)
+	}
+	if len(got) != len(chunks) {
+		t.Fatalf("topics = %d chunks, want %d", len(got), len(chunks))
+	}
+	// Two malformed attempts for the first 32-chunk batch, two successful
+	// 16-chunk halves, and the unaffected final one-chunk batch.
+	if requests != 5 {
+		t.Fatalf("provider requests = %d, want 5 isolated attempts", requests)
+	}
+}
+
+func TestBatchedTopicsStopsAfterTerminalBatchFailure(t *testing.T) {
+	requests := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		requests++
+		http.Error(w, "provider unavailable", http.StatusServiceUnavailable)
+	}))
+	defer server.Close()
+
+	chunks := make([]examgen.Chunk, topicBatchMaxChunks+1)
+	for i := range chunks {
+		chunks[i] = examgen.Chunk{ID: fmt.Sprintf("p1-c%d", i), Page: 1, Text: "passage"}
+	}
+	client := NewDeepSeekAt(server.URL, "test-key", server.Client())
+	batcher := NewBatchedTopicGenerator(client, "deepseek-chat")
+	_, err := batcher.BatchTopics(context.Background(), chunks, nil)
+	if err == nil {
+		t.Fatal("BatchTopics() error = nil, want provider failure")
+	}
+	if requests != 1 {
+		t.Fatalf("provider requests = %d, want pending batches cancelled after first terminal failure", requests)
 	}
 }
 

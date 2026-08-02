@@ -163,12 +163,13 @@ continue and `[q + enter]` to quit.
 Extraction and embedding are cached under `.scratch/` (gitignored) because they are
 slow and rerunning them while iterating on prompts is a waste.
 
-For Gemini and DeepSeek, pass 1 maps all chunks in one structured request, then
-uses one reduce request. This changes `outline/map` from one call per chunk to
-one call for the whole document; if a provider omits a chunk, only that chunk
-is retried individually. The rest of the pipeline still reports its own calls.
-The default 13-second spacing is only applied to Gemini. Use `--fresh` when you
-want to regenerate a cached outline after changing provider or prompts.
+For Gemini and DeepSeek, pass 1 maps chunks in bounded structured batches of at
+most 32 chunks and about 36,000 runes, then uses one reduce request. The CLI
+prints this base call count before sending anything. Batches run concurrently
+up to `--parallel`; Gemini still spaces request starts by 13 seconds. If JSON is
+truncated, only that batch is split and retried; if a provider omits a chunk,
+only that chunk is retried. Terminal network/auth errors cancel pending batches.
+Use `--fresh` to regenerate a cached outline after changing provider or prompts.
 
 At the end of every process, including one that exits after an API error, the run
 prints a cumulative call report. With Gemini or DeepSeek, `TOTAL` is the exact

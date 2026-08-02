@@ -3,28 +3,161 @@ package llm
 import (
 	"context"
 	"fmt"
+	"strings"
+	"sync"
 
 	"protoexam/examgen"
 )
 
-// BatchedTopicGenerator uses a provider's larger context window to map all
-// chunks in one structured request. The normal Generator.Topics path remains
-// unchanged for Ollama and for any caller that does not opt into this feature.
+const (
+	topicBatchMaxChunks = 32
+	topicBatchMaxRunes  = 36_000
+)
+
+// BatchedTopicGenerator uses bounded provider requests instead of either one
+// request per chunk or one document-sized request. The normal Generator.Topics
+// path remains unchanged for Ollama and callers that do not opt in.
 type BatchedTopicGenerator struct {
-	c     ModelClient
-	model string
+	c        ModelClient
+	model    string
+	parallel int
 }
 
-func NewBatchedTopicGenerator(c ModelClient, model string) *BatchedTopicGenerator {
-	return &BatchedTopicGenerator{c: c, model: model}
+func NewBatchedTopicGenerator(c ModelClient, model string, parallel ...int) *BatchedTopicGenerator {
+	slots := 1
+	if len(parallel) > 0 && parallel[0] > 1 {
+		slots = parallel[0]
+	}
+	return &BatchedTopicGenerator{c: c, model: model, parallel: slots}
 }
 
-func (b *BatchedTopicGenerator) BatchTopics(ctx context.Context, chunks []examgen.Chunk) ([][]string, error) {
+type topicBatch struct {
+	start  int
+	chunks []examgen.Chunk
+}
+
+func planTopicBatches(chunks []examgen.Chunk) []topicBatch {
+	var batches []topicBatch
+	for start := 0; start < len(chunks); {
+		end := start
+		runes := 0
+		for end < len(chunks) && end-start < topicBatchMaxChunks {
+			// Include the labelled-prompt framing in the budget. It is small but
+			// counting it keeps the limit meaningful for unusually long IDs.
+			next := examgen.RuneLen(chunks[end].Text) + examgen.RuneLen(chunks[end].ID) + 32
+			if end > start && runes+next > topicBatchMaxRunes {
+				break
+			}
+			runes += next
+			end++
+		}
+		batches = append(batches, topicBatch{start: start, chunks: chunks[start:end]})
+		start = end
+	}
+	return batches
+}
+
+// PlannedTopicBatches reports the normal map-call count before any provider
+// request is made. Malformed-output recovery and omitted-chunk fallback can add
+// calls, and the final outline reduce is one separate call.
+func PlannedTopicBatches(chunks []examgen.Chunk) int {
+	return len(planTopicBatches(chunks))
+}
+
+func (b *BatchedTopicGenerator) BatchTopics(ctx context.Context, chunks []examgen.Chunk, progress examgen.Progress) ([][]string, error) {
 	if len(chunks) == 0 {
 		return [][]string{}, nil
 	}
 
 	ctx = WithLabel(ctx, "outline/map")
+	batchCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	batches := planTopicBatches(chunks)
+	results := make([][][]string, len(batches))
+	sem := make(chan struct{}, b.parallel)
+	var (
+		wg       sync.WaitGroup
+		mu       sync.Mutex
+		done     int
+		firstErr error
+	)
+	for i, batch := range batches {
+		wg.Add(1)
+		go func(i int, batch topicBatch) {
+			defer wg.Done()
+			select {
+			case sem <- struct{}{}:
+			case <-batchCtx.Done():
+				return
+			}
+			defer func() { <-sem }()
+			if batchCtx.Err() != nil {
+				return
+			}
+
+			mapped, err := b.mapBatch(batchCtx, batch.chunks)
+			mu.Lock()
+			defer mu.Unlock()
+			if err != nil {
+				if firstErr == nil {
+					firstErr = fmt.Errorf("batch %d/%d: %w", i+1, len(batches), err)
+					cancel()
+				}
+				return
+			}
+			results[i] = mapped
+			done += len(batch.chunks)
+			if progress != nil {
+				progress("outline/map", done, len(chunks), fmt.Sprintf("batch %d/%d", i+1, len(batches)))
+			}
+		}(i, batch)
+	}
+	wg.Wait()
+	if firstErr != nil {
+		return nil, firstErr
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
+	perChunk := make([][]string, len(chunks))
+	for i, batch := range batches {
+		copy(perChunk[batch.start:batch.start+len(batch.chunks)], results[i])
+	}
+	return perChunk, nil
+}
+
+func (b *BatchedTopicGenerator) mapBatch(ctx context.Context, chunks []examgen.Chunk) ([][]string, error) {
+	mapped, err := b.requestBatch(ctx, chunks)
+	if err == nil {
+		return mapped, nil
+	}
+	if len(chunks) == 1 || !isMalformedTopicJSON(err) {
+		return nil, err
+	}
+
+	// Retrying the same oversized shape cannot restore bytes the provider did
+	// not return. Split only this failed batch; successful sibling batches are
+	// untouched and remain usable.
+	mid := len(chunks) / 2
+	left, leftErr := b.mapBatch(ctx, chunks[:mid])
+	if leftErr != nil {
+		return nil, leftErr
+	}
+	right, rightErr := b.mapBatch(ctx, chunks[mid:])
+	if rightErr != nil {
+		return nil, rightErr
+	}
+	return append(left, right...), nil
+}
+
+func isMalformedTopicJSON(err error) bool {
+	message := strings.ToLower(err.Error())
+	return !strings.Contains(message, "fallback topics") &&
+		strings.Contains(message, "unparseable json")
+}
+
+func (b *BatchedTopicGenerator) requestBatch(ctx context.Context, chunks []examgen.Chunk) ([][]string, error) {
 	var out struct {
 		Chunks []struct {
 			ID     string   `json:"chunk_id"`
@@ -35,7 +168,7 @@ func (b *BatchedTopicGenerator) BatchTopics(ctx context.Context, chunks []examge
 		{Role: "system", Content: examgen.TopicBatchSystem()},
 		{Role: "user", Content: examgen.TopicBatchPrompt(chunks)},
 	}
-	if err := b.c.ChatJSON(ctx, b.model, msgs, examgen.TopicBatchSchema(), genOptions(32768, 0), &out); err != nil {
+	if err := b.c.ChatJSON(ctx, b.model, msgs, examgen.TopicBatchSchema(), genOptions(8192, 0), &out); err != nil {
 		return nil, err
 	}
 
