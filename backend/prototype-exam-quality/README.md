@@ -151,7 +151,9 @@ Docling's structural JSON, and figure-level image crops referenced from the
 Markdown. It does **not** render and store every page as an image. That keeps
 the reading bundle small while preserving diagrams and photos that would be
 lost by text extraction. The older `extracted.txt` is also written for
-compatibility.
+compatibility. Physical pages are never renumbered or dropped: a page with no
+serialized content is retained as an empty per-page file and an empty section
+in `document.md`.
 
 Extraction reports the active stage and elapsed time while Docling is running,
 then the exact page/figure totals and bundle-write progress. `--extract-only`

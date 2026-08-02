@@ -110,7 +110,9 @@ committed.
 - `pdfx/docling.go`, `docling_helper.py`, `auto.go`, and tests — local Docling
   standard-pipeline extraction using pypdfium2. `auto` is Docling-only and uses
   EasyOCR `th,en` by default. Failure is surfaced; there is no text-only or LLM
-  OCR fallback.
+  OCR fallback. Docling's Markdown serializer omits empty physical pages, so the
+  helper now aligns serialized sections back to Docling page numbers and keeps
+  empty page files/sections instead of rejecting a valid document.
 - `pdfx/bundle.go` and tests — durable extraction bundle containing a manifest,
   Docling JSON, combined/per-page Markdown and plain text, source SHA-256, and
   figure-level crops referenced from Markdown. Fresh runs remove stale managed
@@ -212,6 +214,11 @@ sufficient evidence.
 - Docling 2.117.0, RapidOCR 3.9.2, EasyOCR 1.7.2 and ONNX Runtime 1.28.0 live in
   repo-level `.scratch/docling-venv`. `setup-docling.ps1` recreates it. This path
   is entirely local and makes zero Gemini/DeepSeek/generative-LLM calls.
+- Full fresh extraction of `samples/thai-highschool-biology-ipst.pdf` passed on
+  2026-08-03: 254 physical pages, 254 Markdown page files, 253 combined-document
+  separators, 242 figure crops and 347,577 runes. Pages 2 and 234 are valid empty
+  Markdown pages. Runtime was about 8m32s; the next cache hit completed in about
+  1.1s without running Docling again.
 - RTX 4050 Laptop 6 GB, Ryzen 7 8845HS, 31 GB RAM but only ~8 GB free during the
   session, which is why the 19 GB `typhoon2.5-qwen3-30b-a3b` was never tried.
 - PowerShell 5.1: no `&&`. Build once with `go build -o protoexam.exe .`.

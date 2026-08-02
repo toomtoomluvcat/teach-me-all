@@ -102,6 +102,32 @@ def portable_markdown(text: str, root: Path, page_file: bool = False) -> str:
     return text
 
 
+def combine_page_markdown(page_markdown: list[str]) -> str:
+    """Build one document while retaining one section per physical PDF page."""
+    sections = [
+        re.sub(r"\(\.\./(assets/[^)]+)\)", r"(\1)", markdown).strip()
+        for markdown in page_markdown
+    ]
+    return f"\n\n{PAGE_BREAK}\n\n".join(sections)
+
+
+def align_page_sections(
+    page_numbers: list[int], sections: list[str], pages_with_content: set[int]
+) -> list[str]:
+    """Map serializer sections back to physical pages, including empty ones."""
+    expected = sum(page_no in pages_with_content for page_no in page_numbers)
+    if len(sections) != expected:
+        raise RuntimeError(
+            f"Docling Markdown contained {len(sections)} content sections for "
+            f"{expected} non-empty pages ({len(page_numbers)} physical pages)"
+        )
+    section_iter = iter(sections)
+    return [
+        next(section_iter) if page_no in pages_with_content else ""
+        for page_no in page_numbers
+    ]
+
+
 def write_text(path: Path, text: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(text.rstrip() + "\n", encoding="utf-8")
@@ -207,36 +233,35 @@ def convert(args) -> dict:
     document = result.document
     page_numbers = sorted(document.pages)
 
-    # This public API call writes the canonical combined Markdown and creates
-    # only picture crops. Page images are disabled in pipeline_options above.
+    # Save referenced pictures once. Docling's page-break placeholder marks
+    # transitions between serialized content, so empty physical pages do not
+    # produce a section and must be aligned explicitly below.
     document.save_as_markdown(
         root / "document.md",
         artifacts_dir=assets_dir,
         image_mode=ImageRefMode.REFERENCED,
         page_break_placeholder=PAGE_BREAK,
     )
-    combined_markdown = portable_markdown(
+    serialized = portable_markdown(
         (root / "document.md").read_text(encoding="utf-8"), root
     )
-    write_text(root / "document.md", combined_markdown)
-    sections = combined_markdown.split(PAGE_BREAK)
-    if len(sections) != len(page_numbers):
-        # A one-page document has no separator; any other mismatch means a
-        # Docling serialization contract changed and should fail loudly.
-        if len(page_numbers) == 1:
-            sections = [combined_markdown]
-        else:
-            raise RuntimeError(
-                f"Docling Markdown contained {len(sections)} page sections for "
-                f"{len(page_numbers)} pages"
-            )
+    sections = [] if not serialized.strip() else serialized.split(PAGE_BREAK)
+    pages_with_content = {
+        page_no
+        for page_no in page_numbers
+        if document.export_to_markdown(
+            page_no=page_no, image_mode=ImageRefMode.PLACEHOLDER
+        ).strip()
+    }
+    page_sections = align_page_sections(page_numbers, sections, pages_with_content)
 
     page_records: list[dict] = []
+    page_markdown: list[str] = []
     combined_text: list[str] = []
-    for page_no, section in zip(page_numbers, sections):
-        markdown = portable_markdown(section, root, page_file=True)
+    for page_no, section in zip(page_numbers, page_sections):
         markdown_path = f"pages/page-{page_no:04d}.md"
         text_path = f"pages/page-{page_no:04d}.txt"
+        markdown = portable_markdown(section, root, page_file=True)
         write_text(root / markdown_path, markdown)
         plain = document.export_to_text(page_no=page_no, traverse_pictures=True)
         write_text(root / text_path, plain)
@@ -249,8 +274,10 @@ def convert(args) -> dict:
                 "text_path": text_path,
             }
         )
+        page_markdown.append(markdown)
         combined_text.append(f"Page {page_no}\n\n{plain.strip()}\n")
 
+    write_text(root / "document.md", combine_page_markdown(page_markdown))
     write_text(root / "document.txt", "\n".join(combined_text))
 
     # Structural JSON preserves layout/provenance; images remain referenced in
