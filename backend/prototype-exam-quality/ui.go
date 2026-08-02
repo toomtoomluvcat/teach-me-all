@@ -40,7 +40,7 @@ func keys(pairs ...string) {
 // renderExtraction shows what came out of the PDF. This screen exists because
 // bad extraction and a bad model look identical downstream, and this is the
 // only place you can tell them apart.
-func renderExtraction(pdfPath, mode string, pages []examgen.Page, chunks []examgen.Chunk) {
+func renderExtraction(pdfPath, mode string, pages []examgen.Page, chunks []examgen.Chunk, waitForInput bool) {
 	clear()
 	header("STEP 1 — extracted text")
 
@@ -69,7 +69,9 @@ func renderExtraction(pdfPath, mode string, pages []examgen.Page, chunks []examg
 		shown++
 	}
 
-	keys("enter", "continue", "q", "quit")
+	if waitForInput {
+		keys("enter", "continue", "q + enter", "quit")
+	}
 }
 
 // renderOutline lists the lessons pass 1 produced.

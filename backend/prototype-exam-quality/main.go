@@ -28,27 +28,37 @@ import (
 )
 
 type config struct {
-	provider          string
-	pdfPath           string
-	extract           string
-	model             string
-	embedModel        string
-	ocrModel          string
-	host              string
-	geminiHost        string
-	geminiAPIKey      string
-	deepseekHost      string
-	deepseekAPIKey    string
-	geminiMinInterval time.Duration
-	forceCalc         bool
-	scope             string
-	pages             string
-	budget            int
-	fresh             bool
-	extractOnly       bool
-	repair            bool
-	calcTool          bool
-	parallel          int
+	provider           string
+	pdfPath            string
+	extract            string
+	model              string
+	embedModel         string
+	extractDir         string
+	doclingPython      string
+	doclingOCREngine   string
+	doclingOCRLang     string
+	doclingOCRFullPage bool
+	host               string
+	geminiHost         string
+	geminiAPIKey       string
+	deepseekHost       string
+	deepseekAPIKey     string
+	geminiMinInterval  time.Duration
+	forceCalc          bool
+	scope              string
+	pages              string
+	budget             int
+	fresh              bool
+	extractOnly        bool
+	repair             bool
+	calcTool           bool
+	parallel           int
+}
+
+type extractionCache struct {
+	Pages    []examgen.Page       `json:"pages"`
+	Mode     string               `json:"mode"`
+	Prepared *pdfx.PreparedBundle `json:"prepared,omitempty"`
 }
 
 func main() {
@@ -56,7 +66,12 @@ func main() {
 	var cfg config
 	flag.StringVar(&cfg.provider, "provider", "ollama", "model provider: ollama | gemini | deepseek")
 	flag.StringVar(&cfg.pdfPath, "pdf", "", "path to the source PDF (required)")
-	flag.StringVar(&cfg.extract, "extract", "auto", "extraction mode: auto | text | poppler | ocr")
+	flag.StringVar(&cfg.extract, "extract", "auto", "extraction mode: auto | docling (both use Docling; auto is the default name)")
+	flag.StringVar(&cfg.extractDir, "extract-dir", "", "directory for the extraction bundle; default .scratch/<hash>/extract")
+	flag.StringVar(&cfg.doclingPython, "docling-python", "", "Python with Docling installed; auto-detected from .scratch/docling-venv")
+	flag.StringVar(&cfg.doclingOCREngine, "docling-ocr-engine", "auto", "Docling OCR engine: auto | rapidocr | easyocr")
+	flag.StringVar(&cfg.doclingOCRLang, "docling-ocr-lang", "th,en", "Docling OCR languages; defaults to Thai + English")
+	flag.BoolVar(&cfg.doclingOCRFullPage, "docling-ocr-full-page", false, "force OCR over complete pages instead of only detected regions")
 	flag.StringVar(&cfg.model, "model", "", "generation and judge model (provider default when empty)")
 	// bge-m3, not nomic-embed-text. Measured on Thai question pairs,
 	// nomic returns cosine 1.0000 for every pair in the same chapter whether
@@ -64,7 +79,6 @@ func main() {
 	// chunk ranking built on it is random. bge-m3 scores duplicates at 0.95+
 	// and different questions at 0.60, a usable gap of 0.31.
 	flag.StringVar(&cfg.embedModel, "embed-model", "", "embedding model, empty to use the provider default")
-	flag.StringVar(&cfg.ocrModel, "ocr-model", "scb10x/typhoon-ocr1.5-3b", "vision model used by --extract=ocr")
 	flag.StringVar(&cfg.host, "host", "http://localhost:11434", "Ollama host")
 	flag.StringVar(&cfg.geminiHost, "gemini-host", "https://generativelanguage.googleapis.com", "Gemini API host")
 	flag.StringVar(&cfg.geminiAPIKey, "gemini-api-key", "", "Gemini API key (prefer GEMINI_API_KEY)")
@@ -195,11 +209,8 @@ func run(ctx context.Context, cfg config) error {
 		modelClient = client
 		stats = client.Stats
 	} else {
-		if cfg.extract == "ocr" {
-			return fmt.Errorf("--extract=ocr currently requires --provider ollama; Gemini and DeepSeek text generation are supported, OCR is not wired for them")
-		}
 		if cfg.provider == "gemini" {
-			if (!cfg.extractOnly || cfg.extract == "ocr") && cfg.geminiAPIKey == "" {
+			if !cfg.extractOnly && cfg.geminiAPIKey == "" {
 				return fmt.Errorf("Gemini provider requires GEMINI_API_KEY or --gemini-api-key")
 			}
 			gemini := llm.NewGeminiAt(cfg.geminiHost, cfg.geminiAPIKey, nil)
@@ -207,7 +218,7 @@ func run(ctx context.Context, cfg config) error {
 			modelClient = gemini
 			stats = gemini.Stats
 		} else {
-			if (!cfg.extractOnly || cfg.extract == "ocr") && cfg.deepseekAPIKey == "" {
+			if !cfg.extractOnly && cfg.deepseekAPIKey == "" {
 				return fmt.Errorf("DeepSeek provider requires DEEPSEEK_API_KEY or --deepseek-api-key")
 			}
 			deepseek := llm.NewDeepSeekAt(cfg.deepseekHost, cfg.deepseekAPIKey, nil)
@@ -220,7 +231,7 @@ func run(ctx context.Context, cfg config) error {
 	// Fail here rather than twenty minutes into pass 1. Skipped for
 	// --extract-only, whose whole point is to inspect extraction on a machine
 	// with no models pulled yet.
-	if cfg.provider == "ollama" && (!cfg.extractOnly || cfg.extract == "ocr") {
+	if cfg.provider == "ollama" && !cfg.extractOnly {
 		if err := preflight(ctx, client, cfg); err != nil {
 			return err
 		}
@@ -232,37 +243,59 @@ func run(ctx context.Context, cfg config) error {
 		return err
 	}
 
-	chosen := cfg.extract
-	pages, err := cached(cfg, "pages", func() ([]examgen.Page, error) {
+	renderProgress("extract", 0, 0, "checking cache")
+	// v3 is Docling-only. Older caches may contain fallback text without the
+	// structured Markdown/figure envelope and must never satisfy this path.
+	extracted, err := cachedT(cfg, "pages-v3", func() (extractionCache, error) {
 		switch cfg.extract {
 		case "auto":
-			p, mode, err := pdfx.ExtractAuto(cfg.pdfPath, from, to)
-			chosen = "auto -> " + mode
-			return p, err
-		case "text":
-			return pdfx.ExtractText(cfg.pdfPath, from, to)
-		case "poppler":
-			return pdfx.ExtractPoppler(cfg.pdfPath, from, to)
-		case "ocr":
-			renderProgress("ocr", 0, 0, "loading "+cfg.ocrModel)
-			return pdfx.ExtractOCR(ctx, client, cfg.ocrModel, cfg.pdfPath, from, to, func(done, total int) {
-				renderProgress("ocr", done, total, "rasterise + read")
+			result, err := pdfx.ExtractAuto(ctx, pdfx.AutoOptions{
+				PDF: cfg.pdfPath, OutputDir: extractionDir(cfg), From: from, To: to,
+				Python: cfg.doclingPython, OCREngine: cfg.doclingOCREngine,
+				OCRLanguage: cfg.doclingOCRLang, OCRFullPage: cfg.doclingOCRFullPage,
+				Progress: renderProgress,
 			})
+			return extractionCache{Pages: result.Pages, Mode: result.Mode, Prepared: result.Prepared}, err
+		case "docling":
+			result, err := pdfx.ExtractDocling(ctx, pdfx.DoclingOptions{
+				Python: cfg.doclingPython, PDF: cfg.pdfPath, OutputDir: extractionDir(cfg),
+				From: from, To: to, OCREngine: cfg.doclingOCREngine,
+				OCRLanguage: cfg.doclingOCRLang, OCRFullPage: cfg.doclingOCRFullPage,
+				Progress: renderProgress,
+			})
+			mode := "docling"
+			if result.ResolvedOCREngine != "" {
+				mode += "/" + result.ResolvedOCREngine
+			}
+			return extractionCache{Pages: result.Pages, Mode: mode, Prepared: &result.Prepared}, err
 		default:
-			return nil, fmt.Errorf("--extract must be auto, text, poppler or ocr, got %q", cfg.extract)
+			return extractionCache{}, fmt.Errorf("--extract must be auto or docling, got %q", cfg.extract)
 		}
 	})
 	if err != nil {
 		return fmt.Errorf("extract: %w", err)
 	}
+	pages := extracted.Pages
+	resolved := extracted.Mode
+	if resolved == "" {
+		resolved = cfg.extract
+	}
+	displayMode := resolved
+	if cfg.extract == "auto" {
+		displayMode = "auto -> " + resolved
+	}
+	renderProgress("extract", len(pages), len(pages), "ready: "+displayMode)
 	chunks := examgen.ChunkPages(pages, examgen.DefaultChunkOptions())
-	renderExtraction(cfg.pdfPath, chosen, pages, chunks)
+	renderExtraction(cfg.pdfPath, displayMode, pages, chunks, !cfg.extractOnly)
 	// A scanned PDF has pages but no characters on them. Counting pages is not
 	// enough to notice — count what actually came out.
 	verdict := checkExtraction(cfg, pages)
 	if cfg.extractOnly {
 		if verdict != nil {
 			fmt.Printf("\n%s%v%s\n", red, verdict, reset)
+		}
+		if err := writeExtractionBundle(cfg, resolved, from, to, pages, extracted.Prepared); err != nil {
+			return err
 		}
 		return dumpExtraction(cfg, pages)
 	}
@@ -271,12 +304,6 @@ func run(ctx context.Context, cfg config) error {
 	}
 	if !confirm(in) {
 		return nil
-	}
-
-	// The OCR model and the generation model cannot both sit in 6 GB of VRAM,
-	// so the one we are done with is evicted before the next is loaded.
-	if client != nil && cfg.extract == "ocr" {
-		_ = client.Unload(ctx, cfg.ocrModel)
 	}
 
 	// --- step 2: outline ----------------------------------------------------
@@ -392,13 +419,10 @@ func checkExtraction(cfg config, pages []examgen.Page) error {
 	}
 
 	if total == 0 {
-		if cfg.extract == "ocr" {
-			return fmt.Errorf("OCR returned nothing for any of the %d pages — check the model and the rasterised images", len(pages))
-		}
-		return fmt.Errorf("%s has %d pages and no text layer at all — it is a scan.\nrerun with --extract=ocr", cfg.pdfPath, len(pages))
+		return fmt.Errorf("Docling returned no text for any of the %d pages in %s — inspect the extraction bundle and OCR settings", len(pages), cfg.pdfPath)
 	}
 	if empty*2 > len(pages) {
-		fmt.Printf("\n%swarning: %d of %d pages came out effectively empty. If those pages matter, use --extract=ocr.%s\n",
+		fmt.Printf("\n%swarning: %d of %d pages came out effectively empty; inspect those pages and adjust Docling OCR settings if needed.%s\n",
 			yellow, empty, len(pages), reset)
 	}
 	return nil
@@ -426,16 +450,35 @@ func dumpExtraction(cfg config, pages []examgen.Page) error {
 	return nil
 }
 
+func writeExtractionBundle(cfg config, mode string, from, to int, pages []examgen.Page, prepared *pdfx.PreparedBundle) error {
+	result, err := pdfx.WriteBundle(pdfx.BundleOptions{
+		OutputDir:      extractionDir(cfg),
+		SourcePDF:      cfg.pdfPath,
+		RequestedMode:  cfg.extract,
+		ResolvedMode:   mode,
+		ExtractionMode: mode, // compatibility alias for older consumers
+		From:           from,
+		To:             to,
+		Pages:          pages,
+		Prepared:       prepared,
+		Progress:       renderProgress,
+	})
+	if err != nil {
+		return fmt.Errorf("write extraction bundle: %w", err)
+	}
+	for _, warning := range result.Warnings {
+		fmt.Printf("\n%swarning: %s%s\n", yellow, warning, reset)
+	}
+	fmt.Printf("\n%sextraction bundle written to %s%s\n", dim, extractionDir(cfg), reset)
+	return nil
+}
+
 // preflight checks the models are pulled before anything slow starts.
 func preflight(ctx context.Context, c *llm.Client, cfg config) error {
 	want := []string{cfg.model}
 	if cfg.embedModel != "" {
 		want = append(want, cfg.embedModel)
 	}
-	if cfg.extract == "ocr" {
-		want = append(want, cfg.ocrModel)
-	}
-
 	var missing []string
 	for _, m := range want {
 		ok, err := c.Installed(ctx, m)
@@ -574,6 +617,13 @@ func parsePages(s string) (int, int, error) {
 func scratchDir(cfg config) string {
 	h := sha1.Sum([]byte(cfg.pdfPath + "|" + cfg.extract + "|" + cfg.pages))
 	return filepath.Join(".scratch", hex.EncodeToString(h[:8]))
+}
+
+func extractionDir(cfg config) string {
+	if cfg.extractDir != "" {
+		return cfg.extractDir
+	}
+	return filepath.Join(scratchDir(cfg), "extract")
 }
 
 // cached memoises a slow step to disk. Extraction and pass 1 take minutes and

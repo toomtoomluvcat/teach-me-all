@@ -63,7 +63,6 @@ will have to do anyway. Building it here is not throwaway work.
   ```
   ollama pull scb10x/typhoon2.5-qwen3-4b
   ollama pull bge-m3
-  ollama pull scb10x/typhoon-ocr1.5-3b     # only for --extract=ocr
   ```
 - Gemini is also supported through the Gemini REST API. Set `GEMINI_API_KEY`
   before running; the default Gemini models are `gemini-2.5-flash` and
@@ -74,7 +73,15 @@ will have to do anyway. Building it here is not throwaway work.
   disabled for this provider.
 - The CLI also loads the nearest `.env` from the working directory or its
   parents. Already-exported environment variables take precedence.
-- For `--extract=ocr`: `pdftoppm` (poppler) on PATH to rasterize pages.
+- For the best `--extract=auto` path: Python 3.12 plus the project-local
+  Docling runtime. Set it up once from PowerShell:
+  ```powershell
+  .\setup-docling.ps1
+  ```
+  The runtime lives at the repo-level `.scratch/docling-venv`; it is reused by
+  `go run` and `protoexam.exe` and never calls Gemini, DeepSeek, or another
+  generative API. Models download only on the first run. Docling is required;
+  extraction fails clearly when this runtime is unavailable.
 
 Target machine is 6 GB VRAM, so models are loaded and unloaded one at a time.
 
@@ -103,7 +110,12 @@ Flags:
 |------|---------|---------|
 | `--pdf` | *(required)* | source PDF |
 | `--provider` | `ollama` | `ollama`, `gemini`, or `deepseek` |
-| `--extract` | `auto` | `auto` picks per document, `text` = ledongthuc/pdf, `poppler` = pdftotext, `ocr` = rasterise + typhoon-ocr |
+| `--extract` | `auto` | `auto` and `docling` both run the single supported Docling pipeline; there is no lower-quality fallback |
+| `--extract-dir` | `.scratch/<hash>/extract` | output directory for the reusable extraction bundle |
+| `--docling-python` | auto-detected | Python executable containing Docling; overrides `DOCLING_PYTHON` |
+| `--docling-ocr-engine` | `auto` | auto selects EasyOCR because the default language set includes Thai; pass `rapidocr` explicitly for a Latin-only speed test |
+| `--docling-ocr-lang` | `th,en` | comma-separated OCR languages |
+| `--docling-ocr-full-page` | `false` | OCR the complete page; normally leave off so native PDF text stays native |
 | `--calc-tool` | `true` | model calls a calculator before writing calculation questions. Took arithmetic failures from 5 to 0 — see VERDICT.md |
 | `--repair` | `false` | hand rejected questions back with the discrepancy. Measured worthless on 4B |
 | `--model` | provider default | generation + judge model; Ollama defaults to `scb10x/typhoon2.5-qwen3-4b`, Gemini to `gemini-2.5-flash`, DeepSeek to `deepseek-chat` |
@@ -120,14 +132,31 @@ Flags:
 | `--scope` | *(none)* | free-text focus; chunks are ranked against this instead of the lesson title |
 | `--budget` | *(model decides)* | override how many questions the lesson should have |
 
-**Run `--extract-only` first, on both PDFs, before installing anything.** It is
-free and instant and it tells you whether the rest of the pipeline has a chance:
+**Run `--extract-only` first.** It makes no LLM API calls and tells you whether
+the rest of the pipeline has a chance:
 
 ```
 go run . --pdf ../../samples/thai-book.pdf --extract-only
 ```
 
-It writes the whole extracted text to `.scratch/<hash>/extracted.txt`. Read it.
+The built executable can be reused without rebuilding:
+
+```powershell
+.\protoexam.exe --extract-only --extract auto --pdf ..\..\samples\openstax-college-algebra.pdf
+```
+
+It writes a reusable bundle under `.scratch/<hash>/extract/` (or
+`--extract-dir`): `manifest.json`, combined and per-page Markdown/plain text,
+Docling's structural JSON, and figure-level image crops referenced from the
+Markdown. It does **not** render and store every page as an image. That keeps
+the reading bundle small while preserving diagrams and photos that would be
+lost by text extraction. The older `extracted.txt` is also written for
+compatibility.
+
+Extraction reports the active stage and elapsed time while Docling is running,
+then the exact page/figure totals and bundle-write progress. `--extract-only`
+does not wait for keyboard input; a normal generation run shows `[enter]` to
+continue and `[q + enter]` to quit.
 
 Extraction and embedding are cached under `.scratch/` (gitignored) because they are
 slow and rerunning them while iterating on prompts is a waste.
@@ -173,28 +202,18 @@ and returns values. That is what makes it liftable.
 
 ## What extraction actually does
 
-Two things had to be fixed before the text layer was usable, both in `pdfx`:
-
-1. **`GetPlainText` is not usable.** It emits every PDF text run on its own
-   line, so "DLD-01" arrives as three lines and a Thai word split across runs
-   arrives split. `GetTextByRow` groups runs by Y position instead; `pageText`
-   then joins them left to right, inserting a space only where the gap is wide
-   enough to be a real one. Thai gets a wider threshold because it does not put
-   spaces between words at all.
-2. **SARA AM (ำ) loses its NIKHAHIT.** It is drawn as two glyphs and many PDFs
-   have no character map for the one on top, so "คำ" extracts as "ค" + space +
-   "า". Without repairing this, gate 1 fails on every Thai question — the model
-   writes "คำ" and the source says "ค า". `repairThai` puts it back.
-
-Lines that are more than 30% U+FFFD are dropped: diagrams embed fonts with no
-character map and what comes out is noise that costs tokens and confuses pass 1.
+`auto` is **Docling standard pipeline + pypdfium2**. It recovers reading order,
+tables, native text, OCR text, and figure crops in one local pass. EasyOCR
+`th,en` is the default so Thai remains supported for bitmap text and scans.
+The same result supplies Markdown for reading and plain text for exam chunks.
+There is deliberately no text-only or LLM OCR fallback: a Docling failure is an
+extraction failure, not permission to silently return a lower-quality document.
 
 ## Known risks going in
 
-1. ~~**Thai PDF extraction.**~~ Checked against a real Thai course handout:
-   `ledongthuc/pdf` reads Thai correctly once the two fixes above are in place.
-   Still verify with `--extract-only` on each new document — a scanned PDF has
-   no text layer at all and needs `--extract=ocr`.
+1. **Thai camera/flatbed scans.** The official ม.5 benchmark is a digital PDF.
+   Pages 60-62 prove Thai text, tables, page boundaries, OCR labels, and figure
+   crops, but not skew, shadows, blur, or paper texture from a genuine scan.
 2. **A 4B model judging gates 2 and 3.** If it rejects good questions we will
    misread the pipeline as broken. Cross-check by hand on the first run.
 3. **4B Thai output quality** is a separate failure mode from (1). Do not conflate

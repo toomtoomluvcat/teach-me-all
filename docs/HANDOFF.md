@@ -3,8 +3,8 @@
 Last updated 2026-08-03. Supersedes the earlier copy in the OS temp directory;
 this file is canonical, delete that one.
 
-Repo: `E:\contribute\teach-me-all`. Branch `prototype/exam-quality`, two commits
-ahead of `main`, with `origin/prototype/exam-quality` at `5a61b8c`. Work done
+Repo: `E:\contribute\teach-me-all`. Branch `prototype/exam-quality`, five commits
+ahead of `main`, with `origin/prototype/exam-quality` at `339827d`. Work done
 after that commit is uncommitted; see "Uncommitted work" below.
 
 ## Read these first, in this order
@@ -102,39 +102,27 @@ Reading the 10 passing biology questions by hand: 3 genuinely good, 3 with a tru
 distractor, 4 weak (off-topic distractors, or answerable without reading). So 45%
 still overstates it.
 
-## Uncommitted work since `5a61b8c`
+## Uncommitted work since `339827d`
 
 Everything below is in the working tree, builds, and `go vet` is clean. It is not
 committed.
 
-- `examgen/pipeline.go` — cheap gates now run before duplicate embeddings, and
-  eligible question stems are embedded as one batch per source chunk.
-- `examgen/pipeline_test.go` — regression test for the batching and skip path.
-- `llm/stats.go` and `llm/client.go` — measured model-call wall clock, plus an
-  elapsed-time `embed` bucket for `/api/embed`; report shares now use wall clock
-  rather than the sum of overlapping call durations.
-- `llm/stats_test.go` — deterministic regression test for the timing report.
-- `llm/gemini.go`, `llm/gemini_test.go`, and `main.go` — Gemini REST provider
-  behind the same `ModelClient` interface. Use `--provider gemini` with
-  `GEMINI_API_KEY`; the report labels itself and `TOTAL` is the exact number of
-  Gemini HTTP requests attempted by the process, including retries and failed
-  responses. OCR remains Ollama-only. Live smoke testing completed the map pass
-  before the configured Gemini free-tier quota returned 429 on reduce.
-- `examgen/pipeline.go`, `examgen/prompt.go`, and `llm/topic_batch.go` — Gemini
-  maps all chunks in one structured pass-1 request instead of one request per
-  chunk. The CLI also spaces Gemini requests by 13 seconds by default and
-  retries one 429 using the server's retry hint; Ollama is unchanged.
-- `llm/deepseek.go`, `llm/topic_batch.go`, and `llm/deepseek_test.go` — added
-  DeepSeek's OpenAI-compatible chat provider (`--provider deepseek`) with JSON
-  mode, function calling, batched pass-1 mapping, and call-count reporting.
-  DeepSeek embeddings are intentionally disabled; set `DEEPSEEK_API_KEY` in
-  `.env`. Because DeepSeek JSON mode does not enforce the supplied schema, the
-  batch mapper now retries only omitted chunks individually and the prompts
-  spell out the exact JSON shape for both mapping and question generation.
-  `Calculation.Expected` also accepts a strictly numeric quoted value from a
-  hosted model, but rejects units and other prose before the arithmetic gate.
-- `backend/prototype-exam-quality/README.md` — Gemini setup, flags, and call
-  report semantics.
+- `pdfx/docling.go`, `docling_helper.py`, `auto.go`, and tests — local Docling
+  standard-pipeline extraction using pypdfium2. `auto` is Docling-only and uses
+  EasyOCR `th,en` by default. Failure is surfaced; there is no text-only or LLM
+  OCR fallback.
+- `pdfx/bundle.go` and tests — durable extraction bundle containing a manifest,
+  Docling JSON, combined/per-page Markdown and plain text, source SHA-256, and
+  figure-level crops referenced from Markdown. Fresh runs remove stale managed
+  assets; full-page screenshots are no longer generated.
+- `main.go` and tests — Docling flags, `--extract=docling`, v3 cache envelopes
+  that preserve the prepared Markdown/asset graph, and bundle creation on every
+  `--extract-only` run including cache hits. Extraction reports a heartbeat with
+  elapsed time while Docling runs. The preview only prints keyboard actions when
+  it is actually waiting; quit is line-based (`q` then Enter).
+- `setup-docling.ps1` — reproducible pinned project-local runtime installation.
+- `backend/prototype-exam-quality/README.md` — extraction bundle layout and the
+  reusable `protoexam.exe` workflow.
 
 ## Findings that will not be obvious from the code
 
@@ -144,14 +132,10 @@ committed.
   This also means chunk ranking and `--scope` were random on Thai before the
   switch. bge-m3 is 1024-dim, nomic is 768 — changing embedder invalidates every
   stored vector.
-- **No single PDF extractor works.** Thai handout → the Go path (poppler drops
-  the NIKHAHIT of ำ silently, turning "คำ" into the different, valid word "คา").
-  arXiv → poppler (the Go path gets no glyph geometry at all, every run reporting
-  X, W, FontSize of zero). Biology → poppler (the Go path lost every space:
-  "Theenergystoredincarbohydrate"). Each new document produced a new rule.
-  `--extract=auto` now decides per document and prints which it chose.
-- **Letter count cannot detect missing spaces** — that was a real bug in `auto`
-  and is why `spacingBroken()` exists.
+- **The discarded text-layer extractors failed in different ways.** The Go,
+  Poppler, and Typhoon OCR paths were useful experiments but are no longer in
+  runtime code. Docling is now the only PDF extraction contract so every bundle
+  has the same Markdown/table/figure representation.
 - **Tools and a `format` JSON schema are mutually exclusive in Ollama.** With
   both set the grammar wins, no tool call is emitted, and the model quietly
   answers from its own head. Generation is two turns because of this.
@@ -191,10 +175,13 @@ always exactly true. Real sizes: 19 biology pages → 46 chunks; 3 Thai pages �
 
 Tables to create: `documents` (with `sha256` and a **pinned `extract_mode`** —
 re-extracting with a different extractor shifts every offset and breaks every
-stored citation), `document_pages` (raw page text, so re-chunking never requires
-re-running OCR), `chunk_sets` (versioned, so changing chunk size does not orphan
-questions that reference old chunks), `chunks` (page_no, ordinal, start_off,
-end_off, text, `vector(1024)`, HNSW index).
+stored citation), `document_pages` (`markdown` for reading/model context and
+derived `plain_text` for search/quote offsets, so re-chunking never requires
+re-running OCR), `document_assets` (page/figure image, MIME type, storage key,
+page number and later bounding box/alt text), `chunk_sets` (versioned, so
+changing chunk size does not orphan questions that reference old chunks),
+`chunks` (page_no, ordinal, start_off, end_off, text, `vector(1024)`, HNSW
+index), and later `question_assets` for questions that require an image.
 
 Three decisions that are painful to reverse:
 
@@ -205,27 +192,26 @@ Three decisions that are painful to reverse:
    characters in half. Postgres `substring(text FROM n FOR m)` counts characters
    and lines up; `substr()` on `bytea` does not.
 
-## Open question the owner has not answered
+## OCR representation decision now settled
 
-**The OCR path emits Markdown, the other two emit plain text.** `typhoon-ocr` is
-instructed to render tables as HTML and equations as LaTeX. So one
-`document_pages.text` column would hold two formats depending on mode and page
-content, and `quote_verbatim` would have to match against `<td>` and `$…$`.
-Options put to the owner, not yet chosen: strip markup before storing and keep
-the marked-up version in a separate column, or tell typhoon-ocr to emit plain
-text and lose table structure. Nothing was implemented either way.
+Keep both representations. Markdown is canonical for the reading UI and model
+context; derived plain text is canonical for search, chunk offsets and exact
+quote checks. Images are separate figure assets referenced by Markdown, never
+base64 inside stored content. Docling now extracts figure-level crops rather
+than keeping every PDF page as a PNG. Image-dependent questions must attach the
+relevant source asset or be rejected; an AI-generated description alone is not
+sufficient evidence.
 
 ## Environment on this machine
 
 - Ollama 0.32.5 at `%LOCALAPPDATA%\Programs\Ollama`, **not on PATH**. Running
   with `OLLAMA_NUM_PARALLEL=4` and `OLLAMA_MAX_LOADED_MODELS=2` (set as user env
   vars; a restart is needed for changes to take).
-- Models: `scb10x/typhoon2.5-qwen3-4b`, `bge-m3`, `nomic-embed-text`,
-  `scb10x/typhoon-ocr1.5-3b`.
-- poppler 25.07 via winget, **also not on PATH**; `pdfx/tools.go` globs the
-  winget Packages directory. Git for Windows ships an Xpdf 4.00 binary also
-  called `pdftotext` that *is* on PATH and is worse at Thai — `findTool`
-  deliberately looks past it.
+- Generation models: `scb10x/typhoon2.5-qwen3-4b`, `bge-m3`, and
+  `nomic-embed-text`. PDF extraction does not use these models.
+- Docling 2.117.0, RapidOCR 3.9.2, EasyOCR 1.7.2 and ONNX Runtime 1.28.0 live in
+  repo-level `.scratch/docling-venv`. `setup-docling.ps1` recreates it. This path
+  is entirely local and makes zero Gemini/DeepSeek/generative-LLM calls.
 - RTX 4050 Laptop 6 GB, Ryzen 7 8845HS, 31 GB RAM but only ~8 GB free during the
   session, which is why the 19 GB `typhoon2.5-qwen3-30b-a3b` was never tried.
 - PowerShell 5.1: no `&&`. Build once with `go build -o protoexam.exe .`.
@@ -247,17 +233,19 @@ Found by reading, not fixed, filed nowhere else:
 
 1. **Close the prototype.** The owner still has not compared against NotebookLM
    on the same file. Keep asking before anyone builds on the numbers.
-2. **If a clean performance claim matters, do one cold-cache rerun** after
+2. Replay the six known true-distractor questions through `judge/source` only,
+   once with local 4B and once with DeepSeek. The DeepSeek smoke run proved the
+   wiring, not that the larger judge catches the recurring defect.
+3. Obtain a genuine Thai camera/flatbed scan. The new official สสวท. benchmark
+   is digital (Biology M.5 book 4); pages 60-62 prove Thai text, table, page
+   breaks and figure crops, but do not prove robustness to skew/shadows/blur.
+   If image-dependent questions are in MVP scope, add `question_assets`;
+   otherwise forbid those questions explicitly.
+4. **If a clean performance claim matters, do one cold-cache rerun** after
    unloading both models. The instrumentation now shows the batching path itself
    is only 9 embed calls / 3.007s on this workload; the remaining load cost is
    generator/judge model swapping.
-3. Run one small live Gemini generation with a real key and record the call
-   report alongside the Ollama baseline; this validates provider wiring and
-   gives the first remote quality/cost comparison.
-4. **Then** try a larger model on `judge/source` only — the true-distractor
-   defect is the only thing left that a bigger model fixes.
-5. Decide the Markdown-vs-plain-text question above.
-6. Commit the uncommitted work.
+5. Commit the uncommitted extraction-bundle work.
 
 ## Suggested skills
 
@@ -278,7 +266,9 @@ Found by reading, not fixed, filed nowhere else:
 ## Traps
 
 - `.scratch/` caches extraction and the pass-1 outline per (file, mode, page
-  range). Edit a prompt, rerun, and you get the cached outline. Pass `--fresh`.
+  range). Extraction uses `pages-v3.json` so caches from removed fallback paths
+  cannot satisfy Docling-only runs. Edit a prompt, rerun, and you get the cached outline. Pass
+  `--fresh`.
 - Without `--budget` the model often sets its own budget to 1, and a 1/1 pass
   rate measures nothing.
 - Without `--pages`, pass 1 fires one model call per chunk across the whole
