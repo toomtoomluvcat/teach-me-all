@@ -3,10 +3,13 @@
 Last updated 2026-08-03. Supersedes the earlier copy in the OS temp directory;
 this file is canonical, delete that one.
 
-Repo: `E:\contribute\teach-me-all`. Branch `prototype/exam-quality`, ten commits
-ahead of `main`. Current HEAD is `1d99b8e`; `origin/prototype/exam-quality` is
-`f929434`, so the branch has one local commit not pushed. The source tree was
-clean before this handoff update; this `docs/HANDOFF.md` edit is uncommitted.
+Repo: `E:\contribute\teach-me-all`. Branch `prototype/exam-quality`. HEAD is
+`4aacc9f`; nothing is pushed and the working tree is clean.
+
+The previous session ran out of budget mid-decision. Everything it decided is
+written down here. **Start at items 1 and 2 of "What to do next"** — item 1 is
+a live problem, not an improvement: `needs_the_source` currently rejects about
+84% of drafts on a mis-calibrated criterion.
 
 ## Read these first, in this order
 
