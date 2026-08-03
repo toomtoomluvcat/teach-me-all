@@ -26,12 +26,19 @@ type Chunk struct {
 	LessonID string
 }
 
-// TopicKind is what the map step says a topic is.
+// TopicKind is what the map step says a passage is.
 //
 // The classification is made by the model while it still has the passage in
 // front of it, which costs no extra request. The alternative — matching known
 // teacher-guide phrases against topic titles afterwards — was implemented and
 // then removed: it only ever knew the wording of the books it had already seen.
+//
+// It is a property of the passage, not of an individual topic. Labelling each
+// topic separately was measured first and over-dropped badly: a teacher's-guide
+// page mixes instructions with the subject matter they are about, and asking
+// "what is this topic" invited the model to file the whole passage under the
+// instruction it saw first. "What is this passage" is one judgement per chunk
+// and is the question the pipeline actually needs answered.
 type TopicKind string
 
 const (
@@ -46,61 +53,80 @@ const (
 	TopicNonContent TopicKind = "non_content"
 )
 
-// nonContentSentinel is the pre-kind wire value. Cached and older provider
-// output still carries it as a topic title.
+// nonContentSentinel is the pre-kind wire value. Older provider output still
+// carries it as a topic title.
 const nonContentSentinel = "NON_CONTENT"
 
-// Topic is one label the map step attached to a chunk.
-type Topic struct {
-	Title string    `json:"title"`
-	Kind  TopicKind `json:"kind"`
+// ChunkTopics is what the map step returns for one chunk: what the passage is,
+// and the topics it names.
+type ChunkTopics struct {
+	Kind   TopicKind `json:"kind"`
+	Topics []string  `json:"topics"`
 }
 
-// Teaches reports whether this topic may become a concept in the evidence graph.
-func (t Topic) Teaches() bool {
-	return t.Kind == TopicContent && strings.TrimSpace(t.Title) != ""
+// NewChunkTopics normalises raw provider fields into a labelled chunk.
+func NewChunkTopics(kind string, topics []string) ChunkTopics {
+	labelled := ChunkTopics{Kind: TopicKind(strings.ToLower(strings.TrimSpace(kind))), Topics: topics}
+	labelled.normalise()
+	return labelled
 }
 
-// UnmarshalJSON accepts a bare string as well as the requested object. A JSON
-// schema guarantees syntax, not shape — DeepSeek has already been observed
-// returning an older field layout — and a topic that arrives without a kind is
-// treated as content, because wrongly dropping real material costs more than
-// letting one rubric through to the question-level gate.
-func (t *Topic) UnmarshalJSON(data []byte) error {
+// Teaches reports whether this passage may contribute concepts to the evidence
+// graph.
+func (c ChunkTopics) Teaches() bool { return c.Kind == TopicContent }
+
+// UnmarshalJSON tolerates a bare topic list and the pre-kind NON_CONTENT
+// sentinel. A JSON schema guarantees syntax, not shape — DeepSeek has already
+// been observed returning an older field layout — and a passage that arrives
+// without a kind is read as content, because wrongly dropping source material
+// costs more than letting one rubric reach the question-level gates.
+func (c *ChunkTopics) UnmarshalJSON(data []byte) error {
 	trimmed := strings.TrimSpace(string(data))
-	if strings.HasPrefix(trimmed, `"`) {
-		var title string
-		if err := json.Unmarshal(data, &title); err != nil {
+	if strings.HasPrefix(trimmed, "[") {
+		var topics []string
+		if err := json.Unmarshal(data, &topics); err != nil {
 			return err
 		}
-		*t = Topic{Title: title}
-		t.normalise()
+		*c = ChunkTopics{Topics: topics}
+		c.normalise()
 		return nil
 	}
 
 	var wire struct {
-		Title string `json:"title"`
-		Kind  string `json:"kind"`
+		Kind   string   `json:"kind"`
+		Topics []string `json:"topics"`
 	}
 	if err := json.Unmarshal(data, &wire); err != nil {
 		return err
 	}
-	*t = Topic{Title: wire.Title, Kind: TopicKind(strings.ToLower(strings.TrimSpace(wire.Kind)))}
-	t.normalise()
+	*c = ChunkTopics{Kind: TopicKind(strings.ToLower(strings.TrimSpace(wire.Kind))), Topics: wire.Topics}
+	c.normalise()
 	return nil
 }
 
-func (t *Topic) normalise() {
-	t.Title = strings.TrimSpace(t.Title)
-	if strings.EqualFold(t.Title, nonContentSentinel) {
-		t.Title = ""
-		t.Kind = TopicNonContent
-		return
+func (c *ChunkTopics) normalise() {
+	kept := c.Topics[:0]
+	sentinel := false
+	for _, title := range c.Topics {
+		title = strings.TrimSpace(title)
+		if title == "" {
+			continue
+		}
+		if strings.EqualFold(title, nonContentSentinel) {
+			sentinel = true
+			continue
+		}
+		kept = append(kept, title)
 	}
-	switch t.Kind {
+	c.Topics = kept
+
+	switch c.Kind {
 	case TopicContent, TopicApparatus, TopicNonContent:
 	default:
-		t.Kind = TopicContent
+		c.Kind = TopicContent
+	}
+	if sentinel && len(c.Topics) == 0 {
+		c.Kind = TopicNonContent
 	}
 }
 

@@ -2,76 +2,74 @@ package examgen
 
 import (
 	"encoding/json"
+	"reflect"
 	"testing"
 )
 
-func TestTopicUnmarshalToleratesProviderShapes(t *testing.T) {
+func TestChunkTopicsUnmarshalToleratesProviderShapes(t *testing.T) {
 	cases := []struct {
 		name string
 		json string
-		want Topic
+		want ChunkTopics
 	}{
 		{
 			name: "classified content",
-			json: `{"title":"การย่อยอาหารในปาก","kind":"content"}`,
-			want: Topic{Title: "การย่อยอาหารในปาก", Kind: TopicContent},
+			json: `{"kind":"content","topics":["การย่อยอาหารในปาก"]}`,
+			want: ChunkTopics{Kind: TopicContent, Topics: []string{"การย่อยอาหารในปาก"}},
 		},
 		{
 			name: "classified apparatus",
-			json: `{"title":"เฉลยแบบฝึกหัดท้ายบทที่ 13","kind":"APPARATUS"}`,
-			want: Topic{Title: "เฉลยแบบฝึกหัดท้ายบทที่ 13", Kind: TopicApparatus},
+			json: `{"kind":"APPARATUS","topics":["เฉลยแบบฝึกหัดท้ายบทที่ 13"]}`,
+			want: ChunkTopics{Kind: TopicApparatus, Topics: []string{"เฉลยแบบฝึกหัดท้ายบทที่ 13"}},
 		},
-		// A kind the model invented is not a licence to delete material, so it
+		// A kind the model invented is not a licence to delete a passage, so it
 		// falls back to content and the question-level gates stay responsible.
 		{
 			name: "unknown kind falls back to content",
-			json: `{"title":"Gas exchange","kind":"pedagogy"}`,
-			want: Topic{Title: "Gas exchange", Kind: TopicContent},
+			json: `{"kind":"pedagogy","topics":["Gas exchange"]}`,
+			want: ChunkTopics{Kind: TopicContent, Topics: []string{"Gas exchange"}},
 		},
 		{
 			name: "missing kind falls back to content",
-			json: `{"title":"Gas exchange"}`,
-			want: Topic{Title: "Gas exchange", Kind: TopicContent},
+			json: `{"topics":["Gas exchange"]}`,
+			want: ChunkTopics{Kind: TopicContent, Topics: []string{"Gas exchange"}},
 		},
-		// The pre-kind wire shape. DeepSeek has already been observed returning
-		// an older field layout, so this is a real regression path, not paranoia.
+		// The pre-kind wire shapes. DeepSeek has already been observed returning
+		// an older field layout, so these are real regression paths.
 		{
-			name: "bare string",
-			json: `"Gas exchange"`,
-			want: Topic{Title: "Gas exchange", Kind: TopicContent},
+			name: "bare topic list",
+			json: `["Gas exchange"]`,
+			want: ChunkTopics{Kind: TopicContent, Topics: []string{"Gas exchange"}},
 		},
 		{
 			name: "legacy NON_CONTENT sentinel",
-			json: `"NON_CONTENT"`,
-			want: Topic{Title: "", Kind: TopicNonContent},
+			json: `{"topics":["NON_CONTENT"]}`,
+			want: ChunkTopics{Kind: TopicNonContent, Topics: []string{}},
 		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			var got Topic
+			var got ChunkTopics
 			if err := json.Unmarshal([]byte(tc.json), &got); err != nil {
 				t.Fatalf("Unmarshal(%s) error = %v", tc.json, err)
 			}
-			if got != tc.want {
+			if got.Kind != tc.want.Kind || !reflect.DeepEqual(got.Topics, tc.want.Topics) {
 				t.Fatalf("Unmarshal(%s) = %#v, want %#v", tc.json, got, tc.want)
 			}
 		})
 	}
 }
 
-func TestBuildEvidenceGraphKeepsOnlyContentTopics(t *testing.T) {
+func TestBuildEvidenceGraphKeepsOnlyContentChunks(t *testing.T) {
 	chunks := []Chunk{
 		{ID: "p1-c0", Page: 1, Text: "digestion"},
 		{ID: "p2-c1", Page: 2, Text: "answers to the chapter exercises"},
 		{ID: "p3-c2", Page: 3, Text: "table of contents"},
 	}
-	perChunk := [][]Topic{
-		{
-			{Title: "การย่อยอาหารในปาก", Kind: TopicContent},
-			{Title: "แนวการวัดและประเมินผล", Kind: TopicApparatus},
-		},
-		{{Title: "เฉลยแบบฝึกหัดท้ายบทที่ 13", Kind: TopicApparatus}},
-		{{Title: "สารบัญ", Kind: TopicNonContent}},
+	perChunk := []ChunkTopics{
+		{Kind: TopicContent, Topics: []string{"การย่อยอาหารในปาก"}},
+		{Kind: TopicApparatus, Topics: []string{"เฉลยแบบฝึกหัดท้ายบทที่ 13", "แนวการวัดและประเมินผล"}},
+		{Kind: TopicNonContent, Topics: []string{"สารบัญ"}},
 	}
 
 	apparatus, furniture := CountDroppedTopics(perChunk)
@@ -81,12 +79,12 @@ func TestBuildEvidenceGraphKeepsOnlyContentTopics(t *testing.T) {
 
 	graph := BuildEvidenceGraph(chunks, perChunk)
 	if len(graph.Concepts) != 1 || graph.Concepts[0].Title != "การย่อยอาหารในปาก" {
-		t.Fatalf("concepts = %#v, want only the content topic", graph.Concepts)
+		t.Fatalf("concepts = %#v, want only the content chunk's topic", graph.Concepts)
 	}
 	if len(graph.Concepts[0].ChunkIDs) != 1 || graph.Concepts[0].ChunkIDs[0] != "p1-c0" {
 		t.Fatalf("provenance = %#v, want the chunk that taught the concept", graph.Concepts[0])
 	}
-	// A dropped topic must not become an edge endpoint, or the reduce step would
+	// A dropped chunk must not become an edge endpoint, or the reduce step would
 	// see a concept ID the graph no longer contains.
 	if len(graph.Edges) != 0 {
 		t.Fatalf("edges = %#v, want none", graph.Edges)

@@ -38,7 +38,7 @@ func writeDeepSeekTopics(t *testing.T, w http.ResponseWriter, ids []string) {
 	t.Helper()
 	chunks := make([]map[string]any, len(ids))
 	for i, id := range ids {
-		chunks[i] = map[string]any{"chunk_id": id, "topics": []string{"topic " + id}}
+		chunks[i] = map[string]any{"chunk_id": id, "kind": "content", "topics": []string{"topic " + id}}
 	}
 	content, err := json.Marshal(map[string]any{"chunks": chunks})
 	if err != nil {
@@ -79,7 +79,7 @@ func TestBatchedTopicsUsesOneCallAndRestoresOrder(t *testing.T) {
 	if err != nil {
 		t.Fatalf("BatchTopics() error = %v", err)
 	}
-	if len(got) != 2 || got[0][0].Title != "first" || got[1][0].Title != "second" {
+	if len(got) != 2 || got[0].Topics[0] != "first" || got[1].Topics[0] != "second" {
 		t.Fatalf("topics = %#v, want document order", got)
 	}
 	if calls := client.Stats.by["outline/map"].Calls; calls != 1 {
@@ -92,7 +92,7 @@ func TestBatchedTopicsUsesOneCallAndRestoresOrder(t *testing.T) {
 func TestBatchedTopicsCarriesTheClassificationThrough(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"choices":[{"message":{"content":"{\"chunks\":[{\"chunk_id\":\"p1-c0\",\"topics\":[{\"title\":\"การย่อยอาหารในปาก\",\"kind\":\"content\"}]},{\"chunk_id\":\"p1-c1\",\"topics\":[{\"title\":\"เฉลยแบบฝึกหัดท้ายบทที่ 13\",\"kind\":\"apparatus\"}]}]}"}}]}`))
+		_, _ = w.Write([]byte(`{"choices":[{"message":{"content":"{\"chunks\":[{\"chunk_id\":\"p1-c0\",\"kind\":\"content\",\"topics\":[\"การย่อยอาหารในปาก\"]},{\"chunk_id\":\"p1-c1\",\"kind\":\"apparatus\",\"topics\":[\"เฉลยแบบฝึกหัดท้ายบทที่ 13\"]}]}"}}]}`))
 	}))
 	defer server.Close()
 
@@ -105,11 +105,11 @@ func TestBatchedTopicsCarriesTheClassificationThrough(t *testing.T) {
 	if err != nil {
 		t.Fatalf("BatchTopics() error = %v", err)
 	}
-	if len(got) != 2 || got[0][0].Kind != examgen.TopicContent || got[1][0].Kind != examgen.TopicApparatus {
+	if len(got) != 2 || got[0].Kind != examgen.TopicContent || got[1].Kind != examgen.TopicApparatus {
 		t.Fatalf("topics = %#v, want the provider's own classification", got)
 	}
-	if got[1][0].Title != "เฉลยแบบฝึกหัดท้ายบทที่ 13" {
-		t.Fatalf("apparatus title = %q, want it kept for the run report", got[1][0].Title)
+	if got[1].Topics[0] != "เฉลยแบบฝึกหัดท้ายบทที่ 13" {
+		t.Fatalf("apparatus title = %q, want it kept for the run report", got[1].Topics[0])
 	}
 }
 
@@ -135,7 +135,7 @@ func TestBatchedTopicsFallsBackForOmittedChunks(t *testing.T) {
 	if err != nil {
 		t.Fatalf("BatchTopics() error = %v", err)
 	}
-	if len(got) != 2 || got[0][0].Title != "first" || got[1][0].Title != "second" {
+	if len(got) != 2 || got[0].Topics[0] != "first" || got[1].Topics[0] != "second" {
 		t.Fatalf("topics = %#v, want fallback plus batch result in document order", got)
 	}
 	if requests != 2 {

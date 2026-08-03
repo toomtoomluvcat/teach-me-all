@@ -40,31 +40,34 @@ func topicListSchema() map[string]any {
 		"minItems":    1,
 		"maxItems":    3,
 		"description": "the distinct topics this passage covers",
-		"items": obj(map[string]any{
-			"title": str("a short topic title, in the same language as the passage"),
-			"kind": enum("what this topic is: content teaches the subject, apparatus is teacher-facing machinery about the subject, non_content is page furniture",
-				string(TopicContent), string(TopicApparatus), string(TopicNonContent)),
-		}, "title", "kind"),
+		"items":       str("a short topic title, in the same language as the passage"),
 	}
+}
+
+func passageKindSchema() map[string]any {
+	return enum("what this passage is: content teaches the subject, apparatus is teacher-facing machinery about the subject, non_content is page furniture",
+		string(TopicContent), string(TopicApparatus), string(TopicNonContent))
 }
 
 // TopicSchema is what the model returns for a single chunk during the map step.
 func TopicSchema() map[string]any {
 	return obj(map[string]any{
+		"kind":   passageKindSchema(),
 		"topics": topicListSchema(),
-	}, "topics")
+	}, "kind", "topics")
 }
 
 const topicSystem = `You are indexing a textbook so it can be split into lessons.
 
-Read the passage, name the topics it covers, and classify each one. Rules:
+Read the passage, say what it is, and name the topics it covers. Rules:
 - Name only topics the passage actually covers. Do not infer topics from a
   heading that has no material under it.
 - Write the titles in the same language as the passage.
 - A title is a noun phrase, not a sentence, and not a question.
 
-Set kind for every topic. Many textbooks are teacher's editions, so a passage
-can be well-written prose and still teach the learner nothing:
+Then set kind — one judgement about the whole passage, not about each topic.
+Many textbooks are teacher's editions, so a passage can be well-written prose
+and still teach the learner nothing:
 
 - "content" — subject matter a learner is meant to understand. Facts,
   mechanisms, definitions, worked examples, experimental results, and the
@@ -112,8 +115,9 @@ func TopicBatchSchema() map[string]any {
 			"minItems": 1,
 			"items": obj(map[string]any{
 				"chunk_id": str("the exact chunk ID supplied in the input"),
+				"kind":     passageKindSchema(),
 				"topics":   topicListSchema(),
-			}, "chunk_id", "topics"),
+			}, "chunk_id", "kind", "topics"),
 		},
 	}, "chunks")
 }
@@ -125,9 +129,9 @@ You will receive multiple labelled passages in one request. Return exactly one
 result for every chunk_id. Copy each chunk_id character for character. Do not
 merge chunks, skip chunks, or put topics from one chunk under another chunk. A
 passage that is entirely apparatus or page furniture still gets its chunk_id
-back, with its topics classified as such — never an empty list. Return exactly
-this JSON shape, with no other top-level keys:
-{"chunks":[{"chunk_id":"p30-c0","topics":[{"title":"topic title","kind":"content"}]}]}.
+back, with its own kind and topics — never an empty list. Return exactly this
+JSON shape, with no other top-level keys:
+{"chunks":[{"chunk_id":"p30-c0","kind":"content","topics":["topic title"]}]}.
 This is only a shape example: use every actual chunk_id supplied below. Count
 the objects before answering; the number must equal the number of passages.`
 }

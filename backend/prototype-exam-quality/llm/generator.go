@@ -30,19 +30,17 @@ func genOptions(numCtx int, temp float64) *Options {
 	}
 }
 
-func (g *Generator) Topics(ctx context.Context, c examgen.Chunk) ([]examgen.Topic, error) {
+func (g *Generator) Topics(ctx context.Context, c examgen.Chunk) (examgen.ChunkTopics, error) {
 	ctx = WithLabel(ctx, "outline/map")
-	var out struct {
-		Topics []examgen.Topic `json:"topics"`
-	}
+	var out examgen.ChunkTopics
 	msgs := []Message{
 		{Role: "system", Content: examgen.TopicSystem()},
 		{Role: "user", Content: examgen.TopicPrompt(c)},
 	}
 	if err := g.c.ChatJSON(ctx, g.model, msgs, examgen.TopicSchema(), genOptions(4096, 0), &out); err != nil {
-		return nil, err
+		return examgen.ChunkTopics{}, err
 	}
-	return out.Topics, nil
+	return out, nil
 }
 
 func (g *Generator) Outline(ctx context.Context, graph examgen.EvidenceGraph) (*examgen.Outline, []examgen.LessonConcepts, error) {

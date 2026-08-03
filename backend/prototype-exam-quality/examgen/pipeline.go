@@ -13,7 +13,7 @@ import (
 // a future version can point them at two different models without touching this
 // file.
 type Generator interface {
-	Topics(ctx context.Context, c Chunk) ([]Topic, error)
+	Topics(ctx context.Context, c Chunk) (ChunkTopics, error)
 	Outline(ctx context.Context, graph EvidenceGraph) (*Outline, []LessonConcepts, error)
 	Questions(ctx context.Context, lesson Lesson, graph *EvidenceGraph, c Chunk, feedback []RejectedDraft, want int, forceCalc bool) ([]Question, error)
 }
@@ -42,7 +42,7 @@ type Embedder interface {
 // part of Generator: Ollama keeps the measured one-call-per-chunk map path,
 // while Gemini can map all chunks in one larger-context request.
 type TopicBatcher interface {
-	BatchTopics(ctx context.Context, chunks []Chunk, progress Progress) ([][]Topic, error)
+	BatchTopics(ctx context.Context, chunks []Chunk, progress Progress) ([]ChunkTopics, error)
 }
 
 // Progress lets the TUI show what is happening during the slow parts. The logic
@@ -94,7 +94,7 @@ func BuildOutline(ctx context.Context, chunks []Chunk, d Deps) (*Outline, []Chun
 	// Every chunk is independent, so this is the easiest place in the pipeline
 	// to run concurrently. Results are collected by index and merged in document
 	// order afterwards, because lesson ordering depends on it.
-	var perChunk [][]Topic
+	var perChunk []ChunkTopics
 	if d.TopicBatcher != nil {
 		var err error
 		perChunk, err = d.TopicBatcher.BatchTopics(ctx, chunks, d.Log)
@@ -105,7 +105,7 @@ func BuildOutline(ctx context.Context, chunks []Chunk, d Deps) (*Outline, []Chun
 			return nil, nil, fmt.Errorf("batched topics returned %d chunk results for %d chunks", len(perChunk), len(chunks))
 		}
 	} else {
-		perChunk = make([][]Topic, len(chunks))
+		perChunk = make([]ChunkTopics, len(chunks))
 		var (
 			wg       sync.WaitGroup
 			sem      = make(chan struct{}, d.slots())

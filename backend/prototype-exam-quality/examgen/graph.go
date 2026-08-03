@@ -34,19 +34,21 @@ type ConceptEdge struct {
 // CountDroppedTopics reports how many distinct topic labels BuildEvidenceGraph
 // will refuse, split by why, so a run can say what it removed instead of
 // silently shrinking.
-func CountDroppedTopics(perChunk [][]Topic) (apparatus, nonContent int) {
+func CountDroppedTopics(perChunk []ChunkTopics) (apparatus, nonContent int) {
 	seenApparatus := map[string]bool{}
 	seenNonContent := map[string]bool{}
-	for _, topics := range perChunk {
-		for _, topic := range topics {
-			key := conceptKey(topic.Title)
+	for _, labelled := range perChunk {
+		if labelled.Teaches() {
+			continue
+		}
+		for _, title := range labelled.Topics {
+			key := conceptKey(title)
 			if key == "" {
 				continue
 			}
-			switch topic.Kind {
-			case TopicApparatus:
+			if labelled.Kind == TopicApparatus {
 				seenApparatus[key] = true
-			case TopicNonContent:
+			} else {
 				seenNonContent[key] = true
 			}
 		}
@@ -63,10 +65,10 @@ func conceptKey(title string) string {
 // conservative structural facts: concepts co-occur in one chunk or follow one
 // another in document order. No semantic relation is invented without source.
 //
-// Only topics the map step classified as content become concepts. A chunk whose
-// labels were all apparatus or page furniture therefore ends up with no concept,
-// which leaves it unassigned to any lesson and out of generation entirely.
-func BuildEvidenceGraph(chunks []Chunk, perChunk [][]Topic) EvidenceGraph {
+// Only chunks the map step classified as content contribute concepts. A chunk
+// the model called apparatus or page furniture ends up with no concept, which
+// leaves it unassigned to any lesson and out of generation entirely.
+func BuildEvidenceGraph(chunks []Chunk, perChunk []ChunkTopics) EvidenceGraph {
 	graph := EvidenceGraph{}
 	byKey := map[string]int{}
 	edgeIndex := map[string]int{}
@@ -76,13 +78,16 @@ func BuildEvidenceGraph(chunks []Chunk, perChunk [][]Topic) EvidenceGraph {
 		if i >= len(perChunk) {
 			break
 		}
+		if !perChunk[i].Teaches() {
+			continue
+		}
 		var chunkConcepts []string
 		seenInChunk := map[string]bool{}
-		for _, topic := range perChunk[i] {
-			if !topic.Teaches() {
+		for _, title := range perChunk[i].Topics {
+			title = strings.TrimSpace(title)
+			if title == "" {
 				continue
 			}
-			title := strings.TrimSpace(topic.Title)
 			key := conceptKey(title)
 			index, exists := byKey[key]
 			if !exists {
