@@ -3,9 +3,10 @@
 Last updated 2026-08-03. Supersedes the earlier copy in the OS temp directory;
 this file is canonical, delete that one.
 
-Repo: `E:\contribute\teach-me-all`. Branch `prototype/exam-quality`, five commits
-ahead of `main`, with `origin/prototype/exam-quality` at `339827d`. Work done
-after that commit is uncommitted; see "Uncommitted work" below.
+Repo: `E:\contribute\teach-me-all`. Branch `prototype/exam-quality`, ten commits
+ahead of `main`. Current HEAD is `1d99b8e`; `origin/prototype/exam-quality` is
+`f929434`, so the branch has one local commit not pushed. The source tree was
+clean before this handoff update; this `docs/HANDOFF.md` edit is uncommitted.
 
 ## Read these first, in this order
 
@@ -62,11 +63,12 @@ without a reason; several are recorded nowhere else.
 
 ## Where the work actually stands
 
-Six gates now, not four. Two are model-backed, four are pure Go:
+Six gates now, not four. Two are model-backed and four are deterministic or
+locally reproducible:
 
 | gate | decided by |
 |---|---|
-| `well_formed` — nine structural checks | Go |
+| `well_formed` — ten structural checks, including teacher-guide metadata | Go |
 | `quote_verbatim` | Go |
 | `arithmetic` | Go |
 | `not_a_duplicate` — embedding similarity vs accepted questions | Go + embedder |
@@ -75,6 +77,23 @@ Six gates now, not four. Two are model-backed, four are pure Go:
 
 Deterministic checks run first and short-circuit: a question Go has already
 rejected never reaches a judge.
+
+Pass 1 is now a provenance-preserving evidence graph, not a flat topic list.
+The cached full-book result for the 254-page Thai IPST biology teacher book has
+217 concepts, 240 evidenced `co_occurs`/`follows` edges, and 17 lessons. Every
+concept retains source chunk/page provenance and generation sees only concepts
+evidenced by its current chunk.
+
+Failed questions are **not repaired**. The repair implementation, prompts,
+tests, counters, UI labels and `--repair` flag were deleted. The newest four
+failed drafts are kept as compact rejection memory and appended to the next
+normal top-up generation prompt. This adds no dedicated provider request and
+asks for a materially different question rather than a paraphrased fix.
+
+The generator is also explicitly forbidden from asking about learning
+objectives, assessment rubrics/guidelines, classroom activities, videos,
+pedagogy or chapter numbering. A deterministic pre-judge check catches known
+Thai and English teacher-guide phrases if the model ignores the prompt.
 
 Measured pass rates, all on `scb10x/typhoon2.5-qwen3-4b`:
 
@@ -86,7 +105,22 @@ Measured pass rates, all on `scb10x/typhoon2.5-qwen3-4b`:
 
 The rate fell because the checks got honest, not because anything regressed.
 
-## The one defect that keeps recurring
+Latest hosted DeepSeek measurement on lesson 3 (human digestion), budget 4:
+
+| mode | drafts | gate-passing | actual subject questions by manual read | API calls | model wall |
+|---|---:|---:|---:|---:|---:|
+| no rejection memory | 4 | 4 | 2/4 | 13 | 20.073s |
+| rejection memory, before metadata ban | 7 | 4 | 4/4 | 21 | 30.911s |
+| rejection memory + metadata prompt/gate | 4 | 4 | **4/4** | **14** | **17.827s** |
+
+The final 14 calls were `generate` 3, `calc-tool` 3, `judge/blind` 4 and
+`judge/source` 4. The first generation call correctly returned no questions for
+a metadata-only chunk. Summed request latency was 21.019s; model wall was lower
+because judge calls run in parallel. The four accepted questions were read by
+hand and ask about digestive-tract order, stages of food processing, where
+chemical digestion begins, and why chewing helps digestion.
+
+## The quality defect that still deserves a larger eval
 
 **A distractor that happens to be a true statement.** Observed six times across
 two documents and two languages. Examples from the biology run: "Photosynthesis
@@ -94,18 +128,33 @@ converts sunlight into chemical energy" offered as a wrong answer; "Photosynthes
 requires sunlight and aerobic respiration does not" offered as a wrong answer.
 Both true. The `single_defensible` judge passed all of them.
 
-No Go rule can catch this — it requires knowing whether a sentence is true of the
-material. **This is the only remaining argument for a larger model**, and it
-should be spent on the `judge/source` call specifically, not on generation.
+No Go rule can catch this — it requires knowing whether a sentence is true of
+the material. A paid DeepSeek regression now confirms one important Thai case:
+`ถ่ายอุจจาระ` versus `ขับถ่าย` is classified as equivalent rather than silently
+accepted. That proves the source-judge wiring and one semantic case, but the six
+historical true-distractor questions have not all been replayed as a proper
+local-4B-vs-DeepSeek eval. If model spend is limited, spend it on
+`judge/source`, not generation.
 
 Reading the 10 passing biology questions by hand: 3 genuinely good, 3 with a true
 distractor, 4 weak (off-topic distractors, or answerable without reading). So 45%
 still overstates it.
 
-## Uncommitted work since `339827d`
+## Recent committed work
 
-Everything below is in the working tree, builds, and `go vet` is clean. It is not
-committed.
+The extraction, hosted batching, graph generation, repair removal and metadata
+gate are committed through `1d99b8e`. The important commits after the old
+handoff baseline are:
+
+- `3919792` — remove legacy PDF extractors and make Docling the runtime path.
+- `9053549` — align Docling serialization to physical pages and preserve empty
+  page files.
+- `9893339` — bounded hosted-provider pass-1 batching and provider error
+  handling.
+- `f929434` — evidence-graph generation and semantic distractor hardening.
+- `1d99b8e` — remove the unsuccessful repair loop, add bounded rejection memory,
+  block teacher-guide metadata, record the live DeepSeek A/B, and rebuild
+  `protoexam.exe`.
 
 - `pdfx/docling.go`, `docling_helper.py`, `auto.go`, and tests — local Docling
   standard-pipeline extraction using pypdfium2. `auto` is Docling-only and uses
@@ -128,13 +177,10 @@ committed.
   terminal errors cancel pending work. The 392-chunk Thai biology benchmark
   plans 13 map calls plus one reduce call. DeepSeek usage tokens are now included
   in the cumulative call report.
-- The real DeepSeek rerun of that 392-chunk benchmark passed: 13 map calls plus
-  one reduce call, about 1m wall clock at `--parallel 4`, 132,003 input tokens
-  and 18,485 output tokens. It produced 273 topics and 43 lessons. The flat
-  topic-to-outline reduce left 70 chunks unassigned; this is concrete evidence
-  for the next experiment being a provenance-preserving evidence graph
-  (`concept/edge -> chunk_ids/assets`), evaluated A/B rather than adopted as a
-  database architecture up front.
+- The real DeepSeek rerun of that 392-chunk benchmark passed. The earlier flat
+  map produced 273 topics and 43 lessons with 70 chunks unassigned; that result
+  motivated the evidence graph now in the code. The current cached graph has
+  217 source-provenanced concepts, 240 edges and 17 lessons.
 - `setup-docling.ps1` — reproducible pinned project-local runtime installation.
 - `backend/prototype-exam-quality/README.md` — extraction bundle layout and the
   reusable `protoexam.exe` workflow.
@@ -160,9 +206,21 @@ committed.
   live run mapped 13 chunks in one `outline/map` call, reduced in one call, and
   completed the selected lesson with 6 total provider calls (one generation
   retry was needed). The fallback remains for regressions in provider output.
-- **Correcting a 4B model does not work; preventing the error does.** The repair
-  loop repaired 0 of 4, twice. The calculator tool took arithmetic failures from
-  5 to 0 on the same document.
+- **Correcting a model afterwards does not work; preventing the error does.**
+  The local 4B repair loop repaired 0 of 4 twice. DeepSeek later returned
+  unchanged, duplicate, or synonym-swapped distractors and violated the focused
+  replacement contract. Repair is therefore gone, not merely disabled. The
+  calculator tool still took arithmetic failures from 5 to 0 on the same local
+  document.
+- **Automatic gate pass rate alone still lies.** In the no-memory DeepSeek run,
+  all four drafts passed every gate, but two asked about the teacher guide's
+  learning objectives/assessment rather than biology. Manual reading caused the
+  new metadata prompt and deterministic check.
+- **`calc-tool` currently costs one provider call per generation call even on a
+  prose-only biology lesson.** The final run spent 3 of 14 calls there and
+  produced no calculation questions. `--calc-tool=false` is the immediate cheap
+  mode for a known non-mathematical source; a cleaner future optimisation is to
+  invoke the tool turn only for chunks/concepts likely to require arithmetic.
 - **Model swapping, not the GPU, is the biggest time sink.** A biology run spent
   4m39s of 11m54s on model loading, because the 4B generator and bge-m3 cannot
   both stay resident once KV cache is counted. Generation itself runs at 35–55
@@ -251,21 +309,33 @@ Found by reading, not fixed, filed nowhere else:
 
 ## What to do next, in the order it makes sense
 
-1. **Close the prototype.** The owner still has not compared against NotebookLM
-   on the same file. Keep asking before anyone builds on the numbers.
-2. Replay the six known true-distractor questions through `judge/source` only,
-   once with local 4B and once with DeepSeek. The DeepSeek smoke run proved the
-   wiring, not that the larger judge catches the recurring defect.
-3. Obtain a genuine Thai camera/flatbed scan. The new official สสวท. benchmark
+1. **Close the human-quality half of the prototype.** Read and label at least 20
+   passing questions, then compare the same lesson/PDF with NotebookLM. The
+   latest four were read and are acceptable, but four is not the agreed sample.
+2. Replay the six historical true-distractor questions through
+   `judge/source`, once with local 4B and once with DeepSeek. The current paid
+   regression proves one Thai paraphrase case, not the whole recurring defect.
+3. Filter pedagogy at graph compilation, not only generation. The current
+   outline still contains lessons such as "การประเมินผลระบบหายใจ". They no
+   longer produce shipped questions, but keeping them as concepts/lessons wastes
+   pass-1 tokens and gives the user useless lesson choices.
+4. For known prose subjects, measure `--calc-tool=false`. It should remove the
+   three calculator-tool calls seen in the 14-call biology run; keep the
+   arithmetic gate regardless. Do not make this the global default without a
+   routing rule because quantitative science/math passages need the tool.
+5. Obtain a genuine Thai camera/flatbed scan. The official สสวท. benchmark
    is digital (Biology M.5 book 4); pages 60-62 prove Thai text, table, page
    breaks and figure crops, but do not prove robustness to skew/shadows/blur.
    If image-dependent questions are in MVP scope, add `question_assets`;
    otherwise forbid those questions explicitly.
-4. **If a clean performance claim matters, do one cold-cache rerun** after
+6. **If a clean performance claim matters, do one cold-cache rerun** after
    unloading both models. The instrumentation now shows the batching path itself
    is only 9 embed calls / 3.007s on this workload; the remaining load cost is
    generator/judge model swapping.
-5. Commit the uncommitted extraction-bundle work.
+7. Only after the quality comparison, decide how much of `examgen/`, `pdfx/`
+   and `llm/` to lift into the production backend and write the agreed storage
+   migration. The prototype executable is reusable, but it is not production
+   architecture by itself.
 
 ## Suggested skills
 
@@ -287,14 +357,23 @@ Found by reading, not fixed, filed nowhere else:
 
 - `.scratch/` caches extraction and the pass-1 outline per (file, mode, page
   range). Extraction uses `pages-v3.json` so caches from removed fallback paths
-  cannot satisfy Docling-only runs. Edit a prompt, rerun, and you get the cached outline. Pass
-  `--fresh`.
+  cannot satisfy Docling-only runs. Edit a pass-1/graph prompt, rerun, and you
+  still get the cached outline. Pass `--fresh`. Pass-2 generation itself is not
+  cached; each selected lesson spends provider calls again.
 - Without `--budget` the model often sets its own budget to 1, and a 1/1 pass
   rate measures nothing.
-- Without `--pages`, pass 1 fires one model call per chunk across the whole
-  document. On a textbook that is hours.
-- `--repair` is off because it measured worthless on a 4B model. That is a fact
-  about 4B, not about the idea. Re-measure on a frontier model.
+- Without `--pages`, local Ollama pass 1 still fires one model call per chunk.
+  Gemini and DeepSeek instead use bounded batches (max 32 chunks/about 36k
+  runes), but a full textbook is still a paid, non-trivial run.
+- `--repair` no longer exists. Do not re-add it without a new measured design;
+  both local 4B and DeepSeek failed the existing contract. Rejection memory is
+  the current replacement and does not add a dedicated API call.
+- DeepSeek has no embedding model configured by default, so its chunk ranking is
+  source/graph order unless an embedder is explicitly supplied. Local Thai
+  ranking must use `bge-m3`, never `nomic-embed-text`.
+- The cumulative provider report is per process. In the final normal generation
+  process `TOTAL=14`; the separate paid semantic regression test used one
+  additional DeepSeek request and is not part of that 14.
 - Changing `--embed-model` invalidates every stored vector; the dimension changes
   too (bge-m3 1024, nomic 768).
 - Re-running a structural check over old `.scratch/*/run-*.json` files is the
