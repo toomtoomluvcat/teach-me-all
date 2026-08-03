@@ -96,16 +96,29 @@ pedagogy or chapter numbering. A deterministic pre-judge check catches known
 Thai and English teacher-guide phrases if the model ignores the prompt.
 
 Teacher-guide material is now also removed one stage earlier, at graph
-compilation. `examgen.IsPedagogyConcept` drops a pass-1 topic label that names
-apparatus — answer keys, assessment rubrics, scoring guides, test banks,
-teaching plans — before the concept reaches the reduce step. Lab activities and
-`ความรู้เพิ่มเติมสำหรับครู` sidebars are deliberately kept: they carry real
-subject matter, and dropping a concept also detaches its chunks from every
-lesson. Replayed over the cached 254-page biology graph the filter drops 36 of
-217 concepts and 78 of 392 chunks, and empties exactly one lesson —
-`การประเมินผลระบบหายใจ`, the case this handoff previously filed as work to do.
-`examgen.PruneTeacherGuideConcepts` applies the same filter to an already-cached
-outline, so a broadened phrase list never costs a paid pass-1 rerun.
+compilation, and **the model decides it, not a phrase list**. The pass-1 map
+step returns `{title, kind}` per topic, where kind is `content`, `apparatus`
+(answer keys, assessment rubrics, scoring guides, test banks, learning
+objectives, lesson plans, teaching hours) or `non_content` (page furniture,
+replacing the old `NON_CONTENT` sentinel). `BuildEvidenceGraph` admits only
+`content`, so a chunk whose topics were all apparatus never joins a lesson.
+
+This costs no extra provider call: the map step was already reading every chunk.
+A Thai/English phrase list was written first, measured, and then deleted — it
+scored 36 of 217 concepts on the cached biology graph with no false positives,
+but it only ever knew the wording of the one publisher it had been read from,
+and the classification is the map step's job anyway.
+
+Two deliberate rules the prompt spells out, because they are the pairs that
+actually confuse a classifier: a page of answers to chapter exercises is
+apparatus even though every answer is about biology, and a laboratory activity
+is content even though a teacher runs it. Teacher-knowledge sidebars
+(`ความรู้เพิ่มเติมสำหรับครู: Osmolarity`) are content too.
+
+`examgen.Topic.UnmarshalJSON` accepts a bare string as well as the object, and a
+topic with a missing or unknown kind is treated as content — wrongly deleting
+material costs more than letting one rubric reach the question-level gates,
+which still ban teacher-guide stems.
 
 Measured pass rates, all on `scb10x/typhoon2.5-qwen3-4b`:
 
@@ -327,14 +340,16 @@ Found by reading, not fixed, filed nowhere else:
 2. Replay the six historical true-distractor questions through
    `judge/source`, once with local 4B and once with DeepSeek. The current paid
    regression proves one Thai paraphrase case, not the whole recurring defect.
-3. ~~Filter pedagogy at graph compilation~~ — done; see the filter paragraph
-   above. What is **not** done is measuring it end to end: no run has yet been
-   made with the filter in place, so the claim that it improves pass rate or
-   lowers reduce cost is unproven. The 36/217 and 78/392 numbers are a replay of
-   the cached graph, not a fresh pass 1. Two known gaps in the phrase list:
-   `ตัวอย่างผลการทำกิจกรรม` and `ผลการทำกิจกรรม` are teacher-facing expected
-   results that were left in on purpose because neighbouring concepts with almost
-   the same wording are real experimental data.
+3. **Measure the topic classifier on one real pass 1.** The code is written and
+   tested; whether the model actually classifies well is unmeasured, and it is
+   the whole mechanism now that the phrase list is gone. The biology outline
+   cache was invalidated (`outline-v2` → `outline-v3`), so the next run of that
+   book pays for pass 1 again: 13 map calls plus one reduce on DeepSeek. Do it
+   once, then compare the concept list against the 36 the deleted phrase list
+   found — those are recorded in `git show e2aec77` and are a usable answer key.
+   Watch two things: a 4B local model may classify worse than a hosted one, and a
+   model that marks everything `content` degrades silently back to the old
+   behaviour rather than failing.
 4. For known prose subjects, measure `--calc-tool=false`. It should remove the
    three calculator-tool calls seen in the 14-call biology run; keep the
    arithmetic gate regardless. Do not make this the global default without a
@@ -392,15 +407,16 @@ Found by reading, not fixed, filed nowhere else:
   additional DeepSeek request and is not part of that 14.
 - Changing `--embed-model` invalidates every stored vector; the dimension changes
   too (bge-m3 1024, nomic 768).
-- The pedagogy filter runs inside `BuildOutline`, which is cached as
-  `outline-v2.json`. An existing cache therefore still holds the unfiltered
-  concepts; `PruneTeacherGuideConcepts` is applied on load so a cached run
-  behaves like a fresh one, and prints what it dropped. Do not read a cached
-  `outline-v2.json` by hand and assume it matches what the run used.
-- `examgen.IsPedagogyConcept` and `PruneTeacherGuideConcepts` are exported for
-  the same reason `CheckWellFormed` is: a phrase-list change is testable against
-  the real cached graph for free. `TestPedagogyFilterOnCachedOutline` does that
-  and fails if a lesson holding more than one concept is emptied.
+- **`outline-v2.json` caches are dead.** They were built before topics carried a
+  kind, so they still contain apparatus concepts and nothing in the code can
+  identify them any more. The cache key is `outline-v3`; the old files are left
+  on disk but never read. Extraction caches (`pages-v3.json`) are untouched, so
+  the expensive Docling run is not repeated.
+- A topic whose kind is missing or unrecognised is kept as content. Silence from
+  the model therefore looks exactly like "everything is content" — check the
+  `outline/filter` progress line, which reports how many apparatus and furniture
+  topics were dropped. Zero on a teacher's edition means the classifier is not
+  working, not that the book is clean.
 - Re-running a structural check over old `.scratch/*/run-*.json` files is the
   cheapest way to test a new rule — `examgen.CheckWellFormed` is exported for
   exactly that, and it caught a false positive of mine that would otherwise have

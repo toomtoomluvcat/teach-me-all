@@ -26,6 +26,84 @@ type Chunk struct {
 	LessonID string
 }
 
+// TopicKind is what the map step says a topic is.
+//
+// The classification is made by the model while it still has the passage in
+// front of it, which costs no extra request. The alternative — matching known
+// teacher-guide phrases against topic titles afterwards — was implemented and
+// then removed: it only ever knew the wording of the books it had already seen.
+type TopicKind string
+
+const (
+	// TopicContent is subject matter a learner is meant to know.
+	TopicContent TopicKind = "content"
+	// TopicApparatus is teacher-facing machinery about the subject: answer keys,
+	// assessment rubrics, scoring guides, test banks, lesson plans, teaching
+	// hours. It is real prose, so quote grounding cannot distinguish it.
+	TopicApparatus TopicKind = "apparatus"
+	// TopicNonContent is page furniture: front matter, tables of contents,
+	// headers, indexes.
+	TopicNonContent TopicKind = "non_content"
+)
+
+// nonContentSentinel is the pre-kind wire value. Cached and older provider
+// output still carries it as a topic title.
+const nonContentSentinel = "NON_CONTENT"
+
+// Topic is one label the map step attached to a chunk.
+type Topic struct {
+	Title string    `json:"title"`
+	Kind  TopicKind `json:"kind"`
+}
+
+// Teaches reports whether this topic may become a concept in the evidence graph.
+func (t Topic) Teaches() bool {
+	return t.Kind == TopicContent && strings.TrimSpace(t.Title) != ""
+}
+
+// UnmarshalJSON accepts a bare string as well as the requested object. A JSON
+// schema guarantees syntax, not shape — DeepSeek has already been observed
+// returning an older field layout — and a topic that arrives without a kind is
+// treated as content, because wrongly dropping real material costs more than
+// letting one rubric through to the question-level gate.
+func (t *Topic) UnmarshalJSON(data []byte) error {
+	trimmed := strings.TrimSpace(string(data))
+	if strings.HasPrefix(trimmed, `"`) {
+		var title string
+		if err := json.Unmarshal(data, &title); err != nil {
+			return err
+		}
+		*t = Topic{Title: title}
+		t.normalise()
+		return nil
+	}
+
+	var wire struct {
+		Title string `json:"title"`
+		Kind  string `json:"kind"`
+	}
+	if err := json.Unmarshal(data, &wire); err != nil {
+		return err
+	}
+	*t = Topic{Title: wire.Title, Kind: TopicKind(strings.ToLower(strings.TrimSpace(wire.Kind)))}
+	t.normalise()
+	return nil
+}
+
+func (t *Topic) normalise() {
+	t.Title = strings.TrimSpace(t.Title)
+	if strings.EqualFold(t.Title, nonContentSentinel) {
+		t.Title = ""
+		t.Kind = TopicNonContent
+		return
+	}
+	switch t.Kind {
+	case TopicContent, TopicApparatus, TopicNonContent:
+	default:
+		t.Kind = TopicContent
+	}
+}
+
 // Lesson is one entry of the course outline produced by pass 1.
 type Lesson struct {
 	ID      string

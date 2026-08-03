@@ -79,11 +79,37 @@ func TestBatchedTopicsUsesOneCallAndRestoresOrder(t *testing.T) {
 	if err != nil {
 		t.Fatalf("BatchTopics() error = %v", err)
 	}
-	if len(got) != 2 || got[0][0] != "first" || got[1][0] != "second" {
+	if len(got) != 2 || got[0][0].Title != "first" || got[1][0].Title != "second" {
 		t.Fatalf("topics = %#v, want document order", got)
 	}
 	if calls := client.Stats.by["outline/map"].Calls; calls != 1 {
 		t.Fatalf("Gemini API calls = %d, want 1", calls)
+	}
+}
+
+// The map step, not a phrase list, is what keeps answer keys and rubrics out of
+// the evidence graph, so the classification has to survive the wire.
+func TestBatchedTopicsCarriesTheClassificationThrough(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"choices":[{"message":{"content":"{\"chunks\":[{\"chunk_id\":\"p1-c0\",\"topics\":[{\"title\":\"การย่อยอาหารในปาก\",\"kind\":\"content\"}]},{\"chunk_id\":\"p1-c1\",\"topics\":[{\"title\":\"เฉลยแบบฝึกหัดท้ายบทที่ 13\",\"kind\":\"apparatus\"}]}]}"}}]}`))
+	}))
+	defer server.Close()
+
+	client := NewDeepSeekAt(server.URL, "test-key", server.Client())
+	batcher := NewBatchedTopicGenerator(client, "deepseek-chat")
+	got, err := batcher.BatchTopics(context.Background(), []examgen.Chunk{
+		{ID: "p1-c0", Page: 1, Text: "digestion in the mouth"},
+		{ID: "p1-c1", Page: 1, Text: "answers to the chapter exercises"},
+	}, nil)
+	if err != nil {
+		t.Fatalf("BatchTopics() error = %v", err)
+	}
+	if len(got) != 2 || got[0][0].Kind != examgen.TopicContent || got[1][0].Kind != examgen.TopicApparatus {
+		t.Fatalf("topics = %#v, want the provider's own classification", got)
+	}
+	if got[1][0].Title != "เฉลยแบบฝึกหัดท้ายบทที่ 13" {
+		t.Fatalf("apparatus title = %q, want it kept for the run report", got[1][0].Title)
 	}
 }
 
@@ -109,7 +135,7 @@ func TestBatchedTopicsFallsBackForOmittedChunks(t *testing.T) {
 	if err != nil {
 		t.Fatalf("BatchTopics() error = %v", err)
 	}
-	if len(got) != 2 || got[0][0] != "first" || got[1][0] != "second" {
+	if len(got) != 2 || got[0][0].Title != "first" || got[1][0].Title != "second" {
 		t.Fatalf("topics = %#v, want fallback plus batch result in document order", got)
 	}
 	if requests != 2 {

@@ -1,79 +1,94 @@
 package examgen
 
-import "testing"
+import (
+	"encoding/json"
+	"testing"
+)
 
-// The titles here are verbatim from the cached 217-concept graph of the Thai
-// IPST biology teacher book, so a change to the phrase lists is measured against
-// real pass-1 output rather than invented strings.
-func TestIsPedagogyConceptSeparatesApparatusFromSubjectMatter(t *testing.T) {
-	apparatus := []string{
-		"การวัดและประเมินผล",
-		"แนวการวัดและประเมินผลด้านความรู้และทักษะ",
-		"เฉลยแบบฝึกหัดท้ายบทที่ 13",
-		"เฉลยคำถามท้ายกิจกรรม",
-		"แบบทดสอบแบบเลือกตอบ",
-		"แบบประเมินคุณลักษณะด้านจิตวิทยาศาสตร์",
-		"เกณฑ์การประเมินสมรรถภาพด้านการเขียน",
-		"แนวทางการให้คะแนนการเขียนรายงานการทดลอง",
-		"แนวการจัดการเรียนรู้",
-		"การวิเคราะห์ผลการเรียนรู้",
-		"การเตรียมตัวล่วงหน้าสำหรับครู",
-		"ผังมโนทัศน์ บทที่ 17",
-		"เวลาที่ใช้",
-		"ชวนคิด",
-		"การประเมินการนำเสนอผลงาน",
-		"Assessment criteria",
-		"Answer key",
+func TestTopicUnmarshalToleratesProviderShapes(t *testing.T) {
+	cases := []struct {
+		name string
+		json string
+		want Topic
+	}{
+		{
+			name: "classified content",
+			json: `{"title":"การย่อยอาหารในปาก","kind":"content"}`,
+			want: Topic{Title: "การย่อยอาหารในปาก", Kind: TopicContent},
+		},
+		{
+			name: "classified apparatus",
+			json: `{"title":"เฉลยแบบฝึกหัดท้ายบทที่ 13","kind":"APPARATUS"}`,
+			want: Topic{Title: "เฉลยแบบฝึกหัดท้ายบทที่ 13", Kind: TopicApparatus},
+		},
+		// A kind the model invented is not a licence to delete material, so it
+		// falls back to content and the question-level gates stay responsible.
+		{
+			name: "unknown kind falls back to content",
+			json: `{"title":"Gas exchange","kind":"pedagogy"}`,
+			want: Topic{Title: "Gas exchange", Kind: TopicContent},
+		},
+		{
+			name: "missing kind falls back to content",
+			json: `{"title":"Gas exchange"}`,
+			want: Topic{Title: "Gas exchange", Kind: TopicContent},
+		},
+		// The pre-kind wire shape. DeepSeek has already been observed returning
+		// an older field layout, so this is a real regression path, not paranoia.
+		{
+			name: "bare string",
+			json: `"Gas exchange"`,
+			want: Topic{Title: "Gas exchange", Kind: TopicContent},
+		},
+		{
+			name: "legacy NON_CONTENT sentinel",
+			json: `"NON_CONTENT"`,
+			want: Topic{Title: "", Kind: TopicNonContent},
+		},
 	}
-	for _, title := range apparatus {
-		if !IsPedagogyConcept(title) {
-			t.Errorf("IsPedagogyConcept(%q) = false, want true", title)
-		}
-	}
-
-	// Dropping a concept also detaches its chunks from every lesson, so these
-	// must survive. Lab activities and teacher-knowledge sidebars carry the real
-	// subject matter that the surrounding apparatus is written about.
-	subject := []string{
-		"กิจกรรม 15.1 โครงสร้างของหัวใจสัตว์เลี้ยงลูกด้วยน้ำนม",
-		"ความรู้เพิ่มเติมสำหรับครู: Osmolarity และ countercurrent multiplier system",
-		"ผลการทดลองกิจกรรมจำลองการทำงานของกล้ามเนื้อกะบังลม",
-		"การย่อยอาหารในกระเพาะอาหาร",
-		"เวลาที่ใช้ในการย่อยอาหาร",
-		"การขับถ่ายอุจจาระ",
-		"Gas exchange in the alveoli",
-	}
-	for _, title := range subject {
-		if IsPedagogyConcept(title) {
-			t.Errorf("IsPedagogyConcept(%q) = true, want false", title)
-		}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var got Topic
+			if err := json.Unmarshal([]byte(tc.json), &got); err != nil {
+				t.Fatalf("Unmarshal(%s) error = %v", tc.json, err)
+			}
+			if got != tc.want {
+				t.Fatalf("Unmarshal(%s) = %#v, want %#v", tc.json, got, tc.want)
+			}
+		})
 	}
 }
 
-func TestBuildEvidenceGraphDropsPedagogyConceptsAndTheirOnlyChunks(t *testing.T) {
+func TestBuildEvidenceGraphKeepsOnlyContentTopics(t *testing.T) {
 	chunks := []Chunk{
 		{ID: "p1-c0", Page: 1, Text: "digestion"},
-		{ID: "p2-c1", Page: 2, Text: "assessment guidance"},
+		{ID: "p2-c1", Page: 2, Text: "answers to the chapter exercises"},
+		{ID: "p3-c2", Page: 3, Text: "table of contents"},
 	}
-	perChunk := [][]string{
-		{"การย่อยอาหารในปาก", "แนวการวัดและประเมินผล"},
-		{"เฉลยแบบฝึกหัดท้ายบทที่ 13"},
+	perChunk := [][]Topic{
+		{
+			{Title: "การย่อยอาหารในปาก", Kind: TopicContent},
+			{Title: "แนวการวัดและประเมินผล", Kind: TopicApparatus},
+		},
+		{{Title: "เฉลยแบบฝึกหัดท้ายบทที่ 13", Kind: TopicApparatus}},
+		{{Title: "สารบัญ", Kind: TopicNonContent}},
 	}
 
-	if got := CountPedagogyTopics(perChunk); got != 2 {
-		t.Fatalf("CountPedagogyTopics() = %d, want 2", got)
+	apparatus, furniture := CountDroppedTopics(perChunk)
+	if apparatus != 2 || furniture != 1 {
+		t.Fatalf("CountDroppedTopics() = %d apparatus, %d furniture; want 2 and 1", apparatus, furniture)
 	}
 
 	graph := BuildEvidenceGraph(chunks, perChunk)
 	if len(graph.Concepts) != 1 || graph.Concepts[0].Title != "การย่อยอาหารในปาก" {
-		t.Fatalf("concepts = %#v, want only the subject-matter concept", graph.Concepts)
+		t.Fatalf("concepts = %#v, want only the content topic", graph.Concepts)
 	}
 	if len(graph.Concepts[0].ChunkIDs) != 1 || graph.Concepts[0].ChunkIDs[0] != "p1-c0" {
 		t.Fatalf("provenance = %#v, want the chunk that taught the concept", graph.Concepts[0])
 	}
-	// The apparatus concept was the only label on p2-c1, so no edge may claim it
-	// and the chunk stays unattached to any lesson.
+	// A dropped topic must not become an edge endpoint, or the reduce step would
+	// see a concept ID the graph no longer contains.
 	if len(graph.Edges) != 0 {
-		t.Fatalf("edges = %#v, want none: a dropped concept cannot be an endpoint", graph.Edges)
+		t.Fatalf("edges = %#v, want none", graph.Edges)
 	}
 }

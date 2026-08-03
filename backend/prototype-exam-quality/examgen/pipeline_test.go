@@ -10,7 +10,7 @@ type batchTestGenerator struct {
 	questions []Question
 }
 
-func (g batchTestGenerator) Topics(context.Context, Chunk) ([]string, error) {
+func (g batchTestGenerator) Topics(context.Context, Chunk) ([]Topic, error) {
 	return nil, nil
 }
 
@@ -37,7 +37,7 @@ type feedbackRecordingGenerator struct {
 	feedback [][]RejectedDraft
 }
 
-func (*feedbackRecordingGenerator) Topics(context.Context, Chunk) ([]string, error) { return nil, nil }
+func (*feedbackRecordingGenerator) Topics(context.Context, Chunk) ([]Topic, error) { return nil, nil }
 func (*feedbackRecordingGenerator) Outline(context.Context, EvidenceGraph) (*Outline, []LessonConcepts, error) {
 	return nil, nil, nil
 }
@@ -85,7 +85,7 @@ type graphTestGenerator struct {
 	graph EvidenceGraph
 }
 
-func (g *graphTestGenerator) Topics(context.Context, Chunk) ([]string, error) {
+func (g *graphTestGenerator) Topics(context.Context, Chunk) ([]Topic, error) {
 	return nil, nil
 }
 
@@ -103,13 +103,23 @@ func (*graphTestGenerator) Questions(context.Context, Lesson, *EvidenceGraph, Ch
 	return nil, nil
 }
 
+// content is the common case in these tests: topics the map step classified as
+// subject matter.
+func content(titles ...string) []Topic {
+	topics := make([]Topic, len(titles))
+	for i, title := range titles {
+		topics[i] = Topic{Title: title, Kind: TopicContent}
+	}
+	return topics
+}
+
 type graphTopicBatcher struct {
-	topics [][]string
+	topics [][]Topic
 }
 
 type omittingGraphGenerator struct{}
 
-func (omittingGraphGenerator) Topics(context.Context, Chunk) ([]string, error) { return nil, nil }
+func (omittingGraphGenerator) Topics(context.Context, Chunk) ([]Topic, error) { return nil, nil }
 
 func (omittingGraphGenerator) Outline(_ context.Context, _ EvidenceGraph) (*Outline, []LessonConcepts, error) {
 	return &Outline{CourseTitle: "Biology", Lessons: []Lesson{
@@ -125,7 +135,7 @@ func (omittingGraphGenerator) Questions(context.Context, Lesson, *EvidenceGraph,
 	return nil, nil
 }
 
-func (b graphTopicBatcher) BatchTopics(context.Context, []Chunk, Progress) ([][]string, error) {
+func (b graphTopicBatcher) BatchTopics(context.Context, []Chunk, Progress) ([][]Topic, error) {
 	return b.topics, nil
 }
 
@@ -138,10 +148,10 @@ func TestBuildOutlineCompilesEvidenceGraphWithoutLosingChunkProvenance(t *testin
 	gen := &graphTestGenerator{}
 	outline, assigned, err := BuildOutline(context.Background(), chunks, Deps{
 		Gen: gen,
-		TopicBatcher: graphTopicBatcher{topics: [][]string{
-			{"Digestion", "Absorption"},
-			{"Absorption"},
-			{"NON_CONTENT"},
+		TopicBatcher: graphTopicBatcher{topics: [][]Topic{
+			content("Digestion", "Absorption"),
+			content("Absorption"),
+			{{Kind: TopicNonContent}},
 		}},
 	})
 	if err != nil {
@@ -172,9 +182,9 @@ func TestBuildOutlineRecoversOmittedConceptThroughEvidenceEdge(t *testing.T) {
 	}
 	outline, assigned, err := BuildOutline(context.Background(), chunks, Deps{
 		Gen: omittingGraphGenerator{},
-		TopicBatcher: graphTopicBatcher{topics: [][]string{
-			{"Digestion", "Absorption"},
-			{"Respiration"},
+		TopicBatcher: graphTopicBatcher{topics: [][]Topic{
+			content("Digestion", "Absorption"),
+			content("Respiration"),
 		}},
 	})
 	if err != nil {

@@ -39,8 +39,12 @@ func topicListSchema() map[string]any {
 		"type":        "array",
 		"minItems":    1,
 		"maxItems":    3,
-		"description": "the distinct teaching topics this passage covers",
-		"items":       str("a short topic title, in the same language as the passage"),
+		"description": "the distinct topics this passage covers",
+		"items": obj(map[string]any{
+			"title": str("a short topic title, in the same language as the passage"),
+			"kind": enum("what this topic is: content teaches the subject, apparatus is teacher-facing machinery about the subject, non_content is page furniture",
+				string(TopicContent), string(TopicApparatus), string(TopicNonContent)),
+		}, "title", "kind"),
 	}
 }
 
@@ -53,13 +57,31 @@ func TopicSchema() map[string]any {
 
 const topicSystem = `You are indexing a textbook so it can be split into lessons.
 
-Read the passage and name the teaching topics it covers. Rules:
-- Name only topics the passage actually teaches. Do not infer topics from a
-  heading that has no content under it.
+Read the passage, name the topics it covers, and classify each one. Rules:
+- Name only topics the passage actually covers. Do not infer topics from a
+  heading that has no material under it.
 - Write the titles in the same language as the passage.
 - A title is a noun phrase, not a sentence, and not a question.
-- If the passage is front matter, a table of contents, a page header, or an
-  index, return the single topic "NON_CONTENT".`
+
+Set kind for every topic. Many textbooks are teacher's editions, so a passage
+can be well-written prose and still teach the learner nothing:
+
+- "content" — subject matter a learner is meant to understand. Facts,
+  mechanisms, definitions, worked examples, experimental results, and the
+  material of a laboratory activity are all content, including background depth
+  written for the teacher.
+- "apparatus" — teacher-facing machinery ABOUT the subject rather than the
+  subject itself: answer keys and worked solutions to exercises, assessment or
+  measurement guidance, scoring rubrics and criteria, banks of test items,
+  learning objectives and outcomes, lesson plans, suggested teaching sequences,
+  preparation notes, and how many hours to spend.
+- "non_content" — page furniture: covers, front matter, tables of contents,
+  running headers, indexes.
+
+Judge what the passage IS, not what it is about. A page of answers to chapter
+exercises is apparatus even though every answer is about the subject. A
+laboratory activity that explains what happens and why is content even though a
+teacher runs it.`
 
 // TopicPrompt builds the map-step user message.
 func TopicPrompt(c Chunk) string {
@@ -89,12 +111,13 @@ func TopicBatchSystem() string {
 
 You will receive multiple labelled passages in one request. Return exactly one
 result for every chunk_id. Copy each chunk_id character for character. Do not
-merge chunks, skip chunks, or put topics from one chunk under another chunk. If
-a passage has no teaching content, still return its chunk_id with topics set to
-["NON_CONTENT"]. Return exactly this JSON shape, with no other top-level keys:
-{"chunks":[{"chunk_id":"p30-c0","topics":["topic title"]}]}. This is
-only a shape example: use every actual chunk_id supplied below. Count the
-objects before answering; the number must equal the number of passages.`
+merge chunks, skip chunks, or put topics from one chunk under another chunk. A
+passage that is entirely apparatus or page furniture still gets its chunk_id
+back, with its topics classified as such — never an empty list. Return exactly
+this JSON shape, with no other top-level keys:
+{"chunks":[{"chunk_id":"p30-c0","topics":[{"title":"topic title","kind":"content"}]}]}.
+This is only a shape example: use every actual chunk_id supplied below. Count
+the objects before answering; the number must equal the number of passages.`
 }
 
 // TopicBatchPrompt renders all map chunks into one provider request. This is

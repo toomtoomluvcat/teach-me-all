@@ -30,10 +30,10 @@ func genOptions(numCtx int, temp float64) *Options {
 	}
 }
 
-func (g *Generator) Topics(ctx context.Context, c examgen.Chunk) ([]string, error) {
+func (g *Generator) Topics(ctx context.Context, c examgen.Chunk) ([]examgen.Topic, error) {
 	ctx = WithLabel(ctx, "outline/map")
 	var out struct {
-		Topics []string `json:"topics"`
+		Topics []examgen.Topic `json:"topics"`
 	}
 	msgs := []Message{
 		{Role: "system", Content: examgen.TopicSystem()},

@@ -327,7 +327,12 @@ func run(ctx context.Context, cfg config) error {
 		Chunks  []examgen.Chunk
 	}
 
-	oc, err := cachedT(cfg, "outline-v2", func() (outlineCache, error) {
+	// v3: pass 1 now classifies every topic as content, apparatus or page
+	// furniture. A v2 cache was built before that existed and still holds answer
+	// keys and assessment rubrics as concepts, with nothing left in the code able
+	// to tell which ones they are. Reusing it would silently serve lessons the
+	// current pipeline would never have produced.
+	oc, err := cachedT(cfg, "outline-v3", func() (outlineCache, error) {
 		clear()
 		header("STEP 2 — reading the whole document (pass 1)")
 		mapPlan := "one model call each"
@@ -344,14 +349,6 @@ func run(ctx context.Context, cfg config) error {
 		return err
 	}
 	outline, chunks := oc.Outline, oc.Chunks
-
-	// A cached outline predates the current phrase list, so prune it here too
-	// rather than force a paid pass-1 rerun to get rid of answer keys and
-	// assessment rubrics. A fresh outline is already clean and prints nothing.
-	if concepts, lessons := examgen.PruneTeacherGuideConcepts(outline, chunks); concepts > 0 {
-		fmt.Printf("%sdropped %d teacher-guide concepts and %d lessons from the cached outline%s\n",
-			dim, concepts, lessons, reset)
-	}
 
 	// --- step 3: pick a lesson, generate, review ----------------------------
 	for {

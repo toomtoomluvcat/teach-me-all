@@ -13,7 +13,7 @@ import (
 // a future version can point them at two different models without touching this
 // file.
 type Generator interface {
-	Topics(ctx context.Context, c Chunk) ([]string, error)
+	Topics(ctx context.Context, c Chunk) ([]Topic, error)
 	Outline(ctx context.Context, graph EvidenceGraph) (*Outline, []LessonConcepts, error)
 	Questions(ctx context.Context, lesson Lesson, graph *EvidenceGraph, c Chunk, feedback []RejectedDraft, want int, forceCalc bool) ([]Question, error)
 }
@@ -42,7 +42,7 @@ type Embedder interface {
 // part of Generator: Ollama keeps the measured one-call-per-chunk map path,
 // while Gemini can map all chunks in one larger-context request.
 type TopicBatcher interface {
-	BatchTopics(ctx context.Context, chunks []Chunk, progress Progress) ([][]string, error)
+	BatchTopics(ctx context.Context, chunks []Chunk, progress Progress) ([][]Topic, error)
 }
 
 // Progress lets the TUI show what is happening during the slow parts. The logic
@@ -77,15 +77,13 @@ func (d Deps) slots() int {
 	return d.Parallel
 }
 
-// nonContent is the sentinel the map-step prompt asks for on front matter,
-// tables of contents and page furniture.
-const nonContent = "NON_CONTENT"
-
-// BuildOutline runs pass 1: name the topics in every chunk, then fold those
-// topics into lessons, then resolve lesson membership back to chunk IDs.
+// BuildOutline runs pass 1: name and classify the topics in every chunk, then
+// fold the content ones into lessons, then resolve lesson membership back to
+// chunk IDs.
 //
-// Chunks are returned with LessonID filled in. Chunks whose only topic was
-// NON_CONTENT come back with an empty LessonID and are never used for questions.
+// Chunks are returned with LessonID filled in. A chunk whose topics were all
+// apparatus or page furniture comes back with an empty LessonID and is never
+// used for questions.
 func BuildOutline(ctx context.Context, chunks []Chunk, d Deps) (*Outline, []Chunk, error) {
 	if d.Gen == nil {
 		return nil, nil, fmt.Errorf("no generator configured")
@@ -96,7 +94,7 @@ func BuildOutline(ctx context.Context, chunks []Chunk, d Deps) (*Outline, []Chun
 	// Every chunk is independent, so this is the easiest place in the pipeline
 	// to run concurrently. Results are collected by index and merged in document
 	// order afterwards, because lesson ordering depends on it.
-	var perChunk [][]string
+	var perChunk [][]Topic
 	if d.TopicBatcher != nil {
 		var err error
 		perChunk, err = d.TopicBatcher.BatchTopics(ctx, chunks, d.Log)
@@ -107,7 +105,7 @@ func BuildOutline(ctx context.Context, chunks []Chunk, d Deps) (*Outline, []Chun
 			return nil, nil, fmt.Errorf("batched topics returned %d chunk results for %d chunks", len(perChunk), len(chunks))
 		}
 	} else {
-		perChunk = make([][]string, len(chunks))
+		perChunk = make([][]Topic, len(chunks))
 		var (
 			wg       sync.WaitGroup
 			sem      = make(chan struct{}, d.slots())
@@ -143,8 +141,9 @@ func BuildOutline(ctx context.Context, chunks []Chunk, d Deps) (*Outline, []Chun
 		}
 	}
 
-	if dropped := CountPedagogyTopics(perChunk); dropped > 0 {
-		d.Log.report("outline/filter", dropped, dropped, "teacher-guide concepts dropped before reduce")
+	if apparatus, furniture := CountDroppedTopics(perChunk); apparatus > 0 || furniture > 0 {
+		d.Log.report("outline/filter", apparatus+furniture, apparatus+furniture,
+			fmt.Sprintf("%d teacher-guide topics and %d page-furniture topics dropped before reduce", apparatus, furniture))
 	}
 	graph := BuildEvidenceGraph(chunks, perChunk)
 	if len(graph.Concepts) == 0 {

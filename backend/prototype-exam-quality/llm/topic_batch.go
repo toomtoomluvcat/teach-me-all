@@ -64,16 +64,16 @@ func PlannedTopicBatches(chunks []examgen.Chunk) int {
 	return len(planTopicBatches(chunks))
 }
 
-func (b *BatchedTopicGenerator) BatchTopics(ctx context.Context, chunks []examgen.Chunk, progress examgen.Progress) ([][]string, error) {
+func (b *BatchedTopicGenerator) BatchTopics(ctx context.Context, chunks []examgen.Chunk, progress examgen.Progress) ([][]examgen.Topic, error) {
 	if len(chunks) == 0 {
-		return [][]string{}, nil
+		return [][]examgen.Topic{}, nil
 	}
 
 	ctx = WithLabel(ctx, "outline/map")
 	batchCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	batches := planTopicBatches(chunks)
-	results := make([][][]string, len(batches))
+	results := make([][][]examgen.Topic, len(batches))
 	sem := make(chan struct{}, b.parallel)
 	var (
 		wg       sync.WaitGroup
@@ -120,14 +120,14 @@ func (b *BatchedTopicGenerator) BatchTopics(ctx context.Context, chunks []examge
 		return nil, err
 	}
 
-	perChunk := make([][]string, len(chunks))
+	perChunk := make([][]examgen.Topic, len(chunks))
 	for i, batch := range batches {
 		copy(perChunk[batch.start:batch.start+len(batch.chunks)], results[i])
 	}
 	return perChunk, nil
 }
 
-func (b *BatchedTopicGenerator) mapBatch(ctx context.Context, chunks []examgen.Chunk) ([][]string, error) {
+func (b *BatchedTopicGenerator) mapBatch(ctx context.Context, chunks []examgen.Chunk) ([][]examgen.Topic, error) {
 	mapped, err := b.requestBatch(ctx, chunks)
 	if err == nil {
 		return mapped, nil
@@ -157,11 +157,11 @@ func isMalformedTopicJSON(err error) bool {
 		strings.Contains(message, "unparseable json")
 }
 
-func (b *BatchedTopicGenerator) requestBatch(ctx context.Context, chunks []examgen.Chunk) ([][]string, error) {
+func (b *BatchedTopicGenerator) requestBatch(ctx context.Context, chunks []examgen.Chunk) ([][]examgen.Topic, error) {
 	var out struct {
 		Chunks []struct {
 			ID     string   `json:"chunk_id"`
-			Topics []string `json:"topics"`
+			Topics []examgen.Topic `json:"topics"`
 		} `json:"chunks"`
 	}
 	msgs := []Message{
@@ -176,7 +176,7 @@ func (b *BatchedTopicGenerator) requestBatch(ctx context.Context, chunks []examg
 	for i, c := range chunks {
 		index[c.ID] = i
 	}
-	perChunk := make([][]string, len(chunks))
+	perChunk := make([][]examgen.Topic, len(chunks))
 	seen := make(map[string]bool, len(chunks))
 	for _, result := range out.Chunks {
 		i, ok := index[result.ID]
@@ -205,9 +205,9 @@ func (b *BatchedTopicGenerator) requestBatch(ctx context.Context, chunks []examg
 	return perChunk, nil
 }
 
-func (b *BatchedTopicGenerator) topic(ctx context.Context, chunk examgen.Chunk) ([]string, error) {
+func (b *BatchedTopicGenerator) topic(ctx context.Context, chunk examgen.Chunk) ([]examgen.Topic, error) {
 	var out struct {
-		Topics []string `json:"topics"`
+		Topics []examgen.Topic `json:"topics"`
 	}
 	msgs := []Message{
 		{Role: "system", Content: examgen.TopicSystem()},
