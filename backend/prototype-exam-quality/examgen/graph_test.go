@@ -60,6 +60,46 @@ func TestChunkTopicsUnmarshalToleratesProviderShapes(t *testing.T) {
 	}
 }
 
+func TestSmoothPassageKindsRescuesOnlyIsolatedChunks(t *testing.T) {
+	apparatus := func(title string) ChunkTopics {
+		return ChunkTopics{Kind: TopicApparatus, Topics: []string{title}}
+	}
+	perChunk := []ChunkTopics{
+		apparatus("ปกหน้า"), // leading run: front matter, never rescued
+		{Kind: TopicContent, Topics: []string{"การย่อยอาหาร"}},
+		apparatus("หัวใจ"), // one chunk inside content: flicker
+		{Kind: TopicContent, Topics: []string{"หลอดเลือด"}},
+		apparatus("เฉลยข้อ 1"), // three-chunk run: a real answer key
+		apparatus("เฉลยข้อ 2"),
+		apparatus("เฉลยข้อ 3"),
+		{Kind: TopicContent, Topics: []string{"ระบบขับถ่าย"}},
+		apparatus("เกณฑ์การประเมิน"), // trailing run: assessment appendix
+	}
+
+	if rescued := SmoothPassageKinds(perChunk); rescued != 1 {
+		t.Fatalf("SmoothPassageKinds() = %d, want 1", rescued)
+	}
+	if !perChunk[2].Teaches() {
+		t.Errorf("the isolated chunk was not rescued: %#v", perChunk[2])
+	}
+	for _, i := range []int{0, 4, 5, 6, 8} {
+		if perChunk[i].Teaches() {
+			t.Errorf("chunk %d was rescued; only isolated runs inside content may be", i)
+		}
+	}
+}
+
+func TestSmoothPassageKindsLeavesEmptyChunksAlone(t *testing.T) {
+	perChunk := []ChunkTopics{
+		{Kind: TopicContent, Topics: []string{"การย่อยอาหาร"}},
+		{Kind: TopicNonContent},
+		{Kind: TopicContent, Topics: []string{"หลอดเลือด"}},
+	}
+	if rescued := SmoothPassageKinds(perChunk); rescued != 0 {
+		t.Fatalf("SmoothPassageKinds() = %d, want 0: a chunk with no topics adds nothing", rescued)
+	}
+}
+
 func TestBuildEvidenceGraphKeepsOnlyContentChunks(t *testing.T) {
 	chunks := []Chunk{
 		{ID: "p1-c0", Page: 1, Text: "digestion"},

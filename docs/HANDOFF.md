@@ -97,28 +97,50 @@ Thai and English teacher-guide phrases if the model ignores the prompt.
 
 Teacher-guide material is now also removed one stage earlier, at graph
 compilation, and **the model decides it, not a phrase list**. The pass-1 map
-step returns `{title, kind}` per topic, where kind is `content`, `apparatus`
+step returns `{kind, topics}` per chunk, where kind is `content`, `apparatus`
 (answer keys, assessment rubrics, scoring guides, test banks, learning
 objectives, lesson plans, teaching hours) or `non_content` (page furniture,
 replacing the old `NON_CONTENT` sentinel). `BuildEvidenceGraph` admits only
-`content`, so a chunk whose topics were all apparatus never joins a lesson.
+`content` chunks, so an answer-key page never joins a lesson.
 
 This costs no extra provider call: the map step was already reading every chunk.
 A Thai/English phrase list was written first, measured, and then deleted — it
 scored 36 of 217 concepts on the cached biology graph with no false positives,
-but it only ever knew the wording of the one publisher it had been read from,
-and the classification is the map step's job anyway.
+but it only ever knew the wording of the one publisher it had been read from.
 
-Two deliberate rules the prompt spells out, because they are the pairs that
-actually confuse a classifier: a page of answers to chapter exercises is
-apparatus even though every answer is about biology, and a laboratory activity
-is content even though a teacher runs it. Teacher-knowledge sidebars
-(`ความรู้เพิ่มเติมสำหรับครู: Osmolarity`) are content too.
+Three things were measured, in this order, all on the same 254-page book. Chunks
+dropped out of 392:
 
-`examgen.Topic.UnmarshalJSON` accepts a bare string as well as the object, and a
-topic with a missing or unknown kind is treated as content — wrongly deleting
-material costs more than letting one rubric reach the question-level gates,
-which still ban teacher-guide stems.
+| what changed | dropped |
+|---|---:|
+| kind per topic, first prompt | 238 |
+| plus the "teacher instructions wrap real content" rule | 184 |
+| kind moved to the chunk | 174 |
+| plus `SmoothPassageKinds` | **131** |
+
+The first number was a disaster: kidney function, blood pressure, gas exchange
+and HIV all classified as apparatus, because a teacher's edition wraps subject
+prose in instructions to the teacher and the model read the wrapper. The prompt
+now says so explicitly, and ends with "when you cannot decide, choose content".
+
+`SmoothPassageKinds` is the structural half and is not a phrase list either.
+Apparatus runs in blocks — an answer key covers whole pages — so a one- or
+two-chunk apparatus run sitting between content chunks is the classifier
+flickering, not a one-chunk answer key. The run-length histogram on the real book
+splits cleanly: 18 runs of one and 7 of two, then real sections of 8, 9, 10, 22
+and 34. It only ever rescues, never drops, because a surviving rubric is caught
+by the question-level gates while a lost passage is lost silently.
+
+After all four steps, 27 of the 217 concepts from the old cached graph are gone
+entirely, and 23 of those are unambiguous apparatus. The four that are not are
+`กิจกรรม 15.3` (pages 129-131), `หมู่เลือดและการให้เลือด` (135), `กิจกรรม 16.2`
+(173) and `ระบบขับถ่าย` (191) — three-chunk runs the smoother will not touch.
+No lesson in the resulting 34 is named after assessment.
+
+`examgen.ChunkTopics.UnmarshalJSON` accepts a bare topic list as well as the
+object, and a chunk with a missing or unknown kind is treated as content —
+wrongly deleting material costs more than letting one rubric reach the
+question-level gates, which still ban teacher-guide stems.
 
 Measured pass rates, all on `scb10x/typhoon2.5-qwen3-4b`:
 
@@ -340,16 +362,14 @@ Found by reading, not fixed, filed nowhere else:
 2. Replay the six historical true-distractor questions through
    `judge/source`, once with local 4B and once with DeepSeek. The current paid
    regression proves one Thai paraphrase case, not the whole recurring defect.
-3. **Measure the topic classifier on one real pass 1.** The code is written and
-   tested; whether the model actually classifies well is unmeasured, and it is
-   the whole mechanism now that the phrase list is gone. The biology outline
-   cache was invalidated (`outline-v2` → `outline-v3`), so the next run of that
-   book pays for pass 1 again: 13 map calls plus one reduce on DeepSeek. Do it
-   once, then compare the concept list against the 36 the deleted phrase list
-   found — those are recorded in `git show e2aec77` and are a usable answer key.
-   Watch two things: a 4B local model may classify worse than a hosted one, and a
-   model that marks everything `content` degrades silently back to the old
-   behaviour rather than failing.
+3. ~~Filter pedagogy at graph compilation~~ — done and measured on DeepSeek over
+   four live runs; see the table above. Two things are still open. **The
+   classifier has never been run on the local 4B model**, which may be much worse
+   at it and would degrade silently rather than fail — a model that answers
+   `content` for everything looks exactly like a clean book, so read the
+   `outline/filter` line. And the reduce step returned 34 lessons this time
+   against 17 before; more concepts survive, so lessons got thinner. Whether that
+   is better or worse for a learner is unmeasured.
 4. For known prose subjects, measure `--calc-tool=false`. It should remove the
    three calculator-tool calls seen in the 14-call biology run; keep the
    arithmetic gate regardless. Do not make this the global default without a
@@ -412,11 +432,15 @@ Found by reading, not fixed, filed nowhere else:
   identify them any more. The cache key is `outline-v3`; the old files are left
   on disk but never read. Extraction caches (`pages-v3.json`) are untouched, so
   the expensive Docling run is not repeated.
-- A topic whose kind is missing or unrecognised is kept as content. Silence from
+- A chunk whose kind is missing or unrecognised is kept as content. Silence from
   the model therefore looks exactly like "everything is content" — check the
   `outline/filter` progress line, which reports how many apparatus and furniture
   topics were dropped. Zero on a teacher's edition means the classifier is not
   working, not that the book is clean.
+- `maxFlickerRun = 2` in `graph.go` was set from a run-length histogram, not
+  taste. Raising it to 3 recovers 12 more chunks and starts merging real
+  three-chunk answer-key runs back into lessons. Re-derive the histogram before
+  changing it; the cached `outline-v3.json` has enough in it to do that offline.
 - Re-running a structural check over old `.scratch/*/run-*.json` files is the
   cheapest way to test a new rule — `examgen.CheckWellFormed` is exported for
   exactly that, and it caught a false positive of mine that would otherwise have

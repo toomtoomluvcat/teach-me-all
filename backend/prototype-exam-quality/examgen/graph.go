@@ -31,6 +31,59 @@ type ConceptEdge struct {
 	EvidenceChunkIDs []string `json:"evidence_chunk_ids"`
 }
 
+// maxFlickerRun is how long a stretch of non-content chunks may be and still be
+// read as a misclassification rather than a real section.
+//
+// Measured on the 254-page Thai biology book, where the map step dropped 174 of
+// 392 chunks. The run-length histogram splits cleanly: 18 runs of one chunk and
+// 7 of two, then real sections of 8, 9, 10, 22 and 34. Every long run is a
+// genuine answer key or assessment appendix. 2 recovers 32 chunks without
+// touching any of them; 3 starts eating three-chunk answer-key runs, which are
+// common at the end of an activity.
+const maxFlickerRun = 2
+
+// SmoothPassageKinds rescues short stretches of non-content chunks that sit
+// inside content on both sides, and reports how many chunks it recovered.
+//
+// Teacher-guide apparatus runs in blocks: an answer key covers whole pages, an
+// assessment appendix covers a chapter's worth. A single chunk marked apparatus
+// between two content chunks is the classifier flickering, not a one-chunk
+// answer key — measured cases include the heart on page 112 and blood
+// components on page 132.
+//
+// It only ever rescues. The costs are not symmetric: a rubric that survives is
+// caught later by the question-level gates, while a lost passage is lost from
+// every lesson silently. Runs at the very start or end of the document are never
+// rescued — front matter and the assessment appendix legitimately live there.
+func SmoothPassageKinds(perChunk []ChunkTopics) int {
+	rescued := 0
+	for i := 0; i < len(perChunk); {
+		if perChunk[i].Teaches() {
+			i++
+			continue
+		}
+		end := i
+		for end < len(perChunk) && !perChunk[end].Teaches() {
+			end++
+		}
+		length := end - i
+		insideContent := i > 0 && end < len(perChunk)
+		if length <= maxFlickerRun && insideContent {
+			for j := i; j < end; j++ {
+				if len(perChunk[j].Topics) == 0 {
+					// Nothing to contribute to the graph, so rescuing it would
+					// only inflate the count.
+					continue
+				}
+				perChunk[j].Kind = TopicContent
+				rescued++
+			}
+		}
+		i = end
+	}
+	return rescued
+}
+
 // CountDroppedTopics reports how many distinct topic labels BuildEvidenceGraph
 // will refuse, split by why, so a run can say what it removed instead of
 // silently shrinking.

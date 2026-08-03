@@ -141,6 +141,9 @@ func BuildOutline(ctx context.Context, chunks []Chunk, d Deps) (*Outline, []Chun
 		}
 	}
 
+	if rescued := SmoothPassageKinds(perChunk); rescued > 0 {
+		d.Log.report("outline/smooth", rescued, rescued, "isolated chunks put back: apparatus runs in blocks, single chunks do not")
+	}
 	if apparatus, furniture := CountDroppedTopics(perChunk); apparatus > 0 || furniture > 0 {
 		d.Log.report("outline/filter", apparatus+furniture, apparatus+furniture,
 			fmt.Sprintf("%d teacher-guide topics and %d page-furniture topics dropped before reduce", apparatus, furniture))
