@@ -51,6 +51,7 @@ type config struct {
 	fresh              bool
 	extractOnly        bool
 	calcTool           bool
+	filterTopics       bool
 	parallel           int
 }
 
@@ -90,6 +91,7 @@ func main() {
 	flag.IntVar(&cfg.budget, "budget", 0, "override the model's own question budget")
 	flag.BoolVar(&cfg.fresh, "fresh", false, "ignore the cache")
 	flag.BoolVar(&cfg.extractOnly, "extract-only", false, "stop after extraction; needs no models and no Ollama")
+	flag.BoolVar(&cfg.filterTopics, "filter-topics", true, "drop chunks pass 1 classified as teacher-guide apparatus or page furniture; set false for a source that really is mostly exercises")
 	flag.BoolVar(&cfg.calcTool, "calc-tool", true, "let the model use a calculator tool before writing calculation questions")
 	flag.IntVar(&cfg.parallel, "parallel", 4, "model calls in flight at once; Ollama also needs OLLAMA_NUM_PARALLEL to match")
 	flag.Parse()
@@ -309,11 +311,12 @@ func run(ctx context.Context, cfg config) error {
 	gen.UseCalcTool = cfg.calcTool
 
 	deps := examgen.Deps{
-		Gen:      gen,
-		Judge:    llm.NewJudge(modelClient, cfg.model),
-		Eval:     examgen.Arith{},
-		Log:      examgen.Progress(safeProgress()),
-		Parallel: cfg.parallel,
+		Gen:           gen,
+		Judge:         llm.NewJudge(modelClient, cfg.model),
+		Eval:          examgen.Arith{},
+		Log:           examgen.Progress(safeProgress()),
+		Parallel:      cfg.parallel,
+		KeepAllTopics: !cfg.filterTopics,
 	}
 	if cfg.provider == "gemini" || cfg.provider == "deepseek" {
 		deps.TopicBatcher = llm.NewBatchedTopicGenerator(modelClient, cfg.model, cfg.parallel)

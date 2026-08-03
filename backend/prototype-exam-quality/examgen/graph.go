@@ -84,6 +84,51 @@ func SmoothPassageKinds(perChunk []ChunkTopics) int {
 	return rescued
 }
 
+// maxDroppedChunkShare is the point past which the classifier is not filtering
+// a book, it has stopped working.
+//
+// Two measured points on the same 254-page teacher's edition: the first broken
+// prompt dropped 61% of chunks, including kidney function and gas exchange; the
+// working one drops 33%. 50% sits in the gap, so a real apparatus-heavy source
+// has room and a collapse does not.
+const maxDroppedChunkShare = 0.5
+
+// checkDropIsPlausible refuses a run whose classification collapsed. Nothing
+// downstream can tell the difference between "this book is clean" and "the
+// model marked everything apparatus" — both produce a short outline that looks
+// fine, which is exactly how a bad run becomes a number somebody trusts later.
+//
+// It refuses rather than silently continuing unfiltered, because whether a
+// workbook really is mostly exercises is a human's call, not a default.
+func checkDropIsPlausible(perChunk []ChunkTopics) error {
+	if len(perChunk) == 0 {
+		return nil
+	}
+	dropped := 0
+	for _, chunk := range perChunk {
+		if !chunk.Teaches() {
+			dropped++
+		}
+	}
+	share := float64(dropped) / float64(len(perChunk))
+	if share <= maxDroppedChunkShare {
+		return nil
+	}
+	return fmt.Errorf(
+		"pass 1 classified %d of %d chunks (%.0f%%) as teacher-guide or page furniture, over the %.0f%% limit — "+
+			"either the model failed to classify this source or it really is mostly exercises and rubrics; "+
+			"read the extracted text, then re-run with --filter-topics=false to keep every chunk",
+		dropped, len(perChunk), share*100, maxDroppedChunkShare*100)
+}
+
+// KeepEveryChunk marks every chunk as content, for a source whose apparatus
+// filtering a human has decided to switch off.
+func KeepEveryChunk(perChunk []ChunkTopics) {
+	for i := range perChunk {
+		perChunk[i].Kind = TopicContent
+	}
+}
+
 // CountDroppedTopics reports how many distinct topic labels BuildEvidenceGraph
 // will refuse, split by why, so a run can say what it removed instead of
 // silently shrinking.

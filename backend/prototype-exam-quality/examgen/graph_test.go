@@ -3,6 +3,7 @@ package examgen
 import (
 	"encoding/json"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -97,6 +98,55 @@ func TestSmoothPassageKindsLeavesEmptyChunksAlone(t *testing.T) {
 	}
 	if rescued := SmoothPassageKinds(perChunk); rescued != 0 {
 		t.Fatalf("SmoothPassageKinds() = %d, want 0: a chunk with no topics adds nothing", rescued)
+	}
+}
+
+func TestCheckDropIsPlausibleRefusesACollapsedClassification(t *testing.T) {
+	chunks := func(dropped, kept int) []ChunkTopics {
+		var out []ChunkTopics
+		for i := 0; i < dropped; i++ {
+			out = append(out, ChunkTopics{Kind: TopicApparatus, Topics: []string{"เฉลย"}})
+		}
+		for i := 0; i < kept; i++ {
+			out = append(out, ChunkTopics{Kind: TopicContent, Topics: []string{"การหายใจ"}})
+		}
+		return out
+	}
+
+	// The measured working run drops a third; half is still allowed so an
+	// apparatus-heavy source is not blocked for being what it is.
+	if err := checkDropIsPlausible(chunks(2, 4)); err != nil {
+		t.Errorf("a third dropped was refused: %v", err)
+	}
+	if err := checkDropIsPlausible(chunks(3, 3)); err != nil {
+		t.Errorf("exactly half dropped was refused: %v", err)
+	}
+	// The measured broken run dropped 61%.
+	err := checkDropIsPlausible(chunks(11, 7))
+	if err == nil {
+		t.Fatal("61% dropped was accepted; that is the measured signature of a collapsed classifier")
+	}
+	if !strings.Contains(err.Error(), "--filter-topics=false") {
+		t.Errorf("the refusal does not say how to proceed: %v", err)
+	}
+	if err := checkDropIsPlausible(nil); err != nil {
+		t.Errorf("an empty document was refused: %v", err)
+	}
+}
+
+func TestKeepEveryChunkDisablesFiltering(t *testing.T) {
+	perChunk := []ChunkTopics{
+		{Kind: TopicApparatus, Topics: []string{"เฉลยแบบฝึกหัด"}},
+		{Kind: TopicNonContent, Topics: []string{"สารบัญ"}},
+	}
+	KeepEveryChunk(perChunk)
+	for i, chunk := range perChunk {
+		if !chunk.Teaches() {
+			t.Errorf("chunk %d still filtered after the human turned filtering off", i)
+		}
+	}
+	if err := checkDropIsPlausible(perChunk); err != nil {
+		t.Errorf("guard fired on an unfiltered run: %v", err)
 	}
 }
 

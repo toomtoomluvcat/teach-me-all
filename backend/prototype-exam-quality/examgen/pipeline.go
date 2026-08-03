@@ -68,6 +68,10 @@ type Deps struct {
 	// it, and the calls this pipeline makes are independent of each other, so
 	// the wall clock drops without changing a single verdict. 1 disables it.
 	Parallel int
+	// KeepAllTopics turns off apparatus filtering for a source that really is
+	// mostly exercises and rubrics. It is opt-out on purpose: the zero value
+	// filters, and a book that trips the guard below makes a human decide.
+	KeepAllTopics bool
 }
 
 func (d Deps) slots() int {
@@ -141,12 +145,20 @@ func BuildOutline(ctx context.Context, chunks []Chunk, d Deps) (*Outline, []Chun
 		}
 	}
 
-	if rescued := SmoothPassageKinds(perChunk); rescued > 0 {
-		d.Log.report("outline/smooth", rescued, rescued, "isolated chunks put back: apparatus runs in blocks, single chunks do not")
-	}
-	if apparatus, furniture := CountDroppedTopics(perChunk); apparatus > 0 || furniture > 0 {
-		d.Log.report("outline/filter", apparatus+furniture, apparatus+furniture,
-			fmt.Sprintf("%d teacher-guide topics and %d page-furniture topics dropped before reduce", apparatus, furniture))
+	if d.KeepAllTopics {
+		KeepEveryChunk(perChunk)
+		d.Log.report("outline/filter", 0, 0, "apparatus filtering is off; every chunk will be offered as a lesson")
+	} else {
+		if rescued := SmoothPassageKinds(perChunk); rescued > 0 {
+			d.Log.report("outline/smooth", rescued, rescued, "isolated chunks put back: apparatus runs in blocks, single chunks do not")
+		}
+		if apparatus, furniture := CountDroppedTopics(perChunk); apparatus > 0 || furniture > 0 {
+			d.Log.report("outline/filter", apparatus+furniture, apparatus+furniture,
+				fmt.Sprintf("%d teacher-guide topics and %d page-furniture topics dropped before reduce", apparatus, furniture))
+		}
+		if err := checkDropIsPlausible(perChunk); err != nil {
+			return nil, nil, err
+		}
 	}
 	graph := BuildEvidenceGraph(chunks, perChunk)
 	if len(graph.Concepts) == 0 {
