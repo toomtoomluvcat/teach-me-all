@@ -37,6 +37,29 @@ func TestRenderExtractionOnlyDoesNotOfferUnreadInput(t *testing.T) {
 	}
 }
 
+func TestRepairEnabledAutomaticallyForHostedProviders(t *testing.T) {
+	for _, provider := range []string{"deepseek", "gemini"} {
+		if !repairEnabled(config{provider: provider}) {
+			t.Fatalf("repairEnabled(%q) = false, want hosted semantic repair", provider)
+		}
+		if got := repairLimit(config{provider: provider}); got != 2 {
+			t.Fatalf("repairLimit(%q) = %d, want 2", provider, got)
+		}
+	}
+	if repairEnabled(config{provider: "ollama"}) {
+		t.Fatal("repairEnabled(ollama) = true without --repair")
+	}
+	if got := repairLimit(config{provider: "ollama"}); got != 0 {
+		t.Fatalf("repairLimit(ollama) = %d, want 0", got)
+	}
+	if !repairEnabled(config{provider: "ollama", repair: true}) {
+		t.Fatal("repairEnabled(ollama --repair) = false")
+	}
+	if got := repairLimit(config{provider: "ollama", repair: true}); got != 1 {
+		t.Fatalf("repairLimit(ollama --repair) = %d, want 1", got)
+	}
+}
+
 func captureStdout(t *testing.T, fn func()) string {
 	t.Helper()
 	r, w, err := os.Pipe()

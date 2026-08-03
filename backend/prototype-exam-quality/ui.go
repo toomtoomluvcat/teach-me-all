@@ -90,10 +90,10 @@ func renderOutline(o *examgen.Outline, chunks []examgen.Chunk) {
 	for i, l := range o.Lessons {
 		fmt.Printf("%s%2d.%s %s\n", bold, i+1, reset, l.Title)
 		fmt.Printf("     %s%s%s\n", dim, l.Summary, reset)
-		fmt.Printf("     %s%d chunks · budget %d questions%s\n", dim, len(l.ChunkIDs), l.QuestionBudget, reset)
+		fmt.Printf("     %s%d concepts · %d chunks · budget %d questions%s\n", dim, len(l.ConceptIDs), len(l.ChunkIDs), l.QuestionBudget, reset)
 	}
 	if orphans > 0 {
-		fmt.Printf("\n%s%d chunks were not assigned to any lesson (front matter, or the reduce step lost them)%s\n",
+		fmt.Printf("\n%s%d chunks had no teaching concept (front matter or page furniture)%s\n",
 			dim, orphans, reset)
 	}
 

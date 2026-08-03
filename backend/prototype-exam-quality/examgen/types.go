@@ -36,12 +36,14 @@ type Lesson struct {
 	// this is the count.
 	QuestionBudget int
 	ChunkIDs       []string
+	ConceptIDs     []string
 }
 
 // Outline is the whole course as pass 1 sees it.
 type Outline struct {
-	CourseTitle string
-	Lessons     []Lesson
+	CourseTitle   string
+	Lessons       []Lesson
+	EvidenceGraph *EvidenceGraph
 }
 
 // Kind distinguishes question shapes. The prototype only generates
@@ -169,6 +171,9 @@ type GateResult struct {
 	// Deterministic marks gates that Go decided without asking a model.
 	// Gates 1 and 4 are deterministic; 2 and 3 are LLM-as-judge and advisory.
 	Deterministic bool
+	// ChoiceVerdicts is populated by single_defensible so a human can inspect
+	// the judge's decision for every option instead of trusting one summary.
+	ChoiceVerdicts []ChoiceVerdict `json:"choice_verdicts,omitempty"`
 }
 
 // GateReport collects every check run against one question.
@@ -186,20 +191,17 @@ func (r *GateReport) Passed() bool {
 	return true
 }
 
-// Repairable reports whether every failure came from a check Go decided by
-// itself — a misquote, or arithmetic that does not add up.
-//
-// Those are worth handing back to the model with the exact discrepancy: the
-// question's idea is usually fine and only its citation or its answer key is
-// wrong. A question the judge rejected is broken at the level of what it asks,
-// and is cheaper to replace than to argue with.
+// Repairable reports whether every failure has concrete feedback that the
+// generator can act on in one bounded retry. Besides deterministic failures,
+// the blind judge can identify missing context and the sourced judge can name
+// ambiguous, equivalent, or unsupported choices.
 func (r *GateReport) Repairable() bool {
 	fails := r.Failures()
 	if len(fails) == 0 {
 		return false
 	}
 	for _, f := range fails {
-		if !f.Deterministic {
+		if !f.Deterministic && f.Gate != GateBlindAnswer && f.Gate != GateSingleValid {
 			return false
 		}
 	}

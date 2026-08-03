@@ -27,9 +27,27 @@ type BlindVerdict struct {
 
 // SourcedVerdict is what a judge reports when it can see the source chunk.
 type SourcedVerdict struct {
-	BestIndex      int    `json:"best_index"`
-	AlsoDefensible []int  `json:"also_defensible"`
-	Reason         string `json:"reason"`
+	BestIndex      int             `json:"best_index"`
+	AlsoDefensible []int           `json:"also_defensible"`
+	ChoiceVerdicts []ChoiceVerdict `json:"choice_verdicts"`
+	Reason         string          `json:"reason"`
+}
+
+type ChoiceStatus string
+
+const (
+	ChoiceSupported   ChoiceStatus = "supported"
+	ChoiceUnsupported ChoiceStatus = "unsupported"
+	ChoiceEquivalent  ChoiceStatus = "equivalent"
+	ChoiceAmbiguous   ChoiceStatus = "ambiguous"
+)
+
+// ChoiceVerdict forces the source judge to audit every option rather than
+// making one holistic pick and overlooking a paraphrased correct answer.
+type ChoiceVerdict struct {
+	Index  int          `json:"index"`
+	Status ChoiceStatus `json:"status"`
+	Reason string       `json:"reason"`
 }
 
 // Judge is the model-backed half of the gates. Two calls, both on the question
@@ -239,7 +257,7 @@ func gateInterpretable(q Question, v BlindVerdict) GateResult {
 // gateSingleDefensible checks the answer key against a judge that can see the
 // source: the judge's pick has to match, and no other choice may be arguable.
 func gateSingleDefensible(q Question, v SourcedVerdict) GateResult {
-	res := GateResult{Gate: GateSingleValid}
+	res := GateResult{Gate: GateSingleValid, ChoiceVerdicts: v.ChoiceVerdicts}
 
 	idx := q.CorrectIndex()
 	if idx < 0 {
@@ -265,9 +283,38 @@ func gateSingleDefensible(q Question, v SourcedVerdict) GateResult {
 			return res
 		}
 	}
+	if len(v.ChoiceVerdicts) > 0 {
+		byIndex := make(map[int]ChoiceVerdict, len(v.ChoiceVerdicts))
+		for _, verdict := range v.ChoiceVerdicts {
+			if verdict.Index < 0 || verdict.Index >= len(q.Choices) {
+				res.Reason = fmt.Sprintf("source judge returned out-of-range choice index %d", verdict.Index)
+				return res
+			}
+			if _, duplicate := byIndex[verdict.Index]; duplicate {
+				res.Reason = fmt.Sprintf("source judge evaluated choice %d more than once", verdict.Index+1)
+				return res
+			}
+			byIndex[verdict.Index] = verdict
+		}
+		if len(byIndex) != len(q.Choices) {
+			res.Reason = fmt.Sprintf("source judge evaluated %d of %d choices", len(byIndex), len(q.Choices))
+			return res
+		}
+		for i := range q.Choices {
+			verdict := byIndex[i]
+			if i == idx && verdict.Status != ChoiceSupported {
+				res.Reason = fmt.Sprintf("choice %d is marked correct but audited as %s: %s", i+1, verdict.Status, verdict.Reason)
+				return res
+			}
+			if i != idx && verdict.Status != ChoiceUnsupported {
+				res.Reason = fmt.Sprintf("choice %d is a distractor but audited as %s: %s", i+1, verdict.Status, verdict.Reason)
+				return res
+			}
+		}
+	}
 
 	res.Pass = true
-	res.Reason = "exactly one choice holds up against the source"
+	res.Reason = "exactly one choice holds up after auditing every option against the source"
 	return res
 }
 

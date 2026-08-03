@@ -91,7 +91,7 @@ func main() {
 	flag.IntVar(&cfg.budget, "budget", 0, "override the model's own question budget")
 	flag.BoolVar(&cfg.fresh, "fresh", false, "ignore the cache")
 	flag.BoolVar(&cfg.extractOnly, "extract-only", false, "stop after extraction; needs no models and no Ollama")
-	flag.BoolVar(&cfg.repair, "repair", false, "send questions rejected by a deterministic gate back to the model once (measured worthless on 4B)")
+	flag.BoolVar(&cfg.repair, "repair", false, "also enable one feedback-guided repair on local Ollama (hosted providers enable it automatically)")
 	flag.BoolVar(&cfg.calcTool, "calc-tool", true, "let the model use a calculator tool before writing calculation questions")
 	flag.IntVar(&cfg.parallel, "parallel", 4, "model calls in flight at once; Ollama also needs OLLAMA_NUM_PARALLEL to match")
 	flag.Parse()
@@ -329,7 +329,7 @@ func run(ctx context.Context, cfg config) error {
 		Chunks  []examgen.Chunk
 	}
 
-	oc, err := cachedT(cfg, "outline", func() (outlineCache, error) {
+	oc, err := cachedT(cfg, "outline-v2", func() (outlineCache, error) {
 		clear()
 		header("STEP 2 — reading the whole document (pass 1)")
 		mapPlan := "one model call each"
@@ -364,7 +364,8 @@ func run(ctx context.Context, cfg config) error {
 		opt.ForceCalc = cfg.forceCalc
 		opt.Scope = cfg.scope
 		opt.Budget = cfg.budget
-		opt.Repair = cfg.repair
+		opt.MaxRepairs = repairLimit(cfg)
+		opt.Repair = opt.MaxRepairs > 0
 
 		clear()
 		header("STEP 3 — generating and gating: " + lesson.Title)
@@ -388,6 +389,20 @@ func run(ctx context.Context, cfg config) error {
 			return err
 		}
 	}
+}
+
+func repairEnabled(cfg config) bool {
+	return repairLimit(cfg) > 0
+}
+
+func repairLimit(cfg config) int {
+	if cfg.provider == "gemini" || cfg.provider == "deepseek" {
+		return 2
+	}
+	if cfg.repair {
+		return 1
+	}
+	return 0
 }
 
 func reportStats(cfg config, stats *llm.Stats) {

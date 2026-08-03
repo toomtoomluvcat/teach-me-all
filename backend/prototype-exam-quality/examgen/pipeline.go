@@ -14,18 +14,18 @@ import (
 // file.
 type Generator interface {
 	Topics(ctx context.Context, c Chunk) ([]string, error)
-	Outline(ctx context.Context, topics []string) (*Outline, []LessonTopics, error)
-	Questions(ctx context.Context, lessonTitle string, c Chunk, want int, forceCalc bool) ([]Question, error)
+	Outline(ctx context.Context, graph EvidenceGraph) (*Outline, []LessonConcepts, error)
+	Questions(ctx context.Context, lesson Lesson, graph *EvidenceGraph, c Chunk, want int, forceCalc bool) ([]Question, error)
 	// Repair takes one rejected question back to the model with the exact
 	// objection. Returns ok=false when the model declined to salvage it.
 	Repair(ctx context.Context, q Question, c Chunk, failures []GateResult, forceCalc bool) (Question, bool, error)
 }
 
-// LessonTopics is the raw topic membership the reduce step returned, before we
-// resolve it back to chunks.
-type LessonTopics struct {
-	LessonID string
-	Topics   []string
+// LessonConcepts is the graph membership returned by the reduce step. Stable
+// concept IDs replace free-text topic titles as the join key.
+type LessonConcepts struct {
+	LessonID   string
+	ConceptIDs []string
 }
 
 // Embedder turns text into vectors.
@@ -138,58 +138,60 @@ func BuildOutline(ctx context.Context, chunks []Chunk, d Deps) (*Outline, []Chun
 		}
 	}
 
-	owners := map[string][]string{} // topic -> chunk IDs
-	var order []string              // topics in first-seen order
-
-	for i, c := range chunks {
-		for _, t := range perChunk[i] {
-			t = strings.TrimSpace(t)
-			if t == "" || strings.EqualFold(t, nonContent) {
-				continue
-			}
-			if _, seen := owners[t]; !seen {
-				order = append(order, t)
-			}
-			owners[t] = append(owners[t], c.ID)
-		}
-	}
-	if len(order) == 0 {
+	graph := BuildEvidenceGraph(chunks, perChunk)
+	if len(graph.Concepts) == 0 {
 		return nil, nil, fmt.Errorf("pass 1 found no teaching content in %d chunks — check the extracted text before blaming the model", len(chunks))
 	}
 
-	// reduce: topics -> lessons.
-	d.Log.report("outline/reduce", 0, 1, fmt.Sprintf("%d topics", len(order)))
-	outline, membership, err := d.Gen.Outline(ctx, order)
+	// reduce: evidence graph -> lessons.
+	d.Log.report("outline/reduce", 0, 1, fmt.Sprintf("%d concepts, %d edges", len(graph.Concepts), len(graph.Edges)))
+	outline, membership, err := d.Gen.Outline(ctx, graph)
 	if err != nil {
 		return nil, nil, fmt.Errorf("outline reduce: %w", err)
 	}
+	outline.EvidenceGraph = &graph
 	d.Log.report("outline/reduce", 1, 1, fmt.Sprintf("%d lessons", len(outline.Lessons)))
 
-	// resolve: lesson -> chunk IDs, via the topics each lesson claimed.
-	// The model is told to copy topic titles verbatim; when it does not, the
-	// topic is matched loosely rather than silently dropped.
+	// resolve: lesson -> concept IDs -> source chunks. Stable IDs make this a
+	// deterministic graph join; model wording can no longer sever provenance.
 	assigned := map[string]string{} // chunk ID -> lesson ID
+	conceptByID := make(map[string]ConceptNode, len(graph.Concepts))
+	for _, concept := range graph.Concepts {
+		conceptByID[concept.ID] = concept
+	}
 	byID := map[string]*Lesson{}
 	for i := range outline.Lessons {
 		byID[outline.Lessons[i].ID] = &outline.Lessons[i]
 	}
+	conceptLesson := map[string]string{}
 	for _, m := range membership {
 		lesson := byID[m.LessonID]
 		if lesson == nil {
 			continue
 		}
-		for _, t := range m.Topics {
-			ids := owners[t]
-			if ids == nil {
-				ids = owners[looseMatch(t, order)]
+		for _, conceptID := range m.ConceptIDs {
+			if _, ok := conceptByID[conceptID]; !ok {
+				continue
 			}
-			for _, id := range ids {
-				if _, taken := assigned[id]; taken {
-					continue
-				}
-				assigned[id] = lesson.ID
-				lesson.ChunkIDs = append(lesson.ChunkIDs, id)
+			if _, taken := conceptLesson[conceptID]; taken {
+				continue
 			}
+			attachConceptToLesson(conceptID, lesson.ID, conceptLesson, byID)
+		}
+	}
+	recoverUnassignedConcepts(graph, conceptLesson, byID)
+
+	for _, concept := range graph.Concepts {
+		lesson := byID[conceptLesson[concept.ID]]
+		if lesson == nil {
+			continue
+		}
+		for _, id := range concept.ChunkIDs {
+			if _, taken := assigned[id]; taken {
+				continue
+			}
+			assigned[id] = lesson.ID
+			lesson.ChunkIDs = append(lesson.ChunkIDs, id)
 		}
 	}
 
@@ -209,21 +211,64 @@ func BuildOutline(ctx context.Context, chunks []Chunk, d Deps) (*Outline, []Chun
 	}
 	outline.Lessons = kept
 	if len(outline.Lessons) == 0 {
-		return nil, nil, fmt.Errorf("every lesson came back with no chunks attached — the reduce step did not copy topic titles verbatim")
+		return nil, nil, fmt.Errorf("every lesson came back with no chunks attached — the reduce step returned no valid concept IDs")
 	}
 
 	return outline, out, nil
 }
 
-// looseMatch finds the closest known topic to one the model reworded. Returns
-// "" when nothing is close enough, which leaves the topic unresolved rather
-// than attaching a lesson to the wrong material.
-func looseMatch(want string, known []string) string {
-	w := strings.ToLower(strings.TrimSpace(want))
-	for _, k := range known {
-		lk := strings.ToLower(k)
-		if lk == w || strings.Contains(lk, w) || strings.Contains(w, lk) {
-			return k
+func attachConceptToLesson(conceptID, lessonID string, assigned map[string]string, lessons map[string]*Lesson) {
+	lesson := lessons[lessonID]
+	if lesson == nil || assigned[conceptID] != "" {
+		return
+	}
+	assigned[conceptID] = lessonID
+	lesson.ConceptIDs = append(lesson.ConceptIDs, conceptID)
+}
+
+// recoverUnassignedConcepts repairs incomplete LLM reduce output from graph
+// evidence. Co-occurrence is strongest, document adjacency is second, and the
+// nearest assigned concept in source order is the final deterministic fallback.
+func recoverUnassignedConcepts(graph EvidenceGraph, assigned map[string]string, lessons map[string]*Lesson) {
+	for _, concept := range graph.Concepts {
+		if assigned[concept.ID] != "" {
+			continue
+		}
+		lessonID := neighboringLesson(concept.ID, EdgeCoOccurs, graph.Edges, assigned)
+		if lessonID == "" {
+			lessonID = neighboringLesson(concept.ID, EdgeFollows, graph.Edges, assigned)
+		}
+		if lessonID != "" {
+			attachConceptToLesson(concept.ID, lessonID, assigned, lessons)
+		}
+	}
+	for i, concept := range graph.Concepts {
+		if assigned[concept.ID] != "" {
+			continue
+		}
+		for distance := 1; distance < len(graph.Concepts); distance++ {
+			if left := i - distance; left >= 0 && assigned[graph.Concepts[left].ID] != "" {
+				attachConceptToLesson(concept.ID, assigned[graph.Concepts[left].ID], assigned, lessons)
+				break
+			}
+			if right := i + distance; right < len(graph.Concepts) && assigned[graph.Concepts[right].ID] != "" {
+				attachConceptToLesson(concept.ID, assigned[graph.Concepts[right].ID], assigned, lessons)
+				break
+			}
+		}
+	}
+}
+
+func neighboringLesson(conceptID string, kind EdgeKind, edges []ConceptEdge, assigned map[string]string) string {
+	for _, edge := range edges {
+		if edge.Kind != kind {
+			continue
+		}
+		if edge.From == conceptID && assigned[edge.To] != "" {
+			return assigned[edge.To]
+		}
+		if edge.To == conceptID && assigned[edge.From] != "" {
+			return assigned[edge.From]
 		}
 	}
 	return ""
@@ -243,16 +288,19 @@ type ExamOptions struct {
 	// MaxChunkVisits caps total work so a lesson that cannot fill its budget
 	// stops instead of grinding through the whole book.
 	MaxChunkVisits int
-	// Repair sends questions rejected by a deterministic gate back to the model
-	// once, with the exact discrepancy.
+	// Repair sends questions with actionable deterministic or semantic feedback
+	// back to the generator once, then runs every gate again.
 	//
 	// Off by default, and that is a measurement, not a guess. On
 	// typhoon2.5-qwen3-4b it was tried on two documents: 4 questions sent back,
 	// 0 came back clean, on both. Telling a 4B model its own arithmetic
 	// disagrees with an independent evaluation does not get the arithmetic
 	// fixed — it costs a model call per rejected question and returns nothing.
-	// Worth re-measuring on a frontier model, where the answer may invert.
+	// Hosted providers enable this automatically; local Ollama keeps it opt-in.
 	Repair bool
+	// MaxRepairs bounds feedback convergence for one draft. Values <= 0 mean
+	// one attempt when Repair is enabled.
+	MaxRepairs int
 }
 
 // DefaultExamOptions is sized so a run finishes in minutes, not hours.
@@ -295,6 +343,10 @@ func GenerateExam(ctx context.Context, outline *Outline, lesson Lesson, chunks [
 	}
 	if budget <= 0 {
 		budget = 5
+	}
+	maxRepairs := opt.MaxRepairs
+	if maxRepairs <= 0 {
+		maxRepairs = 1
 	}
 
 	byID := ChunkByID(chunks)
@@ -341,7 +393,7 @@ func GenerateExam(ctx context.Context, outline *Outline, lesson Lesson, chunks [
 
 		d.Log.report("generate", len(res.Passed), budget, fmt.Sprintf("page %d", c.Page))
 
-		qs, err := d.Gen.Questions(ctx, lesson.Title, c, want, opt.ForceCalc)
+		qs, err := d.Gen.Questions(ctx, lesson, outline.EvidenceGraph, c, want, opt.ForceCalc)
 		if err != nil {
 			return nil, fmt.Errorf("generate from chunk %s: %w", c.ID, err)
 		}
@@ -388,38 +440,37 @@ func GenerateExam(ctx context.Context, outline *Outline, lesson Lesson, chunks [
 			keep(res, q, c, lesson, lessonName, toppedUp, vec, &acceptedVecs)
 			d.Log.report("gate", len(res.Passed), budget, gateNote(rep))
 
-			// A question rejected only by Go — a misquote or arithmetic that
-			// does not add up — gets one chance to be corrected with the exact
-			// discrepancy in hand. Measured on a 4B model, four out of five
-			// calculation questions had arithmetic the model itself got wrong;
-			// throwing all of them away and generating from scratch costs far
-			// more than one targeted retry.
-			if rep.Passed() || !rep.Repairable() || !opt.Repair {
-				continue
+			// A question with concrete gate feedback gets one correction chance.
+			// The retry sees deterministic discrepancies plus the sourced
+			// judge's per-choice semantic labels; it is then audited from scratch.
+			current, currentReport := q, rep
+			for attempt := 0; opt.Repair && attempt < maxRepairs && !currentReport.Passed() && currentReport.Repairable(); attempt++ {
+				res.RepairAttempts++
+				fixed, ok, err := d.Gen.Repair(ctx, current, c, currentReport.Failures(), opt.ForceCalc)
+				if err != nil {
+					return nil, fmt.Errorf("repair from chunk %s: %w", c.ID, err)
+				}
+				if !ok {
+					d.Log.report("repair", len(res.Passed), budget, "model declined")
+					break
+				}
+				fixed.ChunkID = c.ID
+				fixed.Attempt = current.Attempt + 1
+				frep := RunCheapGates(fixed, c, d.Eval)
+				fvec := stemVector(ctx, fixed, d)
+				frep.add(gateDistinct(fixed, res.Passed, fvec, acceptedVecs))
+				if err := AddJudgeGates(ctx, frep, fixed, c, d.Judge); err != nil {
+					return nil, err
+				}
+				fixed.Report = frep
+				res.Questions = append(res.Questions, fixed)
+				if frep.Passed() {
+					res.RepairsAccepted++
+				}
+				keep(res, fixed, c, lesson, lessonName, toppedUp, fvec, &acceptedVecs)
+				d.Log.report("repair", len(res.Passed), budget, gateNote(frep))
+				current, currentReport = fixed, frep
 			}
-			res.RepairAttempts++
-			fixed, ok, err := d.Gen.Repair(ctx, q, c, rep.Failures(), opt.ForceCalc)
-			if err != nil {
-				return nil, fmt.Errorf("repair from chunk %s: %w", c.ID, err)
-			}
-			if !ok {
-				continue
-			}
-			fixed.ChunkID = c.ID
-			fixed.Attempt = q.Attempt + 1
-			frep := RunCheapGates(fixed, c, d.Eval)
-			fvec := stemVector(ctx, fixed, d)
-			frep.add(gateDistinct(fixed, res.Passed, fvec, acceptedVecs))
-			if err := AddJudgeGates(ctx, frep, fixed, c, d.Judge); err != nil {
-				return nil, err
-			}
-			fixed.Report = frep
-			res.Questions = append(res.Questions, fixed)
-			if frep.Passed() {
-				res.RepairsAccepted++
-			}
-			keep(res, fixed, c, lesson, lessonName, toppedUp, fvec, &acceptedVecs)
-			d.Log.report("repair", len(res.Passed), budget, gateNote(frep))
 		}
 	}
 

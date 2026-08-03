@@ -19,15 +19,15 @@ PDF ──extract──> text ──chunk──> chunks ──embed──> vecto
                    │
                    └─ prints a sample so you can SEE if extraction is garbage
 
-chunks ──pass 1 (map-reduce)──> course outline (lessons)
+chunks ──pass 1 (map-reduce)──> evidence graph ──> course outline (lessons)
                                        │
                         you pick a lesson in the TUI
                                        │
 chunks of that lesson ──pass 2──> MCQ (JSON-schema constrained)
                                        │
-                                   4 gates
+                              deterministic + model gates
                                        │
-              failures ──top-up from other chunks / sibling lessons──┘
+       failures ──focused feedback repair (hosted) / top-up──────────┘
                                        │
                           every question kept, pass or fail
 ```
@@ -38,7 +38,7 @@ chunks of that lesson ──pass 2──> MCQ (JSON-schema constrained)
 |---|--------|-----------|
 | 1 | `source_quote` is a verbatim substring of the cited chunk | **Go** — no model involved |
 | 2 | Question is answerable with the source hidden | model, second pass |
-| 3 | Exactly one choice is defensible | model, second pass |
+| 3 | Every choice is audited against the source; exactly one is supported and no distractor is equivalent or ambiguous | model, second pass |
 | 4 | `calculation.expression` evaluates to the answer the model marked correct | **Go** — no model involved |
 
 Gate 4 is a backstop, not the primary defence. Before generating, the model
@@ -51,6 +51,14 @@ generation runs as two turns — see VERDICT.md.
 Gates 1 and 4 are the trustworthy ones — they are deterministic and re-runnable
 forever. Gates 2 and 3 are LLM-as-judge and should be treated as advisory,
 especially on a 4B model. Eyeball the first 20 failures before believing them.
+
+Pass 1 gives every concept a stable graph ID with page/chunk provenance and
+evidenced `co_occurs` / `follows` edges. Generation sees only concepts supported
+by its current chunk. On Gemini and DeepSeek, an actionable gate failure is sent
+back as structured feedback for at most two rounds. `single_defensible` uses a
+focused replacement contract: the model may replace distractors but cannot
+alter the stem, correct answer, quote, or explanation. Invalid replacements are
+dropped and normal top-up continues; they are never accepted on trust.
 
 Anthropic cannot enable citations and structured outputs at the same time
 (400 error), so `source_quote` + server-side substring check is what production
@@ -117,7 +125,7 @@ Flags:
 | `--docling-ocr-lang` | `th,en` | comma-separated OCR languages |
 | `--docling-ocr-full-page` | `false` | OCR the complete page; normally leave off so native PDF text stays native |
 | `--calc-tool` | `true` | model calls a calculator before writing calculation questions. Took arithmetic failures from 5 to 0 — see VERDICT.md |
-| `--repair` | `false` | hand rejected questions back with the discrepancy. Measured worthless on 4B |
+| `--repair` | `false` | opt local Ollama into one feedback repair; Gemini/DeepSeek automatically allow at most two focused rounds per rejected draft |
 | `--model` | provider default | generation + judge model; Ollama defaults to `scb10x/typhoon2.5-qwen3-4b`, Gemini to `gemini-2.5-flash`, DeepSeek to `deepseek-chat` |
 | `--embed-model` | provider default | Ollama `bge-m3`, Gemini `gemini-embedding-001`, DeepSeek disabled; pass an explicit empty value to disable ranking |
 | `--gemini-host` | `https://generativelanguage.googleapis.com` | Gemini API host |
@@ -176,7 +184,9 @@ prints a cumulative call report. With Gemini or DeepSeek, `TOTAL` is the exact
 number of provider HTTP requests attempted by the process, including retries and
 429/5xx responses. The `embed` row counts batch embedding requests, not
 individual texts; the other rows identify the pipeline stage (`outline/map`,
-`outline/reduce`, `generate`, `judge/*`, `repair`, and `calc-tool`).
+`outline/reduce`, `generate`, `judge/*`, `repair`, and `calc-tool`). A hosted
+question that passes first time adds no repair call; a rejected draft can add
+one `repair` plus a fresh judge pair per round, bounded at two rounds.
 
 ## Finish line
 

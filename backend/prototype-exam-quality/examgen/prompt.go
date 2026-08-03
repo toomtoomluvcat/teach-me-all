@@ -127,33 +127,46 @@ func OutlineSchema() map[string]any {
 					"maximum":     20,
 					"description": "how many exam questions this lesson genuinely supports, based on how much distinct material it contains. Be honest: a thin lesson gets a small number.",
 				},
-				"topics": map[string]any{
+				"concept_ids": map[string]any{
 					"type":        "array",
 					"minItems":    1,
-					"description": "the topic titles from the input that belong to this lesson, copied verbatim",
-					"items":       str("a topic title, copied exactly from the input list"),
+					"description": "the stable concept IDs from the evidence graph that belong to this lesson",
+					"items":       str("a concept ID copied exactly, such as C001"),
 				},
-			}, "title", "summary", "question_budget", "topics"),
+			}, "title", "summary", "question_budget", "concept_ids"),
 		},
 	}, "course_title", "lessons")
 }
 
-const outlineSystem = `You are turning a flat list of topics from a textbook into a course outline.
+const outlineSystem = `You are compiling a source-grounded concept graph from a textbook into a course outline.
 
 Rules:
-- Group related topics into lessons that could each be taught in one sitting.
+- Group related concept nodes into lessons that could each be taught in one sitting.
 - Keep the original order of the material. Do not reorder topics to make
   tidier groups.
-- Every topic in the input must appear in exactly one lesson, except topics
-  named "NON_CONTENT", which you drop entirely.
-- Copy topic titles verbatim. Do not reword them — they are used as keys.
-- Write lesson titles and summaries in the same language as the topics.
+- Every concept ID in the input must appear in exactly one lesson.
+- Copy concept IDs verbatim. Titles are descriptions; IDs are the join keys.
+- Use co_occurs and follows edges as structural evidence when choosing groups.
+- Write lesson titles and summaries in the same language as the concept titles.
 - Prefer fewer, substantial lessons over many thin ones.
 - Set question_budget to the number of exam questions the lesson honestly
   supports. Do not pad it to look generous — a lesson covering one definition
   supports one or two questions, not ten.`
 
 func OutlineSystem() string { return outlineSystem }
+
+func OutlinePrompt(graph EvidenceGraph) string {
+	var b strings.Builder
+	b.WriteString("Concept nodes, in first-evidence order:\n")
+	for _, concept := range graph.Concepts {
+		fmt.Fprintf(&b, "- %s | %s | pages %v\n", concept.ID, concept.Title, concept.Pages)
+	}
+	b.WriteString("\nEvidence edges:\n")
+	for _, edge := range graph.Edges {
+		fmt.Fprintf(&b, "- %s -> %s | %s\n", edge.From, edge.To, edge.Kind)
+	}
+	return b.String()
+}
 
 // --- pass 2: question generation --------------------------------------------
 
@@ -211,6 +224,13 @@ Hard requirements for every question:
   student cannot see. Name the thing you are asking about.
 - Exactly one choice is correct. The other three must be wrong for a reason a
   student could articulate — not wrong because they are nonsense.
+- A distractor must not be a synonym, paraphrase, ordinary-language restatement,
+  or merely broader/narrower wording of the correct answer. If two choices could
+  mean the same thing under a reasonable interpretation, rewrite one of them.
+- If the stem asks which items comprise a set, each distractor must replace at
+  least one item with a clearly different, source-contradicted process or
+  entity. Do not swap an item for a near-synonym. If the passage cannot support
+  three unambiguous false sets, do not write that question.
 - All four choices are the same kind of thing and roughly the same length. Do
   not make the correct answer the longest or the most detailed.
 - "All of the above", "none of the above", and "both A and B" are forbidden.
@@ -240,8 +260,20 @@ Return exactly this JSON shape. Do not use a field named "question" instead of
 func QuestionSystem() string { return questionSystem }
 
 // QuestionPrompt builds the generation message.
-func QuestionPrompt(lessonTitle string, c Chunk, want int, forceCalc bool) string {
-	s := fmt.Sprintf("Lesson: %s\n\nPassage (page %d):\n\n%s\n\n", lessonTitle, c.Page, c.Text)
+func QuestionPrompt(lesson Lesson, graph *EvidenceGraph, c Chunk, want int, forceCalc bool) string {
+	s := fmt.Sprintf("Lesson: %s\n\n", lesson.Title)
+	if graph != nil {
+		var focus []string
+		for _, concept := range graph.Concepts {
+			if containsString(lesson.ConceptIDs, concept.ID) && containsString(concept.ChunkIDs, c.ID) {
+				focus = append(focus, fmt.Sprintf("- %s | %s", concept.ID, concept.Title))
+			}
+		}
+		if len(focus) > 0 {
+			s += "Concepts evidenced by this passage:\n" + strings.Join(focus, "\n") + "\n\n"
+		}
+	}
+	s += fmt.Sprintf("Passage (page %d):\n\n%s\n\n", c.Page, c.Text)
 	s += fmt.Sprintf("Write up to %d question(s) from this passage. ", want)
 	s += "If the passage only supports fewer, write fewer. "
 	if forceCalc {
@@ -257,14 +289,24 @@ func QuestionPrompt(lessonTitle string, c Chunk, want int, forceCalc bool) strin
 
 const repairSystem = `A question you wrote failed an automatic check. Fix it.
 
-The checks that rejected it are not opinions. They are arithmetic done
-independently and a character-by-character search of the passage. If a check
-says your expression evaluates to a different number than you claimed, the
-check is right and you are wrong.
+The feedback may come from deterministic checks or from two independent
+reviewers: one checks whether the stem is understandable without hidden
+context, and one audits every choice against the source passage. Treat every
+listed failure and per-choice status as a concrete defect to fix.
 
 Rules for the fix:
 - Keep the question if it is salvageable. Change only what the check objected
   to. Do not write a different question because it is easier.
+- On any single_defensible failure, rewrite all three distractors. Make each
+  one contradict a different source fact in a way a student can explain. Do
+  not preserve a distractor merely because an earlier audit called it
+  unsupported: the complete option set must survive a fresh audit.
+- A synonym, paraphrase, broader wording, or narrower wording of the correct
+  answer is not a valid distractor.
+- If the blind reviewer found missing context, make the stem self-contained
+  without revealing the answer.
+- Do not merely move the correct-answer marker to silence a reviewer. Preserve
+  the source-supported answer and repair the defective wording or distractor.
 - If the arithmetic disagrees, work out which is actually wrong — the
   expression or the answer. Both are your own; one of them does not match the
   passage. Rewrite whichever is wrong and make the correct choice contain the
@@ -272,10 +314,12 @@ Rules for the fix:
 - If the quote was not found in the passage, copy a different sentence
   character for character from the passage below. Do not retype it from memory.
   Do not paraphrase. Do not fix its spelling or spacing.
-- If nothing in the passage supports the question, say so by returning an empty
-  questions list rather than inventing support.
+- If nothing in the passage supports the question, return {"questions":[]}
+  rather than inventing support.
 
-Return the whole question, not a patch.`
+Return the whole question, not a patch. Use exactly this JSON shape; choices
+must be objects using content and is_correct, never strings or an options field:
+{"questions":[{"kind":"mcq_single","stem":"...","choices":[{"content":"...","is_correct":true},{"content":"...","is_correct":false},{"content":"...","is_correct":false},{"content":"...","is_correct":false}],"explanation":"...","source_quote":"...","difficulty":"easy","skill":"recall"}]}`
 
 func RepairSystem() string { return repairSystem }
 
@@ -302,10 +346,93 @@ func RepairPrompt(q Question, c Chunk, failures []GateResult) string {
 	}
 
 	b.WriteString("\nWhat failed:\n")
+	semanticRepair := false
 	for _, f := range failures {
 		fmt.Fprintf(&b, "  - %s: %s\n", f.Gate, f.Reason)
+		if f.Gate == GateBlindAnswer || (f.Gate == GateSingleValid && len(f.ChoiceVerdicts) == len(q.Choices)) {
+			semanticRepair = true
+		}
+		for _, verdict := range f.ChoiceVerdicts {
+			fmt.Fprintf(&b, "      choice %d: %s — %s\n", verdict.Index+1, verdict.Status, verdict.Reason)
+		}
+	}
+	if semanticRepair {
+		b.WriteString("\nThis failure is repairable. Return exactly one repaired question; do not return an empty questions list.\n")
+		correct := q.CorrectIndex()
+		for _, f := range failures {
+			for _, verdict := range f.ChoiceVerdicts {
+				if verdict.Index == correct || verdict.Index < 0 || verdict.Index >= len(q.Choices) || verdict.Status == ChoiceUnsupported {
+					continue
+				}
+				fmt.Fprintf(&b, "MANDATORY REPLACEMENT choice %d: do not return %q; write materially different text that is false from the passage.\n",
+					verdict.Index+1, q.Choices[verdict.Index].Content)
+			}
+		}
 	}
 
+	return b.String()
+}
+
+// DistractorRepairSchema is deliberately smaller than QuestionSchema. A
+// semantic option failure does not authorize the model to rewrite the stem,
+// evidence, explanation, or correct answer.
+func DistractorRepairSchema(numChoices int) map[string]any {
+	return obj(map[string]any{
+		"replacements": map[string]any{
+			"type":     "array",
+			"minItems": numChoices - 1,
+			"maxItems": numChoices - 1,
+			"items": obj(map[string]any{
+				"index":   map[string]any{"type": "integer", "minimum": 0, "maximum": numChoices - 1},
+				"content": str("a materially new distractor that is clearly false from the passage"),
+			}, "index", "content"),
+		},
+	}, "replacements")
+}
+
+const distractorRepairSystem = `You repair only the distractors of a multiple-choice question.
+
+The correct answer, stem, quote, and explanation are locked. Return one new
+distractor for every non-correct index. Every replacement must:
+- be materially different from its forbidden previous text;
+- contradict a different fact, relation, or ordering in the passage;
+- not be a synonym, paraphrase, broader/narrower restatement, or reasonable
+  ordinary-language equivalent of the correct answer;
+- remain plausible enough to test understanding rather than look nonsensical.
+
+Do not replace one listed item with a synonym or a closely related sub-action.
+For a set-membership question, replace an item with a clearly different
+source-contradicted category. For a sequence question whose stem explicitly
+asks for order, prefer swapping two named stages. If the stem does not ask for
+order, reordering the same items is still equivalent and is forbidden.
+
+Use zero-based indices and exactly this JSON shape:
+{"replacements":[{"index":1,"content":"..."}]}`
+
+func DistractorRepairSystem() string { return distractorRepairSystem }
+
+func DistractorRepairPrompt(q Question, c Chunk, verdicts []ChoiceVerdict) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "Passage (page %d):\n\n%s\n\n", c.Page, c.Text)
+	fmt.Fprintf(&b, "Stem (locked): %s\n", q.Stem)
+	correct := q.CorrectIndex()
+	if correct >= 0 {
+		fmt.Fprintf(&b, "Correct answer (preserve exactly): %s\n", q.Choices[correct].Content)
+	}
+	byIndex := make(map[int]ChoiceVerdict, len(verdicts))
+	for _, verdict := range verdicts {
+		byIndex[verdict.Index] = verdict
+	}
+	var indices []string
+	for i, choice := range q.Choices {
+		if i == correct {
+			continue
+		}
+		indices = append(indices, fmt.Sprintf("%d", i))
+		verdict := byIndex[i]
+		fmt.Fprintf(&b, "FORBIDDEN %d: %q (audit: %s — %s)\n", i, choice.Content, verdict.Status, verdict.Reason)
+	}
+	fmt.Fprintf(&b, "\nReturn replacements for indices %s. Do not return any other question fields.\n", strings.Join(indices, ", "))
 	return b.String()
 }
 
@@ -354,33 +481,41 @@ func BlindSystem() string { return blindSystem }
 // SourcedSchema constrains the judge that can read the source.
 func SourcedSchema(numChoices int) map[string]any {
 	return obj(map[string]any{
-		"best_index": map[string]any{
-			"type":        "integer",
-			"minimum":     0,
-			"maximum":     numChoices - 1,
-			"description": "the choice best supported by the passage, 0-based",
-		},
-		"also_defensible": map[string]any{
+		"choice_verdicts": map[string]any{
 			"type":        "array",
-			"description": "0-based indices of any OTHER choices a careful student could also defend from the passage. Empty if there are none.",
-			"items":       map[string]any{"type": "integer", "minimum": 0, "maximum": numChoices - 1},
+			"minItems":    numChoices,
+			"maxItems":    numChoices,
+			"description": "one semantic audit for every choice, including the best choice",
+			"items": obj(map[string]any{
+				"index": map[string]any{
+					"type":    "integer",
+					"minimum": 0,
+					"maximum": numChoices - 1,
+				},
+				"status": enum("semantic status against the passage and the other choices", "supported", "unsupported", "equivalent", "ambiguous"),
+				"reason": str("at most 15 words explaining this choice specifically"),
+			}, "index", "status", "reason"),
 		},
-		"reason": str("at most 20 words explaining your pick, and if any other choice is defensible, why. Do not show your working."),
-	}, "best_index", "also_defensible", "reason")
+	}, "choice_verdicts")
 }
 
 const sourcedSystem = `You are checking an exam question against the passage it was written from.
 
-Do two things:
-1. Using only the passage, pick the choice it best supports.
-2. List any OTHER choices that a careful student could also argue for from the
-   same passage. Be strict here — a question with two defensible answers is a
-   broken question, and finding that is the point of this check. But do not
-   invent objections: if the other three choices are clearly contradicted by the
-   passage, return an empty list.
+Do one thing: audit EVERY choice separately against the passage and the other
+choices. Mark the best answer "supported". Mark a
+   distractor "equivalent" when it is a synonym, paraphrase, broader/narrower
+   wording, or ordinary-language restatement of the supported answer. Mark it
+   "ambiguous" when a reasonable interpretation could make it true. Only mark
+   it "unsupported" when the passage and ordinary meaning clearly rule it out.
 
-You are not told which choice the question's author marked correct. Do not try
-to guess it. Judge only against the passage.`
+Do not excuse equivalent wording because the textbook uses a more technical
+term. For example, an option saying "defecation" and another saying "passing
+stool" can be equivalent even if only one phrase appears verbatim.
+
+Return exactly one top-level field named choice_verdicts. It must contain one
+object for every choice index. Do not return best_index or also_defensible; the
+caller derives them from your per-choice statuses. You are not told which choice
+the author marked correct. Judge only against the passage.`
 
 func SourcedSystem() string { return sourcedSystem }
 

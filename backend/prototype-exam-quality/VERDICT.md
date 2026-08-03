@@ -33,6 +33,35 @@ Everything below was measured on this machine, not estimated.
 | Synthetic scan, `--force-calc`, calculator tool | 1–3 | ocr | 4 | 2 | **50%** |
 | Thai course handout, calculator tool | 2–4 | text | 16 | 12 | **75%** |
 
+### Hosted DeepSeek + full Thai textbook (2026-08-03)
+
+The current Docling/graph pipeline was also run on the 254-page IPST ม.5
+biology teacher book (347,577 runes, 392 chunks). The cached pass-1 result has
+217 source-provenanced concepts, 240 evidenced edges, and 17 lessons; its cold
+run used 13 bounded map calls plus one reduce call.
+
+For lesson 3 with a budget of four, the final `deepseek-chat` run generated five
+drafts and accepted four (**80%**) in 19.72 seconds wall time. I read all four:
+they are valid and source-grounded, though mostly easy recall/sequence items.
+The rejected draft asked which organs were involved in digestion while another
+option also listed digestive organs; the per-choice audit marked that option
+`ambiguous`, so it did not ship.
+
+| call | count | input tokens | output tokens |
+|---|---:|---:|---:|
+| generate | 3 | 3,242 | 1,353 |
+| calc-tool | 3 | 2,595 | 110 |
+| judge/source | 5 | 3,472 | 219 |
+| judge/blind | 5 | 1,643 | 125 |
+| focused repair | 1 | 801 | 77 |
+| **total** | **17** | **11,753** | **1,884** |
+
+The focused repair response violated its replacement contract, so it was
+safely declined and top-up supplied another question. A paid regression eval
+also confirms that `ถ่ายอุจจาระ` versus `ขับถ่าย` is classified as an equivalent
+answer rather than silently accepted. This is intentionally fail-closed:
+hosted feedback can improve a draft, but cannot bypass the fresh source audit.
+
 The last row is not a clean measurement of the calculator tool. The judge was
 fixed in the same batch — its context window was too small, so long replies came
 back as truncated JSON and killed whole runs — and that change alone plausibly
