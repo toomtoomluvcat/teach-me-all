@@ -143,6 +143,9 @@ func BuildOutline(ctx context.Context, chunks []Chunk, d Deps) (*Outline, []Chun
 		}
 	}
 
+	if dropped := CountPedagogyTopics(perChunk); dropped > 0 {
+		d.Log.report("outline/filter", dropped, dropped, "teacher-guide concepts dropped before reduce")
+	}
 	graph := BuildEvidenceGraph(chunks, perChunk)
 	if len(graph.Concepts) == 0 {
 		return nil, nil, fmt.Errorf("pass 1 found no teaching content in %d chunks — check the extracted text before blaming the model", len(chunks))

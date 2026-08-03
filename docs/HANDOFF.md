@@ -95,6 +95,18 @@ objectives, assessment rubrics/guidelines, classroom activities, videos,
 pedagogy or chapter numbering. A deterministic pre-judge check catches known
 Thai and English teacher-guide phrases if the model ignores the prompt.
 
+Teacher-guide material is now also removed one stage earlier, at graph
+compilation. `examgen.IsPedagogyConcept` drops a pass-1 topic label that names
+apparatus — answer keys, assessment rubrics, scoring guides, test banks,
+teaching plans — before the concept reaches the reduce step. Lab activities and
+`ความรู้เพิ่มเติมสำหรับครู` sidebars are deliberately kept: they carry real
+subject matter, and dropping a concept also detaches its chunks from every
+lesson. Replayed over the cached 254-page biology graph the filter drops 36 of
+217 concepts and 78 of 392 chunks, and empties exactly one lesson —
+`การประเมินผลระบบหายใจ`, the case this handoff previously filed as work to do.
+`examgen.PruneTeacherGuideConcepts` applies the same filter to an already-cached
+outline, so a broadened phrase list never costs a paid pass-1 rerun.
+
 Measured pass rates, all on `scb10x/typhoon2.5-qwen3-4b`:
 
 | document | generated | passed | rate |
@@ -315,10 +327,14 @@ Found by reading, not fixed, filed nowhere else:
 2. Replay the six historical true-distractor questions through
    `judge/source`, once with local 4B and once with DeepSeek. The current paid
    regression proves one Thai paraphrase case, not the whole recurring defect.
-3. Filter pedagogy at graph compilation, not only generation. The current
-   outline still contains lessons such as "การประเมินผลระบบหายใจ". They no
-   longer produce shipped questions, but keeping them as concepts/lessons wastes
-   pass-1 tokens and gives the user useless lesson choices.
+3. ~~Filter pedagogy at graph compilation~~ — done; see the filter paragraph
+   above. What is **not** done is measuring it end to end: no run has yet been
+   made with the filter in place, so the claim that it improves pass rate or
+   lowers reduce cost is unproven. The 36/217 and 78/392 numbers are a replay of
+   the cached graph, not a fresh pass 1. Two known gaps in the phrase list:
+   `ตัวอย่างผลการทำกิจกรรม` and `ผลการทำกิจกรรม` are teacher-facing expected
+   results that were left in on purpose because neighbouring concepts with almost
+   the same wording are real experimental data.
 4. For known prose subjects, measure `--calc-tool=false`. It should remove the
    three calculator-tool calls seen in the 14-call biology run; keep the
    arithmetic gate regardless. Do not make this the global default without a
@@ -376,6 +392,15 @@ Found by reading, not fixed, filed nowhere else:
   additional DeepSeek request and is not part of that 14.
 - Changing `--embed-model` invalidates every stored vector; the dimension changes
   too (bge-m3 1024, nomic 768).
+- The pedagogy filter runs inside `BuildOutline`, which is cached as
+  `outline-v2.json`. An existing cache therefore still holds the unfiltered
+  concepts; `PruneTeacherGuideConcepts` is applied on load so a cached run
+  behaves like a fresh one, and prints what it dropped. Do not read a cached
+  `outline-v2.json` by hand and assume it matches what the run used.
+- `examgen.IsPedagogyConcept` and `PruneTeacherGuideConcepts` are exported for
+  the same reason `CheckWellFormed` is: a phrase-list change is testable against
+  the real cached graph for free. `TestPedagogyFilterOnCachedOutline` does that
+  and fails if a lesson holding more than one concept is emptied.
 - Re-running a structural check over old `.scratch/*/run-*.json` files is the
   cheapest way to test a new rule — `examgen.CheckWellFormed` is exported for
   exactly that, and it caught a false positive of mine that would otherwise have

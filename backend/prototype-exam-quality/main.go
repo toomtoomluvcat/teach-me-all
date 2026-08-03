@@ -345,6 +345,14 @@ func run(ctx context.Context, cfg config) error {
 	}
 	outline, chunks := oc.Outline, oc.Chunks
 
+	// A cached outline predates the current phrase list, so prune it here too
+	// rather than force a paid pass-1 rerun to get rid of answer keys and
+	// assessment rubrics. A fresh outline is already clean and prints nothing.
+	if concepts, lessons := examgen.PruneTeacherGuideConcepts(outline, chunks); concepts > 0 {
+		fmt.Printf("%sdropped %d teacher-guide concepts and %d lessons from the cached outline%s\n",
+			dim, concepts, lessons, reset)
+	}
+
 	// --- step 3: pick a lesson, generate, review ----------------------------
 	for {
 		renderOutline(outline, chunks)
