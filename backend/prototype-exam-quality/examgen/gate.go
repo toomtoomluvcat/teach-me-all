@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"math"
 	"strings"
-	"sync"
 )
 
 // BlindVerdict is what a judge reports when it sees only the question — no
@@ -15,24 +14,40 @@ type BlindVerdict struct {
 	// asked?". This is the vagueness detector and the reason gate 2 exists.
 	Interpretable bool   `json:"interpretable"`
 	Reason        string `json:"reason"`
-
-	// GuessedIndex and GuessConfidence answer a different question: could this
-	// be answered without reading the source at all? A confident correct guess
-	// means the question tests recall of general knowledge, or one choice is
-	// obviously the odd one out. This was advisory until the first NotebookLM
-	// comparison, where a blind labeller marked 22 of 45 questions answerable
-	// without the passage — the largest single defect in every set. It now fails
-	// a question through GateNeedsSource.
-	GuessedIndex    int    `json:"guessed_index"`
-	GuessConfidence string `json:"guess_confidence"`
 }
+
+type SourceDependency string
+
+const (
+	SourceDependencySpecific SourceDependency = "specific"
+	SourceDependencyGeneric  SourceDependency = "generic"
+	SourceDependencyUnclear  SourceDependency = "unclear"
+)
+
+type DependencyKind string
+
+const (
+	DependencyNumber          DependencyKind = "number"
+	DependencyNamedStructure  DependencyKind = "named_structure"
+	DependencyOrder           DependencyKind = "order"
+	DependencyCondition       DependencyKind = "condition"
+	DependencyCauseEffect     DependencyKind = "cause_effect"
+	DependencyComparison      DependencyKind = "comparison"
+	DependencyLocalDefinition DependencyKind = "local_definition"
+	DependencyNone            DependencyKind = "none"
+)
 
 // SourcedVerdict is what a judge reports when it can see the source chunk.
 type SourcedVerdict struct {
-	BestIndex      int             `json:"best_index"`
-	AlsoDefensible []int           `json:"also_defensible"`
-	ChoiceVerdicts []ChoiceVerdict `json:"choice_verdicts"`
-	Reason         string          `json:"reason"`
+	BestIndex        int              `json:"best_index"`
+	AlsoDefensible   []int            `json:"also_defensible"`
+	ChoiceVerdicts   []ChoiceVerdict  `json:"choice_verdicts"`
+	Reason           string           `json:"reason"`
+	SourceDependency SourceDependency `json:"dependency"`
+	DependencyKind   DependencyKind   `json:"dependency_kind"`
+	Evidence         []string         `json:"evidence"`
+	Counterfactual   bool             `json:"counterfactual"`
+	DependencyReason string           `json:"dependency_reason"`
 }
 
 type ChoiceStatus string
@@ -52,10 +67,9 @@ type ChoiceVerdict struct {
 	Reason string       `json:"reason"`
 }
 
-// Judge is the model-backed half of the gates. Two calls, both on the question
-// only — the pipeline never lets the judge see the generator's reasoning.
+// Judge is the model-backed half of the source-dependency gate. The pipeline
+// never lets it see the generator's reasoning.
 type Judge interface {
-	JudgeBlind(ctx context.Context, q Question) (BlindVerdict, error)
 	JudgeAgainstSource(ctx context.Context, q Question, source string) (SourcedVerdict, error)
 }
 
@@ -93,7 +107,8 @@ func quoteFloor(quote string) int {
 // quantities get rounded by the model in the choice text.
 const arithmeticTolerance = 1e-6
 
-// RunGates applies all four checks to one question and returns the report.
+// RunGates applies the cheap checks plus the source-dependency check to one
+// question and returns the report.
 // It never returns an error for a failing question — failure is data. It
 // returns an error only when the judge itself is unreachable.
 func RunGates(ctx context.Context, q Question, chunk Chunk, j Judge, ev Evaluator) (*GateReport, error) {
@@ -114,8 +129,10 @@ func RunCheapGates(q Question, chunk Chunk, ev Evaluator) *GateReport {
 	return rep
 }
 
-// AddJudgeGates appends the two model-backed verdicts — but only if nothing
-// deterministic has already rejected the question.
+// AddJudgeGates appends the one model-backed verdict this experiment needs:
+// whether the answer depends on a fact specific to the source passage. The
+// blind-clarity and per-choice semantic audits remain available for a later
+// quality pass, but are deliberately out of this measurement path.
 //
 // This ordering is the cheapest optimisation available. The judges are 45% of
 // wall clock, and on a measured run 7 questions were duplicates and 4 misquoted
@@ -124,41 +141,16 @@ func RunCheapGates(q Question, chunk Chunk, ev Evaluator) *GateReport {
 // certain about cannot be rescued by a judge that likes it.
 func AddJudgeGates(ctx context.Context, rep *GateReport, q Question, chunk Chunk, j Judge) error {
 	if len(rep.Failures()) > 0 {
-		rep.add(GateResult{Gate: GateBlindAnswer, Pass: true, Reason: "not asked — already rejected by a deterministic check"})
-		rep.add(GateResult{Gate: GateNeedsSource, Pass: true, Reason: "not asked — already rejected by a deterministic check"})
-		rep.add(GateResult{Gate: GateSingleValid, Pass: true, Reason: "not asked — already rejected by a deterministic check"})
+		rep.add(GateResult{Gate: GateSourceSpecific, Pass: true, Reason: "not asked — already rejected by a deterministic check"})
 		return nil
 	}
 
-	// The two judges answer different questions from different inputs — one is
-	// deliberately blind to the source — so neither depends on the other and
-	// they run at the same time. Ollama serves both from the one loaded model.
-	var (
-		wg               sync.WaitGroup
-		blind            BlindVerdict
-		sourced          SourcedVerdict
-		blindErr, srcErr error
-	)
-	wg.Add(2)
-	go func() { defer wg.Done(); blind, blindErr = j.JudgeBlind(ctx, q) }()
-	go func() { defer wg.Done(); sourced, srcErr = j.JudgeAgainstSource(ctx, q, chunk.Text) }()
-	wg.Wait()
-
-	// A judge that fails to answer costs the question, not the run. Twenty
-	// minutes of generation should not be lost because one reply came back
-	// malformed; the failure is recorded on the question where it can be read.
-	if blindErr != nil {
-		rep.add(GateResult{Gate: GateBlindAnswer, Reason: "judge did not answer: " + blindErr.Error()})
-		rep.add(GateResult{Gate: GateNeedsSource, Reason: "judge did not answer: " + blindErr.Error()})
-	} else {
-		rep.add(gateInterpretable(q, blind))
-		rep.add(gateNeedsSource(q, blind))
+	sourced, err := j.JudgeAgainstSource(ctx, q, chunk.Text)
+	if err != nil {
+		rep.add(GateResult{Gate: GateSourceSpecific, Reason: "judge did not answer: " + err.Error()})
+		return nil
 	}
-	if srcErr != nil {
-		rep.add(GateResult{Gate: GateSingleValid, Reason: "judge did not answer: " + srcErr.Error()})
-	} else {
-		rep.add(gateSingleDefensible(q, sourced))
-	}
+	rep.add(gateSourceSpecific(q, chunk, sourced))
 
 	return nil
 }
@@ -254,50 +246,39 @@ func gateInterpretable(q Question, v BlindVerdict) GateResult {
 	return res
 }
 
-// gateNeedsSource is the inverse of gateInterpretable, from the same verdict.
-//
-// gateInterpretable passes when the blind judge understood the question.
-// This one FAILS when the blind judge could also answer it — because then the
-// passage was never needed, and a learner gets nothing from reading it.
-//
-// The two together are why the blind judge is asked to guess even after saying
-// the question is clear. It costs no extra request: both come from the one
-// reply that was already being paid for.
-//
-// Only a confident correct guess counts. A judge guessing right at random is
-// right one time in four, and low or medium confidence is exactly what an
-// honest guess on an unfamiliar specific looks like.
-func gateNeedsSource(q Question, v BlindVerdict) GateResult {
-	res := GateResult{Gate: GateNeedsSource}
+// gateSourceSpecific checks whether the source judge identified a fact that is
+// specific to this passage, rather than asking whether the model happened to
+// know the answer before seeing it. The model supplies the semantic judgement;
+// Go verifies that its evidence is really in the cited chunk.
+func gateSourceSpecific(_ Question, chunk Chunk, v SourcedVerdict) GateResult {
+	res := GateResult{Gate: GateSourceSpecific}
 
-	correct := q.CorrectIndex()
-	if correct < 0 {
-		// gateWellFormed already rejects this; do not fail it twice for the
-		// same defect and confuse the reported reason.
-		res.Pass = true
-		res.Reason = "not judged — the question marks no single correct choice"
+	if v.SourceDependency == "" {
+		res.Reason = "NOT JUDGED — source judge omitted the source-dependency verdict or evidence"
 		return res
 	}
-
-	// A missing confidence makes this gate inert, and an inert gate that reports
-	// "pass" is worse than no gate: the first run with this check shipped 15
-	// questions and every needs_the_source line said the passage was needed,
-	// because DeepSeek omitted the field entirely and "" is not "high". Say so
-	// where it will be read.
-	if strings.TrimSpace(v.GuessConfidence) == "" {
-		res.Pass = true
-		res.Reason = "NOT JUDGED — the blind judge returned no confidence, so this gate decided nothing"
+	if v.SourceDependency != SourceDependencySpecific {
+		res.Reason = fmt.Sprintf("source dependency is %q, not specific", v.SourceDependency)
 		return res
 	}
-
-	if v.GuessedIndex == correct && strings.EqualFold(v.GuessConfidence, "high") {
-		res.Reason = "answerable without the passage: the judge picked it correctly, with high confidence, having seen no source"
+	if len(v.Evidence) == 0 {
+		res.Reason = "NOT JUDGED — source-specific verdict omitted evidence"
 		return res
+	}
+	for _, evidence := range v.Evidence {
+		evidence = stripQuoteMarks(strings.TrimSpace(evidence))
+		if evidence == "" {
+			res.Reason = "source judge supplied an empty evidence span"
+			return res
+		}
+		if !strings.Contains(squeeze(chunk.Text), squeeze(evidence)) {
+			res.Reason = fmt.Sprintf("source evidence is not verbatim in chunk %s: %q", chunk.ID, evidence)
+			return res
+		}
 	}
 
 	res.Pass = true
-	res.Reason = fmt.Sprintf("the passage is needed — blind guess was %s confidence and %s",
-		strings.ToLower(v.GuessConfidence), map[bool]string{true: "correct", false: "wrong"}[v.GuessedIndex == correct])
+	res.Reason = fmt.Sprintf("source-specific fact supported by %d verified evidence span(s)", len(v.Evidence))
 	return res
 }
 

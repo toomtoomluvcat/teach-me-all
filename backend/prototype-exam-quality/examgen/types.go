@@ -250,17 +250,17 @@ func (q Question) CorrectIndex() int {
 	return found
 }
 
-// GateName identifies which of the four checks produced a result.
+// GateName identifies which check produced a result.
 type GateName string
 
 const (
-	GateWellFormed  GateName = "well_formed"
-	GateQuote       GateName = "quote_verbatim"
-	GateBlindAnswer GateName = "answerable_blind"
-	GateNeedsSource GateName = "needs_the_source"
-	GateSingleValid GateName = "single_defensible"
-	GateArithmetic  GateName = "arithmetic"
-	GateDistinct    GateName = "not_a_duplicate"
+	GateWellFormed     GateName = "well_formed"
+	GateQuote          GateName = "quote_verbatim"
+	GateBlindAnswer    GateName = "answerable_blind"
+	GateSourceSpecific GateName = "source_specific"
+	GateSingleValid    GateName = "single_defensible"
+	GateArithmetic     GateName = "arithmetic"
+	GateDistinct       GateName = "not_a_duplicate"
 )
 
 // GateResult is the outcome of one check.
@@ -271,10 +271,8 @@ type GateResult struct {
 	// point of the prototype is reading these.
 	Reason string
 	// Deterministic marks gates that Go decided without asking a model.
-	// Gates 1 and 4 are deterministic; 2 and 3 are LLM-as-judge and advisory.
 	Deterministic bool
-	// ChoiceVerdicts is populated by single_defensible so a human can inspect
-	// the judge's decision for every option instead of trusting one summary.
+	// ChoiceVerdicts is populated by the deferred single_defensible audit.
 	ChoiceVerdicts []ChoiceVerdict `json:"choice_verdicts,omitempty"`
 }
 

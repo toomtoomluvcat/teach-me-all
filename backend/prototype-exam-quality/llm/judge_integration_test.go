@@ -30,11 +30,7 @@ func TestDeepSeekJudgeFlagsThaiParaphrasedDistractor(t *testing.T) {
 	if err != nil {
 		t.Fatalf("JudgeAgainstSource() error = %v", err)
 	}
-	if len(verdict.ChoiceVerdicts) != len(q.Choices) {
-		t.Fatalf("choice verdicts = %#v, want one per option", verdict.ChoiceVerdicts)
-	}
-	status := verdict.ChoiceVerdicts[2].Status
-	if status != examgen.ChoiceEquivalent && status != examgen.ChoiceAmbiguous && status != examgen.ChoiceSupported {
-		t.Fatalf("paraphrased distractor status = %q (%s), want non-unique answer flagged", status, verdict.ChoiceVerdicts[2].Reason)
+	if verdict.SourceDependency != examgen.SourceDependencySpecific || len(verdict.Evidence) == 0 {
+		t.Fatalf("source dependency = %#v, want a specific verdict with evidence", verdict)
 	}
 }

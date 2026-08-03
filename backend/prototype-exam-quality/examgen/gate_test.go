@@ -2,6 +2,7 @@ package examgen
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"testing"
 )
@@ -10,74 +11,84 @@ type semanticChoiceJudge struct {
 	sourced SourcedVerdict
 }
 
-func TestGateNeedsSourceFailsOnlyAConfidentCorrectBlindGuess(t *testing.T) {
+func TestGateSourceSpecificRequiresVerifiedPassageFact(t *testing.T) {
 	q := Question{Choices: []Choice{
 		{Content: "a"},
 		{Content: "b", IsCorrect: true},
 		{Content: "c"},
 		{Content: "d"},
 	}}
+	chunk := Chunk{ID: "p1-c1", Page: 1, Text: "เมื่อหายใจออกปกติจะมีปริมาตรอากาศที่ตกค้างในปอดเป็น 2,400 mL"}
 
 	cases := []struct {
 		name    string
-		verdict BlindVerdict
+		verdict SourcedVerdict
 		pass    bool
 	}{
 		{
-			// The defect the first NotebookLM comparison measured: the judge never
-			// saw the passage and still knew the answer, so the learner gains
-			// nothing by reading it.
-			name:    "correct and confident fails",
-			verdict: BlindVerdict{GuessedIndex: 1, GuessConfidence: "high"},
-			pass:    false,
+			name: "specific numeric fact passes",
+			verdict: SourcedVerdict{
+				SourceDependency: SourceDependencySpecific,
+				DependencyKind:   DependencyNumber,
+				Evidence:         []string{"ปริมาตรอากาศที่ตกค้างในปอดเป็น 2,400 mL"},
+				Counterfactual:   true,
+			},
+			pass: true,
 		},
 		{
-			name:    "confidence is matched case-insensitively",
-			verdict: BlindVerdict{GuessedIndex: 1, GuessConfidence: "HIGH"},
-			pass:    false,
+			name: "specific provider object may omit a separate kind",
+			verdict: SourcedVerdict{
+				SourceDependency: SourceDependencySpecific,
+				Evidence:         []string{"ปริมาตรอากาศที่ตกค้างในปอดเป็น 2,400 mL"},
+				Counterfactual:   true,
+			},
+			pass: true,
 		},
 		{
-			// One in four guesses is right by luck. Low or medium confidence is
-			// what an honest guess at an unfamiliar specific looks like.
-			name:    "correct but unsure passes",
-			verdict: BlindVerdict{GuessedIndex: 1, GuessConfidence: "medium"},
-			pass:    true,
+			name: "generic fact fails",
+			verdict: SourcedVerdict{
+				SourceDependency: SourceDependencyGeneric,
+				DependencyKind:   DependencyNone,
+				Counterfactual:   false,
+			},
+			pass: false,
 		},
 		{
-			name:    "confident and wrong passes",
-			verdict: BlindVerdict{GuessedIndex: 3, GuessConfidence: "high"},
-			pass:    true,
+			name: "specific evidence does not need a redundant counterfactual field",
+			verdict: SourcedVerdict{
+				SourceDependency: SourceDependencySpecific,
+				DependencyKind:   DependencyNumber,
+				Evidence:         []string{"2,400 mL"},
+				Counterfactual:   false,
+			},
+			pass: true,
+		},
+		{
+			name: "fabricated evidence fails",
+			verdict: SourcedVerdict{
+				SourceDependency: SourceDependencySpecific,
+				DependencyKind:   DependencyNumber,
+				Evidence:         []string{"ปริมาตรอากาศ 9,999 mL"},
+				Counterfactual:   true,
+			},
+			pass: false,
 		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			got := gateNeedsSource(q, tc.verdict)
+			got := gateSourceSpecific(q, chunk, tc.verdict)
 			if got.Pass != tc.pass {
-				t.Fatalf("gateNeedsSource() pass = %v, want %v (%s)", got.Pass, tc.pass, got.Reason)
+				t.Fatalf("gateSourceSpecific() pass = %v, want %v (%s)", got.Pass, tc.pass, got.Reason)
 			}
-			if got.Gate != GateNeedsSource {
-				t.Fatalf("gate = %q, want %q", got.Gate, GateNeedsSource)
+			if got.Gate != GateSourceSpecific {
+				t.Fatalf("gate = %q, want %q", got.Gate, GateSourceSpecific)
 			}
 		})
 	}
 
-	// An absent confidence must be visible, not a quiet pass. The first run with
-	// this gate reported "the passage is needed" 17 times while deciding nothing,
-	// because the provider omitted the field.
-	blank := gateNeedsSource(q, BlindVerdict{GuessedIndex: 1, GuessConfidence: ""})
-	if !blank.Pass {
-		t.Fatalf("a missing confidence failed the question: %s", blank.Reason)
-	}
-	if !strings.Contains(blank.Reason, "NOT JUDGED") {
-		t.Fatalf("a missing confidence was reported as a real verdict: %s", blank.Reason)
-	}
-
-	// A question with no single correct choice is already rejected by
-	// gateWellFormed. Failing it twice for one defect makes the reported reason
-	// harder to read, not more accurate.
-	noKey := Question{Choices: []Choice{{Content: "a"}, {Content: "b"}}}
-	if got := gateNeedsSource(noKey, BlindVerdict{GuessedIndex: 0, GuessConfidence: "high"}); !got.Pass {
-		t.Fatalf("a question with no answer key was failed here as well: %s", got.Reason)
+	missing := gateSourceSpecific(q, chunk, SourcedVerdict{SourceDependency: SourceDependencySpecific, DependencyKind: DependencyNumber, Counterfactual: true})
+	if missing.Pass || !strings.Contains(missing.Reason, "NOT JUDGED") {
+		t.Fatalf("missing evidence was not failed closed: %#v", missing)
 	}
 }
 
@@ -85,7 +96,7 @@ func TestGateInterpretableNoLongerJudgesGuessability(t *testing.T) {
 	// The two gates read the same verdict and must stay separate: one asks
 	// whether the question is clear, the other whether the passage was needed.
 	q := Question{Choices: []Choice{{Content: "a", IsCorrect: true}, {Content: "b"}}}
-	got := gateInterpretable(q, BlindVerdict{Interpretable: true, GuessedIndex: 0, GuessConfidence: "high"})
+	got := gateInterpretable(q, BlindVerdict{Interpretable: true})
 	if !got.Pass {
 		t.Fatalf("a clear question was failed by the clarity gate: %s", got.Reason)
 	}
@@ -100,6 +111,78 @@ func (semanticChoiceJudge) JudgeBlind(context.Context, Question) (BlindVerdict, 
 
 func (j semanticChoiceJudge) JudgeAgainstSource(context.Context, Question, string) (SourcedVerdict, error) {
 	return j.sourced, nil
+}
+
+type partialSourceJudge struct{}
+
+func (partialSourceJudge) JudgeBlind(context.Context, Question) (BlindVerdict, error) {
+	return BlindVerdict{Interpretable: true}, nil
+}
+
+func (partialSourceJudge) JudgeAgainstSource(context.Context, Question, string) (SourcedVerdict, error) {
+	return SourcedVerdict{
+		SourceDependency: SourceDependencySpecific,
+		Evidence:         []string{"ปริมาตรอากาศที่ตกค้างในปอดเป็น 2,400 mL"},
+		Counterfactual:   true,
+	}, errors.New("choice audit incomplete")
+}
+
+func TestAddJudgeGatesRecordsOnlySourceFailureWhenJudgeErrors(t *testing.T) {
+	quote := "เมื่อหายใจออกปกติจะมีปริมาตรอากาศที่ตกค้างในปอดเป็น 2,400 mL"
+	q := Question{
+		Kind:        KindMCQSingle,
+		Stem:        "ปริมาตรอากาศที่ตกค้างในปอดมีเท่าใด?",
+		SourceQuote: quote,
+		Choices: []Choice{
+			{Content: "2,400 mL", IsCorrect: true},
+			{Content: "1,200 mL"},
+			{Content: "3,600 mL"},
+			{Content: "4,800 mL"},
+		},
+	}
+	report := RunCheapGates(q, Chunk{ID: "p1-c1", Page: 1, Text: quote}, Arith{})
+	if failures := report.Failures(); len(failures) != 0 {
+		t.Fatalf("cheap gates rejected test question: %#v", failures)
+	}
+	if err := AddJudgeGates(context.Background(), report, q, Chunk{ID: "p1-c1", Page: 1, Text: quote}, partialSourceJudge{}); err != nil {
+		t.Fatalf("AddJudgeGates() error = %v", err)
+	}
+	var source GateResult
+	for _, result := range report.Results {
+		if result.Gate == GateSourceSpecific {
+			source = result
+		}
+		if result.Gate == GateBlindAnswer || result.Gate == GateSingleValid {
+			t.Fatalf("deferred gate %q still ran: %#v", result.Gate, result)
+		}
+	}
+	if source.Pass || !strings.Contains(source.Reason, "choice audit incomplete") {
+		t.Fatalf("source gate = %#v, want the judge error", source)
+	}
+}
+
+func TestRunGatesCorePathUsesOnlySourceDependencyJudge(t *testing.T) {
+	quote := "เมื่อหายใจออกปกติจะมีปริมาตรอากาศที่ตกค้างในปอดเป็น 2,400 mL"
+	q := Question{
+		Kind:        KindMCQSingle,
+		Stem:        "ปริมาตรอากาศที่ตกค้างในปอดมีเท่าใด?",
+		SourceQuote: quote,
+		Choices: []Choice{
+			{Content: "2,400 mL", IsCorrect: true},
+			{Content: "1,200 mL"},
+			{Content: "3,600 mL"},
+			{Content: "4,800 mL"},
+		},
+	}
+	report, err := RunGates(context.Background(), q, Chunk{ID: "p1-c1", Page: 1, Text: quote}, partialSourceJudge{}, Arith{})
+	if err != nil {
+		t.Fatalf("RunGates() error = %v", err)
+	}
+	for _, result := range report.Results {
+		if result.Gate == GateBlindAnswer || result.Gate == GateSingleValid {
+			t.Fatalf("deferred gate %q still ran: %#v", result.Gate, result)
+		}
+	}
 }
 
 func TestRunGatesRejectsDistractorEquivalentToCorrectChoice(t *testing.T) {
@@ -125,17 +208,7 @@ func TestRunGatesRejectsDistractorEquivalentToCorrectChoice(t *testing.T) {
 		},
 	}}
 
-	report, err := RunGates(context.Background(), q, Chunk{ID: "p31-c43", Page: 31, Text: quote}, judge, Arith{})
-	if err != nil {
-		t.Fatalf("RunGates() error = %v", err)
-	}
-	var single GateResult
-	for _, result := range report.Results {
-		if result.Gate == GateSingleValid {
-			single = result
-			break
-		}
-	}
+	single := gateSingleDefensible(q, judge.sourced)
 	if single.Pass {
 		t.Fatalf("single_defensible passed; want equivalent distractor rejected: %s", single.Reason)
 	}

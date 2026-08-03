@@ -19,6 +19,39 @@ func TestSourcedVerdictAcceptsDeepSeekChoiceVerdictMap(t *testing.T) {
 	}
 }
 
+func TestSourcedVerdictPreservesSourceDependencyFields(t *testing.T) {
+	var verdict SourcedVerdict
+	err := json.Unmarshal([]byte(`{"source_dependency":"specific","dependency_kind":"number","evidence":["2,400 mL"],"counterfactual":true,"dependency_reason":"the value is passage-specific","choice_verdicts":[]}`), &verdict)
+	if err != nil {
+		t.Fatalf("json.Unmarshal() error = %v", err)
+	}
+	if verdict.SourceDependency != SourceDependencySpecific || verdict.DependencyKind != DependencyNumber || !verdict.Counterfactual || len(verdict.Evidence) != 1 || verdict.Evidence[0] != "2,400 mL" {
+		t.Fatalf("source dependency = %#v", verdict)
+	}
+}
+
+func TestSourcedVerdictAcceptsMinimalDependencyString(t *testing.T) {
+	var verdict SourcedVerdict
+	err := json.Unmarshal([]byte(`{"dependency":"specific","evidence":"2,400 mL"}`), &verdict)
+	if err != nil {
+		t.Fatalf("json.Unmarshal() error = %v", err)
+	}
+	if verdict.SourceDependency != SourceDependencySpecific || len(verdict.Evidence) != 1 || verdict.Evidence[0] != "2,400 mL" {
+		t.Fatalf("minimal source dependency = %#v", verdict)
+	}
+}
+
+func TestSourcedVerdictAcceptsNestedProviderSourceDependencyObject(t *testing.T) {
+	var verdict SourcedVerdict
+	err := json.Unmarshal([]byte(`{"source_dependency":{"dependency_kind":"specific","evidence":["บีบขวด","สังเกตการเปลี่ยนแปลง"],"counterfactual":"changing this passage fact changes the answer","reason":"the experiment supplies the observation"},"choice_verdicts":[]}`), &verdict)
+	if err != nil {
+		t.Fatalf("json.Unmarshal() error = %v", err)
+	}
+	if verdict.SourceDependency != SourceDependencySpecific || !verdict.Counterfactual || len(verdict.Evidence) != 2 || verdict.DependencyReason == "" {
+		t.Fatalf("nested source dependency = %#v", verdict)
+	}
+}
+
 func TestCalculationUnmarshalAcceptsNumericString(t *testing.T) {
 	var got Calculation
 	if err := json.Unmarshal([]byte(`{"expression":"2048*1536*48*24*3600","expected":"13063680000000"}`), &got); err != nil {

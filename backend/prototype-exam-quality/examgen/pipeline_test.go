@@ -29,7 +29,7 @@ func (passingTestJudge) JudgeBlind(context.Context, Question) (BlindVerdict, err
 }
 
 func (passingTestJudge) JudgeAgainstSource(context.Context, Question, string) (SourcedVerdict, error) {
-	return SourcedVerdict{BestIndex: 0}, nil
+	return passingSourceVerdict(), nil
 }
 
 type feedbackRecordingGenerator struct {
@@ -76,7 +76,24 @@ func (semanticMemoryJudge) JudgeAgainstSource(_ context.Context, q Question, _ s
 	for i, status := range statuses {
 		verdicts[i] = ChoiceVerdict{Index: i, Status: status, Reason: string(status)}
 	}
-	return SourcedVerdict{BestIndex: 0, ChoiceVerdicts: verdicts}, nil
+	return SourcedVerdict{
+		BestIndex:        0,
+		ChoiceVerdicts:   verdicts,
+		SourceDependency: SourceDependencySpecific,
+		DependencyKind:   DependencyOrder,
+		Evidence:         []string{testQuote()},
+		Counterfactual:   true,
+	}, nil
+}
+
+func passingSourceVerdict() SourcedVerdict {
+	return SourcedVerdict{
+		BestIndex:        0,
+		SourceDependency: SourceDependencySpecific,
+		DependencyKind:   DependencyOrder,
+		Evidence:         []string{testQuote()},
+		Counterfactual:   true,
+	}
 }
 
 type recordingTestEmbedder struct {
@@ -238,7 +255,7 @@ func TestGenerateExamEmbedsOnlyCheapPassingQuestionsAsOneBatch(t *testing.T) {
 	}
 }
 
-func TestGenerateExamPassesSemanticFailureMemoryToNextGeneration(t *testing.T) {
+func TestGenerateExamDefersSemanticChoiceAudit(t *testing.T) {
 	gen := &feedbackRecordingGenerator{}
 	outline := &Outline{Lessons: []Lesson{{ID: "L01", Title: "Lesson", QuestionBudget: 1, ChunkIDs: []string{"c1", "c2"}}}}
 	lesson := outline.Lessons[0]
@@ -253,15 +270,11 @@ func TestGenerateExamPassesSemanticFailureMemoryToNextGeneration(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GenerateExam() error = %v", err)
 	}
-	if gen.calls != 2 || len(gen.feedback) != 2 || len(gen.feedback[0]) != 0 || len(gen.feedback[1]) != 1 {
+	if gen.calls != 1 || len(gen.feedback) != 1 || len(gen.feedback[0]) != 0 {
 		t.Fatalf("generation calls/feedback = %d/%#v", gen.calls, gen.feedback)
 	}
-	memory := gen.feedback[1][0]
-	if len(memory.Failures) != 1 || memory.Failures[0].Gate != GateSingleValid || memory.Failures[0].ChoiceVerdicts[2].Status != ChoiceEquivalent {
-		t.Fatalf("semantic rejection memory = %#v", memory)
-	}
-	if len(res.Passed) != 1 || !strings.Contains(res.Passed[0].Choices[2].Content, "circulation") {
-		t.Fatalf("passed = %#v, want distinct regenerated question", res.Passed)
+	if len(res.Passed) != 1 || strings.Contains(res.Passed[0].Choices[2].Content, "circulation") {
+		t.Fatalf("passed = %#v, want the first question without deferred semantic retry", res.Passed)
 	}
 }
 

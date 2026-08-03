@@ -27,6 +27,43 @@ func TestQuestionPromptIncludesSourceGroundedConceptFocus(t *testing.T) {
 			t.Fatalf("question system does not ban teacher-guide metadata %q:\n%s", want, QuestionSystem())
 		}
 	}
+	blindProps := BlindSchema(4)["properties"].(map[string]any)
+	if _, ok := blindProps["guessed_index"]; ok {
+		t.Fatal("blind schema still asks the model to guess the answer")
+	}
+	for _, want := range []string{"dependency", "evidence"} {
+		if !strings.Contains(SourcedSystem(), want) {
+			t.Fatalf("source judge prompt does not request %q:\n%s", want, SourcedSystem())
+		}
+	}
+	for _, unwanted := range []string{"choice_verdicts", "dependency_kind", "counterfactual", "dependency_reason"} {
+		if strings.Contains(SourcedSystem(), unwanted) {
+			t.Fatalf("source judge prompt still requests deferred field %q:\n%s", unwanted, SourcedSystem())
+		}
+	}
+}
+
+func TestSourcedSchemaIsMinimal(t *testing.T) {
+	properties := SourcedSchema()["properties"].(map[string]any)
+	for _, want := range []string{"dependency", "evidence"} {
+		if _, ok := properties[want]; !ok {
+			t.Fatalf("minimal source schema omitted %q: %#v", want, properties)
+		}
+	}
+	for _, unwanted := range []string{"choice_verdicts", "source_dependency", "dependency_kind", "counterfactual", "dependency_reason"} {
+		if _, ok := properties[unwanted]; ok {
+			t.Fatalf("minimal source schema still exposes deferred field %q", unwanted)
+		}
+	}
+}
+
+func TestBlindSystemDoesNotCoachConfidence(t *testing.T) {
+	if strings.Contains(BlindSystem(), "Do not be modest") {
+		t.Fatal("blind judge prompt still coaches the confidence distribution")
+	}
+	if strings.Contains(BlindSystem(), "guess_confidence") || strings.Contains(BlindSystem(), "guessed_index") {
+		t.Fatal("blind judge prompt still asks the model to guess the answer")
+	}
 }
 
 func TestQuestionPromptCarriesSemanticFailureAsNegativeMemory(t *testing.T) {

@@ -8,16 +8,26 @@ import (
 )
 
 type retryingJudgeClient struct {
-	calls int
+	calls   int
+	minimal bool
 }
 
 func (c *retryingJudgeClient) ChatJSON(_ context.Context, _ string, _ []Message, _ any, _ *Options, out any) error {
 	c.calls++
 	verdict := out.(*examgen.SourcedVerdict)
 	verdict.BestIndex = 0
+	if c.minimal {
+		verdict.SourceDependency = examgen.SourceDependencySpecific
+		verdict.Evidence = []string{"source fact"}
+		return nil
+	}
 	if c.calls == 1 {
 		return nil
 	}
+	verdict.SourceDependency = examgen.SourceDependencySpecific
+	verdict.DependencyKind = examgen.DependencyOrder
+	verdict.Evidence = []string{"source fact"}
+	verdict.Counterfactual = true
 	verdict.ChoiceVerdicts = []examgen.ChoiceVerdict{
 		{Index: 0, Status: examgen.ChoiceSupported, Reason: "supported"},
 		{Index: 1, Status: examgen.ChoiceUnsupported, Reason: "unsupported"},
@@ -25,6 +35,23 @@ func (c *retryingJudgeClient) ChatJSON(_ context.Context, _ string, _ []Message,
 		{Index: 3, Status: examgen.ChoiceUnsupported, Reason: "unsupported"},
 	}
 	return nil
+}
+
+func TestJudgeAgainstSourceAcceptsMinimalSourceContract(t *testing.T) {
+	client := &retryingJudgeClient{minimal: true}
+	judge := NewJudge(client, "test-model")
+	q := examgen.Question{Choices: []examgen.Choice{{Content: "correct", IsCorrect: true}, {Content: "wrong"}}}
+
+	verdict, err := judge.JudgeAgainstSource(context.Background(), q, "source fact")
+	if err != nil {
+		t.Fatalf("JudgeAgainstSource() error = %v", err)
+	}
+	if client.calls != 1 {
+		t.Fatalf("provider calls = %d, want one minimal-contract call", client.calls)
+	}
+	if verdict.SourceDependency != examgen.SourceDependencySpecific || len(verdict.Evidence) != 1 {
+		t.Fatalf("verdict = %#v", verdict)
+	}
 }
 
 func (*retryingJudgeClient) Chat(context.Context, string, []Message, *Options) (string, error) {

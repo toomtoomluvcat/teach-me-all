@@ -48,69 +48,39 @@ func (j *Judge) JudgeAgainstSource(ctx context.Context, q examgen.Question, sour
 	// window costs KV cache on a 6 GB card and buys nothing when the prompt
 	// measures a couple of thousand tokens.
 	opt := genOptions(8192, 0)
-	opt.NumPredict = 900
-	err := j.c.ChatJSON(ctx, j.model, msgs, examgen.SourcedSchema(len(q.Choices)), opt, &v)
+	opt.NumPredict = 220
+	err := j.c.ChatJSON(ctx, j.model, msgs, examgen.SourcedSchema(), opt, &v)
 	if err != nil {
 		return v, err
 	}
-	if validChoiceAudit(v.ChoiceVerdicts, len(q.Choices)) {
-		deriveSourcedSummary(&v)
+	if validSourceDependency(v) {
 		return v, nil
 	}
 
-	// DeepSeek JSON mode guarantees syntax, not schema compliance. A valid
-	// object that silently omits choice_verdicts must not pass the question.
-	msgs = append(msgs, Message{Role: "user", Content: fmt.Sprintf(
-		"Your reply omitted or malformed choice_verdicts. Return the entire JSON object again with exactly %d choice_verdicts, one unique index for every choice from 0 through %d. Audit synonyms, paraphrases, broader/narrower wording, and ordinary-language equivalents explicitly.",
-		len(q.Choices), len(q.Choices)-1,
-	)})
+	// JSON mode guarantees syntax, not schema compliance. Repair only these two
+	// fields; asking for the deferred semantic audit here created avoidable
+	// contract failures in the live run.
+	msgs = append(msgs, Message{Role: "user", Content: "Your reply omitted or malformed the source-dependency fields. Return exactly one JSON object with dependency set to specific, generic, or unclear, and evidence set to one exact passage substring or an empty string. Do not add any other fields."})
 	v = examgen.SourcedVerdict{}
-	err = j.c.ChatJSON(ctx, j.model, msgs, examgen.SourcedSchema(len(q.Choices)), opt, &v)
+	err = j.c.ChatJSON(ctx, j.model, msgs, examgen.SourcedSchema(), opt, &v)
 	if err != nil {
 		return v, err
 	}
-	if !validChoiceAudit(v.ChoiceVerdicts, len(q.Choices)) {
-		return v, fmt.Errorf("source judge omitted a complete per-choice semantic audit twice")
+	if !validSourceDependency(v) {
+		return v, fmt.Errorf("source judge omitted dependency or evidence twice")
 	}
-	deriveSourcedSummary(&v)
-	return v, err
+	return v, nil
 }
 
-func deriveSourcedSummary(v *examgen.SourcedVerdict) {
-	v.BestIndex = -1
-	v.AlsoDefensible = nil
-	for _, verdict := range v.ChoiceVerdicts {
-		switch verdict.Status {
-		case examgen.ChoiceSupported:
-			if v.BestIndex < 0 {
-				v.BestIndex = verdict.Index
-			} else {
-				v.AlsoDefensible = append(v.AlsoDefensible, verdict.Index)
-			}
-		case examgen.ChoiceEquivalent, examgen.ChoiceAmbiguous:
-			v.AlsoDefensible = append(v.AlsoDefensible, verdict.Index)
-		}
-	}
-	v.Reason = "derived from the per-choice semantic audit"
-}
-
-func validChoiceAudit(verdicts []examgen.ChoiceVerdict, choices int) bool {
-	if len(verdicts) != choices {
+func validSourceDependency(v examgen.SourcedVerdict) bool {
+	switch v.SourceDependency {
+	case examgen.SourceDependencySpecific:
+		return len(v.Evidence) > 0
+	case examgen.SourceDependencyGeneric, examgen.SourceDependencyUnclear:
+		return len(v.Evidence) == 0
+	default:
 		return false
 	}
-	seen := make([]bool, choices)
-	for _, verdict := range verdicts {
-		if verdict.Index < 0 || verdict.Index >= choices || seen[verdict.Index] || verdict.Reason == "" {
-			return false
-		}
-		switch verdict.Status {
-		case examgen.ChoiceSupported, examgen.ChoiceUnsupported, examgen.ChoiceEquivalent, examgen.ChoiceAmbiguous:
-		default:
-			return false
-		}
-		seen[verdict.Index] = true
-	}
-	return true
 }
 
 // Embedder adapts the Ollama client to examgen.Embedder.

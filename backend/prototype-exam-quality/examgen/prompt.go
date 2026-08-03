@@ -374,14 +374,7 @@ func BlindSchema(numChoices int) map[string]any {
 			"description": "true if it is clear what the question is asking",
 		},
 		"reason": str("at most 20 words. If not interpretable, say exactly what is missing or ambiguous. Do not restate the question and do not solve it."),
-		"guessed_index": map[string]any{
-			"type":        "integer",
-			"minimum":     0,
-			"maximum":     numChoices - 1,
-			"description": "which choice you would pick, 0-based, guessing if you must",
-		},
-		"guess_confidence": enum("how sure you are of that guess without any source material", "low", "medium", "high"),
-	}, "interpretable", "reason", "guessed_index", "guess_confidence")
+	}, "interpretable", "reason")
 }
 
 const blindSystem = `You are checking whether an exam question is written clearly. You cannot see
@@ -401,59 +394,40 @@ Mark it interpretable when a knowledgeable person would understand the task,
 even if they would need to have studied the material to know the answer. Needing
 knowledge is fine. Needing context you were not given is not.
 
-Then, separately, guess which choice is correct and say how confident you are.
-A high-confidence guess with no source material is worth knowing about.
-
-Both guess fields are required on every reply, including replies where the
-question is not interpretable. guess_confidence must be exactly one of "low",
-"medium" or "high" — never empty, never any other word. Answer it about
-yourself: "high" means you are sure of the answer from what you already know,
-without the material. Do not be modest; an accurate "high" here is more useful
-than a cautious "medium".
-
 Return exactly this JSON shape, with no other top-level keys:
-{"interpretable":true,"reason":"...","guessed_index":0,"guess_confidence":"high"}`
+{"interpretable":true,"reason":"..."}`
 
 func BlindSystem() string { return blindSystem }
 
-// SourcedSchema constrains the judge that can read the source.
-func SourcedSchema(numChoices int) map[string]any {
+// SourcedSchema constrains the minimal source-dependency judge. The variadic
+// argument keeps old callers source-compatible; the number of choices is no
+// longer part of this contract because semantic choice auditing is deferred.
+func SourcedSchema(_ ...int) map[string]any {
 	return obj(map[string]any{
-		"choice_verdicts": map[string]any{
-			"type":        "array",
-			"minItems":    numChoices,
-			"maxItems":    numChoices,
-			"description": "one semantic audit for every choice, including the best choice",
-			"items": obj(map[string]any{
-				"index": map[string]any{
-					"type":    "integer",
-					"minimum": 0,
-					"maximum": numChoices - 1,
-				},
-				"status": enum("semantic status against the passage and the other choices", "supported", "unsupported", "equivalent", "ambiguous"),
-				"reason": str("at most 15 words explaining this choice specifically"),
-			}, "index", "status", "reason"),
-		},
-	}, "choice_verdicts")
+		"dependency": enum("whether the best answer requires a fact specific to this passage, not general subject knowledge", "specific", "generic", "unclear"),
+		"evidence":   str("one exact substring from the passage that makes the answer specific; empty for generic or unclear"),
+	}, "dependency", "evidence")
 }
 
 const sourcedSystem = `You are checking an exam question against the passage it was written from.
 
-Do one thing: audit EVERY choice separately against the passage and the other
-choices. Mark the best answer "supported". Mark a
-   distractor "equivalent" when it is a synonym, paraphrase, broader/narrower
-   wording, or ordinary-language restatement of the supported answer. Mark it
-   "ambiguous" when a reasonable interpretation could make it true. Only mark
-   it "unsupported" when the passage and ordinary meaning clearly rule it out.
+Do not ask whether you personally knew the answer before seeing the passage.
+Ask whether a learner needs a fact or relationship that THIS passage specifically
+supplies.
 
-Do not excuse equivalent wording because the textbook uses a more technical
-term. For example, an option saying "defecation" and another saying "passing
-stool" can be equivalent even if only one phrase appears verbatim.
+Use "specific" only when all of these are true:
+- the answer depends on a particular fact or relationship supplied by this passage;
+- the fact is present in the passage, not merely implied by the topic;
+- without that fact, the best choice could not be identified from general knowledge.
 
-Return exactly one top-level field named choice_verdicts. It must contain one
-object for every choice index. Do not return best_index or also_defensible; the
-caller derives them from your per-choice statuses. You are not told which choice
-the author marked correct. Judge only against the passage.`
+Use "generic" when the answer follows from general subject knowledge, the
+wording of the question and choices, or a standard principle even without this
+passage. A citation that merely repeats a general fact is not enough. Use
+"unclear" when you cannot decide. For "specific", return one shortest exact
+substring from the passage. For "generic" or "unclear", return an empty string.
+
+Return exactly this JSON object and no other fields:
+{"dependency":"specific|generic|unclear","evidence":"exact passage substring or empty string"}`
 
 func SourcedSystem() string { return sourcedSystem }
 
