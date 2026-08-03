@@ -54,6 +54,20 @@ def main():
     check("parse Thai nlm-book.txt exits 0", code == 0, out)
     check("Thai answer line understood", "*B." in out or "*C." in out, out)
 
+    # NotebookLM's chat pane puts the stem, all four options and the answer on
+    # one line. This is the shape the real comparison actually arrived in.
+    code, out = run("parse", str(DATA / "nlm-inline.txt"), "--dry-run")
+    check("inline one-line questions exit 0", code == 0, out)
+    check("inline dry-run reports 4 questions", "Parsed 4 question" in out, out)
+    check("inline answer marks the right choice", "*B. ความแตกต่างของความดันอากาศ" in out, out)
+    check("inline rewrite is announced", "held a whole question inline" in out, out)
+    check(
+        "a number inside an option is not read as an option label",
+        "*B. 500 mL" in out,
+        out,
+    )
+    check("a missing answer line is tolerated", "Parsed 4 question" in out, out)
+
     # --- parser, malformed paths --------------------------------------------
     code, out = run("parse", str(DATA / "malformed.txt"))
     check("three-option question exits non-zero", code != 0, out)

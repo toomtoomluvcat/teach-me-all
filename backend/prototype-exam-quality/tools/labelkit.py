@@ -179,6 +179,87 @@ def find_quads(lines, labels):
     return quads
 
 
+# NotebookLM's chat pane emits a whole question on one line: the stem, then
+# "A. ... B. ... C. ... D. ...", then "เฉลย: B". Copying that out of the browser
+# preserves it as a single line, so the option lines the rest of this parser
+# looks for never exist.
+INLINE_ANSWER_RE = re.compile(
+    r"\s(?:answer|ans|correct answer|correct|key"
+    r"|เฉลย"
+    r"|คำตอบ(?:ที่ถูก(?:ต้อง)?)?"
+    r")\s*(?:คือ\s*)?[:\-–：]\s*(.+)$",
+    re.IGNORECASE,
+)
+
+
+def inline_split(text, labels):
+    """Split one line holding a stem and all four options.
+
+    Returns [stem, opt1..opt4, answer_line|None] or None when the line is not
+    that shape. Deliberately strict: all four labels must appear in order, each
+    at a word boundary with a separator, or the line is left alone for the
+    normal path to accept or reject.
+    """
+    spans = []
+    search_from = 0
+    for label in labels:
+        gap = r"\s+" if label.isdigit() else r"\s*"
+        pattern = r"(?:(?<=\s)|(?<=^))\(?%s\)?\s*[\.\)\:]%s(?=\S)" % (
+            re.escape(label),
+            gap,
+        )
+        m = re.compile(pattern).search(text, search_from)
+        if m is None:
+            return None
+        spans.append((m.start(), m.end()))
+        search_from = m.end()
+
+    stem = text[: spans[0][0]].strip()
+    if not stem:
+        return None
+
+    parts = []
+    for i, (_, end) in enumerate(spans):
+        stop = spans[i + 1][0] if i + 1 < len(spans) else len(text)
+        parts.append(text[end:stop].strip())
+
+    answer = None
+    tail = INLINE_ANSWER_RE.search(parts[-1])
+    if tail is not None:
+        answer = parts[-1][tail.start() :].strip()
+        parts[-1] = parts[-1][: tail.start()].strip()
+
+    if not all(parts):
+        return None
+    return [stem] + parts + [answer]
+
+
+def explode_inline(lines):
+    """Rewrite one-line questions into the multi-line shape, in place.
+
+    Every produced line keeps the original line number, so a later failure
+    still points the operator at the line they have to fix.
+    """
+    for _style, labels in LABEL_STYLES:
+        out = []
+        exploded = 0
+        for line in lines:
+            split = inline_split(line["clean"], labels)
+            if split is None:
+                out.append(line)
+                continue
+            exploded += 1
+            stem, options, answer = split[0], split[1:5], split[5]
+            pieces = [stem] + ["%s. %s" % (labels[i], opt) for i, opt in enumerate(options)]
+            if answer:
+                pieces.append(answer)
+            for piece in pieces:
+                out.append({"lineno": line["lineno"], "raw": line["raw"], "clean": piece})
+        if exploded:
+            return out, exploded
+    return lines, 0
+
+
 def raw_block(lines, start, end):
     """Raw source lines for the inclusive index range, for error messages."""
     return [(lines[i]["lineno"], lines[i]["raw"]) for i in range(start, min(end + 1, len(lines)))]
@@ -199,6 +280,17 @@ def parse_notebooklm(path):
 
     if not lines:
         raise ParseError("file is empty after stripping markdown", path)
+
+    lines, inlined = explode_inline(lines)
+    if inlined:
+        # Say so. The operator is about to trust a sheet built from this, and a
+        # rewrite they did not know about is the kind of thing that quietly
+        # invalidates a measurement.
+        print(
+            "  note: %d line(s) held a whole question inline and were split into "
+            "stem + four options." % inlined,
+            file=sys.stderr,
+        )
 
     # Pick the labelling style that yields the most complete four-option runs.
     best_style, best_labels, best_quads = None, None, []
