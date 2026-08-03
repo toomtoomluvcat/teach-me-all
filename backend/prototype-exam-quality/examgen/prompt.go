@@ -81,7 +81,19 @@ can be well-written prose and still teach the learner nothing:
 Judge what the passage IS, not what it is about. A page of answers to chapter
 exercises is apparatus even though every answer is about the subject. A
 laboratory activity that explains what happens and why is content even though a
-teacher runs it.`
+teacher runs it.
+
+Most of this book is a teacher's edition, so subject matter usually arrives
+wrapped in instructions to the teacher: "the teacher should explain that...",
+"have the students search for...", "ครูควรชี้แจงว่า...", "ครูให้นักเรียนอธิบาย...".
+That wrapper is not what the passage is. If the passage explains the subject
+anywhere inside it — states a mechanism, names a structure and its function,
+gives data or a reason — it is content, no matter who is being addressed. Mark
+apparatus only when the passage would still say nothing about the subject after
+you removed the instructions: a bare list of answers, a scoring table, a
+checklist of objectives, a schedule.
+
+When you cannot decide, choose content.`
 
 // TopicPrompt builds the map-step user message.
 func TopicPrompt(c Chunk) string {
