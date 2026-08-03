@@ -257,6 +257,7 @@ const (
 	GateWellFormed  GateName = "well_formed"
 	GateQuote       GateName = "quote_verbatim"
 	GateBlindAnswer GateName = "answerable_blind"
+	GateNeedsSource GateName = "needs_the_source"
 	GateSingleValid GateName = "single_defensible"
 	GateArithmetic  GateName = "arithmetic"
 	GateDistinct    GateName = "not_a_duplicate"

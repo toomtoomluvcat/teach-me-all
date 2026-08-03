@@ -273,6 +273,13 @@ Hard requirements for every question:
 - When the user message includes rejected draft memory, treat it as a negative
   constraint. Do not repair, paraphrase, or lightly vary those drafts. Ask a
   materially different question and avoid every failure pattern listed there.
+- The answer must depend on something this passage actually says. Anchor it to
+  a number, a named structure, an order of steps, a condition, or a stated
+  cause-and-effect that appears in the passage. A student who knows the subject
+  in general, but has not read this passage, should not be able to answer
+  reliably. Before writing a question, ask yourself whether a good student could
+  answer it from general knowledge alone; if so, do not write it — find a
+  specific the passage supplies and ask about that instead.
 - Ask only about subject matter. Never ask about learning objectives,
   assessment guidelines or criteria, classroom/teaching activities, videos,
   tests, pedagogy, or chapter numbering. Those are document metadata, even when

@@ -19,8 +19,10 @@ type BlindVerdict struct {
 	// GuessedIndex and GuessConfidence answer a different question: could this
 	// be answered without reading the source at all? A confident correct guess
 	// means the question tests recall of general knowledge, or one choice is
-	// obviously the odd one out. Recorded as a signal, never used to fail a
-	// question — random guessing is right 25% of the time.
+	// obviously the odd one out. This was advisory until the first NotebookLM
+	// comparison, where a blind labeller marked 22 of 45 questions answerable
+	// without the passage — the largest single defect in every set. It now fails
+	// a question through GateNeedsSource.
 	GuessedIndex    int    `json:"guessed_index"`
 	GuessConfidence string `json:"guess_confidence"`
 }
@@ -123,6 +125,7 @@ func RunCheapGates(q Question, chunk Chunk, ev Evaluator) *GateReport {
 func AddJudgeGates(ctx context.Context, rep *GateReport, q Question, chunk Chunk, j Judge) error {
 	if len(rep.Failures()) > 0 {
 		rep.add(GateResult{Gate: GateBlindAnswer, Pass: true, Reason: "not asked — already rejected by a deterministic check"})
+		rep.add(GateResult{Gate: GateNeedsSource, Pass: true, Reason: "not asked — already rejected by a deterministic check"})
 		rep.add(GateResult{Gate: GateSingleValid, Pass: true, Reason: "not asked — already rejected by a deterministic check"})
 		return nil
 	}
@@ -146,8 +149,10 @@ func AddJudgeGates(ctx context.Context, rep *GateReport, q Question, chunk Chunk
 	// malformed; the failure is recorded on the question where it can be read.
 	if blindErr != nil {
 		rep.add(GateResult{Gate: GateBlindAnswer, Reason: "judge did not answer: " + blindErr.Error()})
+		rep.add(GateResult{Gate: GateNeedsSource, Reason: "judge did not answer: " + blindErr.Error()})
 	} else {
 		rep.add(gateInterpretable(q, blind))
+		rep.add(gateNeedsSource(q, blind))
 	}
 	if srcErr != nil {
 		rep.add(GateResult{Gate: GateSingleValid, Reason: "judge did not answer: " + srcErr.Error()})
@@ -246,11 +251,42 @@ func gateInterpretable(q Question, v BlindVerdict) GateResult {
 
 	res.Pass = true
 	res.Reason = "question is self-contained"
-	if v.GuessedIndex == q.CorrectIndex() && strings.EqualFold(v.GuessConfidence, "high") {
-		// Advisory only. Surfaced so a human can spot a pattern of trivial
-		// questions, but a question is not failed for it.
-		res.Reason += " (note: judge guessed it correctly with high confidence without the source — may not be testing comprehension)"
+	return res
+}
+
+// gateNeedsSource is the inverse of gateInterpretable, from the same verdict.
+//
+// gateInterpretable passes when the blind judge understood the question.
+// This one FAILS when the blind judge could also answer it — because then the
+// passage was never needed, and a learner gets nothing from reading it.
+//
+// The two together are why the blind judge is asked to guess even after saying
+// the question is clear. It costs no extra request: both come from the one
+// reply that was already being paid for.
+//
+// Only a confident correct guess counts. A judge guessing right at random is
+// right one time in four, and low or medium confidence is exactly what an
+// honest guess on an unfamiliar specific looks like.
+func gateNeedsSource(q Question, v BlindVerdict) GateResult {
+	res := GateResult{Gate: GateNeedsSource}
+
+	correct := q.CorrectIndex()
+	if correct < 0 {
+		// gateWellFormed already rejects this; do not fail it twice for the
+		// same defect and confuse the reported reason.
+		res.Pass = true
+		res.Reason = "not judged — the question marks no single correct choice"
+		return res
 	}
+
+	if v.GuessedIndex == correct && strings.EqualFold(v.GuessConfidence, "high") {
+		res.Reason = "answerable without the passage: the judge picked it correctly, with high confidence, having seen no source"
+		return res
+	}
+
+	res.Pass = true
+	res.Reason = fmt.Sprintf("the passage is needed — blind guess was %s confidence and %s",
+		strings.ToLower(v.GuessConfidence), map[bool]string{true: "correct", false: "wrong"}[v.GuessedIndex == correct])
 	return res
 }
 

@@ -63,8 +63,8 @@ without a reason; several are recorded nowhere else.
 
 ## Where the work actually stands
 
-Six gates now, not four. Two are model-backed and four are deterministic or
-locally reproducible:
+Seven gates now. Three are model-backed — though only two model calls are
+made — and four are deterministic or locally reproducible:
 
 | gate | decided by |
 |---|---|
@@ -73,6 +73,7 @@ locally reproducible:
 | `arithmetic` | Go |
 | `not_a_duplicate` — embedding similarity vs accepted questions | Go + embedder |
 | `answerable_blind` — is it clear what is being asked | model |
+| `needs_the_source` — could it be answered *without* the passage | model (same call) |
 | `single_defensible` — does exactly one choice hold up | model |
 
 Deterministic checks run first and short-circuit: a question Go has already
@@ -399,13 +400,15 @@ Found by reading, not fixed, filed nowhere else:
 
 ## What to do next, in the order it makes sense
 
-1. **Build a gate for "can this be answered without reading?"** The comparison
-   above says this is the dominant defect in every set, ours and NotebookLM's
-   alike, and no existing gate looks for it. One shape that fits the existing
-   design: ask a judge the question with the source chunk withheld, and reject
-   anything it answers correctly with high confidence. That is one extra model
-   call per surviving draft, on the cheap side of the budget, and unlike
-   `answerable_blind` it is a *failure* when the model succeeds.
+1. ~~Build a gate for "can this be answered without reading?"~~ — built, and
+   it needed no extra model call. The blind judge was already being asked to
+   guess the answer and rate its own confidence; that signal had been recorded
+   as advisory since the first version and nothing consumed it. `needs_the_source`
+   now fails a question when the blind judge picks the correct choice with high
+   confidence. The generator prompt was changed first, to anchor every answer to
+   a number, structure, order, condition or stated cause the passage actually
+   supplies — prevention before correction, which is this project's own recorded
+   lesson from the repair loop. **Neither change is measured yet.**
 2. **Relabel the same 45-question sheet by hand.** The first pass was done by a
    model, which is the thing that was explicitly rejected when the protocol was
    agreed. The sheet is untouched and the key is separate, so this costs only
