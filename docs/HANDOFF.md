@@ -167,6 +167,49 @@ because judge calls run in parallel. The four accepted questions were read by
 hand and ask about digestive-tract order, stages of food processing, where
 chemical digestion begins, and why chewing helps digestion.
 
+## The NotebookLM comparison, first run
+
+Protocol agreed before any data was seen, so the verdict could not be argued
+with afterwards. Lesson `กลไกการหายใจและการควบคุม`, 15 questions per set, all
+three sets shuffled into one sheet with provenance held in a separate key.
+Ours came from the whole book on DeepSeek at commit `b43fba6` (30 drafts, 15
+passed the gates, 84 API calls, 2m18s, no top-up outside the lesson).
+NotebookLM was given the same 14 pages in one condition and the whole 254-page
+book in the other, with an identical prompt that deliberately did **not** carry
+our ban on teacher-guide questions.
+
+| label | ours | nlm-pages | nlm-book |
+|---|---:|---:|---:|
+| good | 6 | 8 | 7 |
+| no_reading_needed | 8 | 7 | 7 |
+| true_distractor | 1 | 0 | 1 |
+| off_topic / teacher_guide / ambiguous | 0 | 0 | 0 |
+| **good rate** | **40%** | **53%** | **47%** |
+
+**Verdict: INCONCLUSIVE, and we are not ahead.** The pre-agreed rule was +4/15
+to pass; we are -2 and -1. Per that rule: do not ship, do not rebuild, fix the
+label we lost most to and re-measure with the same protocol.
+
+The finding that matters is not the gap, it is what all three sets share.
+**22 of 45 questions are answerable without reading the passage** — ours 8,
+NotebookLM 15. Every gate in the pipeline checks whether a question is
+well-formed, grounded, arithmetically sound and non-duplicate. Nothing checks
+whether it teaches you anything to answer it. That is the next thing to build,
+and it is worth more than any further work on the topic classifier.
+
+Two caveats that must travel with these numbers:
+
+- **The labeller was a model, not the owner.** The agreed design was the
+  owner's eyes; a subagent with a cold context did this pass because the main
+  session had already seen NotebookLM's output and was contaminated. `Q2` had
+  rejected LLM judging for a measured reason, and the `teacher_guide` count of
+  0 across all 45 is exactly where that blindness would show. The sheet is
+  unchanged and can be relabelled by hand.
+- **n=15 detects only large differences.** INCONCLUSIVE means not known.
+
+Sheet and key: `.scratch/labelling/`. Labels: `sheet.labelled.csv` in the
+session scratchpad, because Excel held the original open.
+
 ## The quality defect that still deserves a larger eval
 
 **A distractor that happens to be a true statement.** Observed six times across
@@ -356,13 +399,22 @@ Found by reading, not fixed, filed nowhere else:
 
 ## What to do next, in the order it makes sense
 
-1. **Close the human-quality half of the prototype.** Read and label at least 20
-   passing questions, then compare the same lesson/PDF with NotebookLM. The
-   latest four were read and are acceptable, but four is not the agreed sample.
-2. Replay the six historical true-distractor questions through
+1. **Build a gate for "can this be answered without reading?"** The comparison
+   above says this is the dominant defect in every set, ours and NotebookLM's
+   alike, and no existing gate looks for it. One shape that fits the existing
+   design: ask a judge the question with the source chunk withheld, and reject
+   anything it answers correctly with high confidence. That is one extra model
+   call per surviving draft, on the cheap side of the budget, and unlike
+   `answerable_blind` it is a *failure* when the model succeeds.
+2. **Relabel the same 45-question sheet by hand.** The first pass was done by a
+   model, which is the thing that was explicitly rejected when the protocol was
+   agreed. The sheet is untouched and the key is separate, so this costs only
+   the owner's half hour and it either confirms the result or exposes where the
+   model judge is blind.
+3. Replay the six historical true-distractor questions through
    `judge/source`, once with local 4B and once with DeepSeek. The current paid
    regression proves one Thai paraphrase case, not the whole recurring defect.
-3. ~~Filter pedagogy at graph compilation~~ — done and measured on DeepSeek over
+4. ~~Filter pedagogy at graph compilation~~ — done and measured on DeepSeek over
    four live runs; see the table above. Two things are still open. **The
    classifier has never been run on the local 4B model**, which may be much worse
    at it and would degrade silently rather than fail — a model that answers
@@ -370,20 +422,20 @@ Found by reading, not fixed, filed nowhere else:
    `outline/filter` line. And the reduce step returned 34 lessons this time
    against 17 before; more concepts survive, so lessons got thinner. Whether that
    is better or worse for a learner is unmeasured.
-4. For known prose subjects, measure `--calc-tool=false`. It should remove the
+5. For known prose subjects, measure `--calc-tool=false`. It should remove the
    three calculator-tool calls seen in the 14-call biology run; keep the
    arithmetic gate regardless. Do not make this the global default without a
    routing rule because quantitative science/math passages need the tool.
-5. Obtain a genuine Thai camera/flatbed scan. The official สสวท. benchmark
+6. Obtain a genuine Thai camera/flatbed scan. The official สสวท. benchmark
    is digital (Biology M.5 book 4); pages 60-62 prove Thai text, table, page
    breaks and figure crops, but do not prove robustness to skew/shadows/blur.
    If image-dependent questions are in MVP scope, add `question_assets`;
    otherwise forbid those questions explicitly.
-6. **If a clean performance claim matters, do one cold-cache rerun** after
+7. **If a clean performance claim matters, do one cold-cache rerun** after
    unloading both models. The instrumentation now shows the batching path itself
    is only 9 embed calls / 3.007s on this workload; the remaining load cost is
    generator/judge model swapping.
-7. Only after the quality comparison, decide how much of `examgen/`, `pdfx/`
+8. Only after the quality comparison, decide how much of `examgen/`, `pdfx/`
    and `llm/` to lift into the production backend and write the agreed storage
    migration. The prototype executable is reusable, but it is not production
    architecture by itself.
