@@ -211,6 +211,68 @@ Two caveats that must travel with these numbers:
 Sheet and key: `.scratch/labelling/`. Labels: `sheet.labelled.csv` in the
 session scratchpad, because Excel held the original open.
 
+## `needs_the_source`: what three runs on one lesson actually showed
+
+Same lesson, same budget, same provider, three consecutive states of the code.
+Read this before touching that gate; two of the three numbers are traps.
+
+| | round 1 `b43fba6` | round 2 `bc2b85f` | round 3 `9ead599` |
+|---|---:|---:|---:|
+| drafts | 30 | 21 | 47 |
+| passed | 15 | 15 | **4** |
+| pass rate | 50% | 71% | 8.5% |
+| filled the budget | yes | yes | **no, hit the ceiling** |
+| API calls | 84 | 55 | — |
+
+**Round 2's 71% is not the gate working.** DeepSeek omitted `guess_confidence`
+entirely, `""` is not `"high"`, so the gate passed all 15 while deciding
+nothing — and printed "the passage is needed" 17 times saying so. The repo
+already had the cause written down (*DeepSeek JSON mode is syntax-only*) and the
+gate ignored it. What round 2 does show is the **prompt** change working:
+requiring each answer to be anchored to a specific the passage supplies cut
+wasted drafts from 15 to 6.
+
+**Round 3's 8.5% is real but measured with a thumb on the scale.** The fix for
+round 2 added, to the blind judge's prompt, *"Do not be modest; an accurate
+'high' here is more useful than a cautious 'medium'."* The judge then answered
+`high` on 33 of 37. That is my instruction talking, not calibration.
+
+What is *not* an artefact is how often the blind judge is simply right:
+
+| | correct | wrong |
+|---|---:|---:|
+| round 2 (no confidence instruction) | 17 | 4 |
+| round 3 | 34 | 3 |
+
+**Without the passage, the judge answers correctly 81-92% of the time. Random
+is 25%.** That is independent of any confidence wording and it agrees with the
+blind labeller, who marked 22 of 45 questions answerable unread.
+
+### The design error underneath
+
+The gate uses an LLM as a stand-in for *a Thai upper-secondary student who has
+not read this passage yet*. It is not one — it has read the whole subject. So
+"the model answered it unread" and "a learner learns nothing from reading" are
+not the same claim, and treating them as the same fails nearly every question a
+textbook can support. That is why round 3 could not even fill a 15-question
+budget from a 19-chunk lesson.
+
+### Decided with the owner, not yet done
+
+1. **Remove the "do not be modest" line and re-measure.** The current
+   distribution cannot be trusted for setting any threshold because I biased it.
+   One run, ~55-90 calls.
+2. **Then replace the proxy (option D).** The criterion should be whether the
+   answer depends on a *specific the passage supplies* — a number, a named
+   structure, a stated order or condition — not whether a well-read model can
+   answer it. The owner's words: *เพราะเนื้อหา ม.ปลายอยู่ในหัวโมเดลอยู่แล้ว.*
+   Design is open. A deterministic shape is plausible (does the correct choice
+   turn on a token that appears in the chunk and is not general vocabulary?) and
+   would cost no model call, but nothing has been tried yet.
+
+Until 1 and 2 land, **do not ship `needs_the_source` as a hard gate** and do not
+read round 3's 8.5% as a quality regression — it is a mis-calibrated ruler.
+
 ## The quality defect that still deserves a larger eval
 
 **A distractor that happens to be a true statement.** Observed six times across
@@ -400,24 +462,33 @@ Found by reading, not fixed, filed nowhere else:
 
 ## What to do next, in the order it makes sense
 
-1. ~~Build a gate for "can this be answered without reading?"~~ — built, and
-   it needed no extra model call. The blind judge was already being asked to
-   guess the answer and rate its own confidence; that signal had been recorded
-   as advisory since the first version and nothing consumed it. `needs_the_source`
-   now fails a question when the blind judge picks the correct choice with high
-   confidence. The generator prompt was changed first, to anchor every answer to
-   a number, structure, order, condition or stated cause the passage actually
-   supplies — prevention before correction, which is this project's own recorded
-   lesson from the repair loop. **Neither change is measured yet.**
-2. **Relabel the same 45-question sheet by hand.** The first pass was done by a
+1. **Start here: de-bias the blind judge, then replace its job.** Remove the
+   "do not be modest" sentence from `blindSystem` in `examgen/prompt.go`, rerun
+   the same lesson once, and read the confidence distribution before setting any
+   threshold. Then design option D — a criterion based on whether the answer
+   turns on a specific the passage supplies, rather than on whether a well-read
+   model can answer it. Full reasoning and the three measured runs are in
+   "`needs_the_source`: what three runs on one lesson actually showed". Both
+   steps were agreed with the owner and neither is started.
+   `needs_the_source` is currently a **hard gate that rejects ~84% of drafts** —
+   whoever picks this up either finishes the two steps or turns the gate back to
+   advisory. Do not leave it as it is.
+2. **Round 2 of the NotebookLM comparison is set up and cheap.** Both NotebookLM
+   sets are fixed artefacts in `tools/nlm-pages.txt` and `tools/nlm-book.txt` and
+   are reused as-is — no browser, no second visit. It costs one generation run
+   plus a **fresh** labelling subagent (the previous one has seen the first
+   sheet and cannot be reused). Same lesson, same seed `20260803`, same +4/15
+   rule. Do not run it until item 1 lands: a run under the current gate cannot
+   even produce 15 questions.
+3. **Relabel the same 45-question sheet by hand.** The first pass was done by a
    model, which is the thing that was explicitly rejected when the protocol was
    agreed. The sheet is untouched and the key is separate, so this costs only
    the owner's half hour and it either confirms the result or exposes where the
    model judge is blind.
-3. Replay the six historical true-distractor questions through
+4. Replay the six historical true-distractor questions through
    `judge/source`, once with local 4B and once with DeepSeek. The current paid
    regression proves one Thai paraphrase case, not the whole recurring defect.
-4. ~~Filter pedagogy at graph compilation~~ — done and measured on DeepSeek over
+5. ~~Filter pedagogy at graph compilation~~ — done and measured on DeepSeek over
    four live runs; see the table above. Two things are still open. **The
    classifier has never been run on the local 4B model**, which may be much worse
    at it and would degrade silently rather than fail — a model that answers
@@ -425,20 +496,20 @@ Found by reading, not fixed, filed nowhere else:
    `outline/filter` line. And the reduce step returned 34 lessons this time
    against 17 before; more concepts survive, so lessons got thinner. Whether that
    is better or worse for a learner is unmeasured.
-5. For known prose subjects, measure `--calc-tool=false`. It should remove the
+6. For known prose subjects, measure `--calc-tool=false`. It should remove the
    three calculator-tool calls seen in the 14-call biology run; keep the
    arithmetic gate regardless. Do not make this the global default without a
    routing rule because quantitative science/math passages need the tool.
-6. Obtain a genuine Thai camera/flatbed scan. The official สสวท. benchmark
+7. Obtain a genuine Thai camera/flatbed scan. The official สสวท. benchmark
    is digital (Biology M.5 book 4); pages 60-62 prove Thai text, table, page
    breaks and figure crops, but do not prove robustness to skew/shadows/blur.
    If image-dependent questions are in MVP scope, add `question_assets`;
    otherwise forbid those questions explicitly.
-7. **If a clean performance claim matters, do one cold-cache rerun** after
+8. **If a clean performance claim matters, do one cold-cache rerun** after
    unloading both models. The instrumentation now shows the batching path itself
    is only 9 embed calls / 3.007s on this workload; the remaining load cost is
    generator/judge model swapping.
-8. Only after the quality comparison, decide how much of `examgen/`, `pdfx/`
+9. Only after the quality comparison, decide how much of `examgen/`, `pdfx/`
    and `llm/` to lift into the production backend and write the agreed storage
    migration. The prototype executable is reusable, but it is not production
    architecture by itself.
