@@ -38,6 +38,17 @@ var bannedPhrases = []string{
 	"described in the text", "in the given text", "mentioned above",
 }
 
+// pedagogyPhrases identify questions about how the source is taught or graded,
+// rather than questions about the subject matter. Teacher books legitimately
+// contain these phrases, so quote grounding alone cannot distinguish them from
+// useful exam content.
+var pedagogyPhrases = []string{
+	"จุดประสงค์การเรียนรู้", "แนวการวัดและประเมินผล", "การประเมินด้านความรู้",
+	"ประเมินจากอะไร", "กิจกรรมและแบบทดสอบ", "การศึกษาวีดิทัศน์",
+	"learning objective", "assessment guideline", "assessment criteria",
+	"teaching activity", "video and discussion",
+}
+
 // questionWords let a stem be recognised as a question. Thai written questions
 // frequently carry no question mark, so punctuation alone is not enough.
 var questionWords = []string{
@@ -86,6 +97,7 @@ func gateWellFormed(q Question) GateResult {
 	for _, check := range []func(Question) string{
 		checkStemIsAQuestion,
 		checkNoBannedPhrase,
+		checkNoPedagogyMetadata,
 		checkChoicesPresent,
 		checkNoMojibake,
 		checkChoicesDistinct,
@@ -131,6 +143,16 @@ func checkNoBannedPhrase(q Question) string {
 	for _, p := range bannedPhrases {
 		if strings.Contains(lower, strings.ToLower(p)) {
 			return fmt.Sprintf("stem points at material the reader cannot see: %q", p)
+		}
+	}
+	return ""
+}
+
+func checkNoPedagogyMetadata(q Question) string {
+	lower := strings.ToLower(q.Stem)
+	for _, p := range pedagogyPhrases {
+		if strings.Contains(lower, strings.ToLower(p)) {
+			return fmt.Sprintf("stem asks about teacher-guide metadata instead of subject matter: %q", p)
 		}
 	}
 	return ""

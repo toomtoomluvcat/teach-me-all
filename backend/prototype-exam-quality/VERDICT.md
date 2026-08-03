@@ -40,27 +40,38 @@ biology teacher book (347,577 runes, 392 chunks). The cached pass-1 result has
 217 source-provenanced concepts, 240 evidenced edges, and 17 lessons; its cold
 run used 13 bounded map calls plus one reduce call.
 
-For lesson 3 with a budget of four, the final `deepseek-chat` run generated five
-drafts and accepted four (**80%**) in 19.72 seconds wall time. I read all four:
-they are valid and source-grounded, though mostly easy recall/sequence items.
-The rejected draft asked which organs were involved in digestion while another
-option also listed digestive organs; the per-choice audit marked that option
-`ambiguous`, so it did not ship.
+The repair call was tested before removal. It returned unchanged, duplicate, or
+synonym-swapped distractors and its replacement contract was violated, so the
+result was safely declined. That call was pure overhead. The implementation and
+the `--repair` flag are now deleted.
 
-| call | count | input tokens | output tokens |
-|---|---:|---:|---:|
-| generate | 3 | 3,242 | 1,353 |
-| calc-tool | 3 | 2,595 | 110 |
-| judge/source | 5 | 3,472 | 219 |
-| judge/blind | 5 | 1,643 | 125 |
-| focused repair | 1 | 801 | 77 |
-| **total** | **17** | **11,753** | **1,884** |
+The replacement is bounded rejection memory: at most four recent failed drafts
+and their gate reasons ride on the next normal top-up prompt. It adds no request
+of its own and tells the generator to ask something materially different rather
+than edit its failed draft. A one-pair A/B run is stochastic and not enough to
+claim a pass-rate improvement, but reading the output exposed the important
+difference:
 
-The focused repair response violated its replacement contract, so it was
-safely declined and top-up supplied another question. A paid regression eval
-also confirms that `ถ่ายอุจจาระ` versus `ขับถ่าย` is classified as an equivalent
-answer rather than silently accepted. This is intentionally fail-closed:
-hosted feedback can improve a draft, but cannot bypass the fresh source audit.
+| mode | drafts | gate-passing | subject questions by manual read | API calls | model wall |
+|---|---:|---:|---:|---:|---:|
+| no rejection memory | 4 | 4 | 2/4 | 13 | 20.073s |
+| rejection memory, before metadata ban | 7 | 4 | 4/4 | 21 | 30.911s |
+| rejection memory + metadata prompt/gate | 4 | 4 | **4/4** | 14 | **17.827s** |
+
+The no-memory run looked perfect to the automated gates, but two accepted
+questions asked about the teacher guide's learning objectives and assessment
+coverage instead of biology. Generation now explicitly excludes pedagogy and
+document metadata, and a deterministic pre-judge gate rejects known Thai and
+English teacher-guide phrases. The final four questions ask about digestive
+tract order, the stages of food processing, where chemical digestion starts,
+and why chewing helps digestion. All are source-grounded subject questions.
+
+The final call breakdown was three generation calls (the first correctly
+returned no questions for a metadata-only chunk), three calculator-tool calls,
+four blind-judge calls, and four source-judge calls: **14 DeepSeek HTTP requests
+total**. Summed request latency was 21.019s; parallel model wall time was
+17.827s. A paid regression eval also confirms that `ถ่ายอุจจาระ` versus
+`ขับถ่าย` is classified as an equivalent answer rather than silently accepted.
 
 The last row is not a clean measurement of the calculator tool. The judge was
 fixed in the same batch — its context window was too small, so long replies came
@@ -146,11 +157,13 @@ looks for real poppler installs before falling back to PATH.
 all works.** These sound like the same idea and are not, and the difference is
 the largest single improvement measured here.
 
-*Repair loop* — a gate rejects a question, we hand it back with the exact
+*Repair loop (removed)* — a gate rejects a question, we hand it back with the exact
 discrepancy and ask for a fix. Measured on both documents: **4 sent back, 0 came
 back clean, twice.** Recognising your own error is a harder task than making it,
-and a 4B model cannot do it even when told precisely what is wrong. Off by
-default, behind `--repair`, counters still reported.
+and a 4B model cannot do it even when told precisely what is wrong. DeepSeek
+later failed the same test by returning unchanged, duplicate, or synonym-swapped
+distractors. The code and `--repair` flag were deleted. Rejected patterns now
+ride on the next generation prompt, which costs no extra request.
 
 *Calculator tool* — before writing anything, the model calls `calc(expression)`
 and Go answers. It never has to compute. This is not the same request: it is

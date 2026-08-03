@@ -62,20 +62,3 @@ func TestRunGatesRejectsDistractorEquivalentToCorrectChoice(t *testing.T) {
 		t.Fatalf("persisted choice audit = %#v, want all four option verdicts", single.ChoiceVerdicts)
 	}
 }
-
-func TestGateReportAllowsOneSemanticRepair(t *testing.T) {
-	report := &GateReport{Results: []GateResult{{
-		Gate:   GateSingleValid,
-		Reason: "choice 3 is a distractor but audited as equivalent",
-		ChoiceVerdicts: []ChoiceVerdict{
-			{Index: 0, Status: ChoiceSupported},
-			{Index: 1, Status: ChoiceUnsupported},
-			{Index: 2, Status: ChoiceEquivalent},
-			{Index: 3, Status: ChoiceUnsupported},
-		},
-	}}}
-
-	if !report.Repairable() {
-		t.Fatal("semantic option audit should be repairable once")
-	}
-}

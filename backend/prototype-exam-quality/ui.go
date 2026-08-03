@@ -109,11 +109,7 @@ func renderQuestion(res *examgen.ExamResult, idx int) {
 	if q.Report != nil && !q.Report.Passed() {
 		verdict = red + "FAILED" + reset
 	}
-	tag := ""
-	if q.Attempt > 0 {
-		tag = cyan + "  [repaired]" + reset
-	}
-	header(fmt.Sprintf("question %d of %d — %s%s", idx+1, len(res.Questions), verdict, tag))
+	header(fmt.Sprintf("question %d of %d — %s", idx+1, len(res.Questions), verdict))
 
 	fmt.Printf("%s%s%s\n\n", bold, q.Stem, reset)
 	for i, c := range q.Choices {
@@ -160,11 +156,6 @@ func renderSummary(res *examgen.ExamResult) {
 	fmt.Printf("%spassed all gates%s %d\n", bold, reset, len(res.Passed))
 	fmt.Printf("%spass rate%s       %s%.0f%%%s\n", bold, reset, bold, res.PassRate()*100, reset)
 	fmt.Printf("%schunks visited%s  %d\n", bold, reset, res.ChunkVisits)
-	if res.RepairAttempts > 0 {
-		fmt.Printf("%srepair loop%s     %d sent back, %d came back clean\n",
-			bold, reset, res.RepairAttempts, res.RepairsAccepted)
-	}
-
 	if len(res.ToppedUpFrom) > 0 {
 		fmt.Printf("%stopped up from%s  %s\n", bold, reset, strings.Join(res.ToppedUpFrom, ", "))
 	}

@@ -15,10 +15,15 @@ import (
 type Generator interface {
 	Topics(ctx context.Context, c Chunk) ([]string, error)
 	Outline(ctx context.Context, graph EvidenceGraph) (*Outline, []LessonConcepts, error)
-	Questions(ctx context.Context, lesson Lesson, graph *EvidenceGraph, c Chunk, want int, forceCalc bool) ([]Question, error)
-	// Repair takes one rejected question back to the model with the exact
-	// objection. Returns ok=false when the model declined to salvage it.
-	Repair(ctx context.Context, q Question, c Chunk, failures []GateResult, forceCalc bool) (Question, bool, error)
+	Questions(ctx context.Context, lesson Lesson, graph *EvidenceGraph, c Chunk, feedback []RejectedDraft, want int, forceCalc bool) ([]Question, error)
+}
+
+// RejectedDraft is compact negative memory for later generation calls. It
+// describes what failed without asking the model to salvage the same question.
+type RejectedDraft struct {
+	Stem     string
+	Choices  []string
+	Failures []GateResult
 }
 
 // LessonConcepts is the graph membership returned by the reduce step. Stable
@@ -288,24 +293,11 @@ type ExamOptions struct {
 	// MaxChunkVisits caps total work so a lesson that cannot fill its budget
 	// stops instead of grinding through the whole book.
 	MaxChunkVisits int
-	// Repair sends questions with actionable deterministic or semantic feedback
-	// back to the generator once, then runs every gate again.
-	//
-	// Off by default, and that is a measurement, not a guess. On
-	// typhoon2.5-qwen3-4b it was tried on two documents: 4 questions sent back,
-	// 0 came back clean, on both. Telling a 4B model its own arithmetic
-	// disagrees with an independent evaluation does not get the arithmetic
-	// fixed — it costs a model call per rejected question and returns nothing.
-	// Hosted providers enable this automatically; local Ollama keeps it opt-in.
-	Repair bool
-	// MaxRepairs bounds feedback convergence for one draft. Values <= 0 mean
-	// one attempt when Repair is enabled.
-	MaxRepairs int
 }
 
 // DefaultExamOptions is sized so a run finishes in minutes, not hours.
 func DefaultExamOptions() ExamOptions {
-	return ExamOptions{PerChunk: 2, MaxChunkVisits: 24, Repair: false}
+	return ExamOptions{PerChunk: 2, MaxChunkVisits: 24}
 }
 
 // ExamResult is everything one generation run produced, kept whole. Questions
@@ -317,10 +309,6 @@ type ExamResult struct {
 	Questions   []Question
 	Passed      []Question
 	ChunkVisits int
-	// RepairAttempts and RepairsAccepted measure whether the retry loop earns
-	// its cost. If accepted stays near zero, drop the loop.
-	RepairAttempts  int
-	RepairsAccepted int
 	// ToppedUpFrom names lessons other than this one that were drawn on.
 	ToppedUpFrom []string
 	// Ceiling is true when the run stopped short of Budget because the material
@@ -344,11 +332,6 @@ func GenerateExam(ctx context.Context, outline *Outline, lesson Lesson, chunks [
 	if budget <= 0 {
 		budget = 5
 	}
-	maxRepairs := opt.MaxRepairs
-	if maxRepairs <= 0 {
-		maxRepairs = 1
-	}
-
 	byID := ChunkByID(chunks)
 	res := &ExamResult{Lesson: lesson, Budget: budget}
 
@@ -380,6 +363,7 @@ func GenerateExam(ctx context.Context, outline *Outline, lesson Lesson, chunks [
 	// acceptedVecs runs in lockstep with res.Passed so the duplicate check can
 	// compare against everything already in the exam.
 	var acceptedVecs [][]float32
+	var feedback []RejectedDraft
 
 	for _, c := range pool {
 		if len(res.Passed) >= budget || res.ChunkVisits >= opt.MaxChunkVisits {
@@ -391,9 +375,13 @@ func GenerateExam(ctx context.Context, outline *Outline, lesson Lesson, chunks [
 			want = opt.PerChunk
 		}
 
-		d.Log.report("generate", len(res.Passed), budget, fmt.Sprintf("page %d", c.Page))
+		note := fmt.Sprintf("page %d", c.Page)
+		if len(feedback) > 0 {
+			note += fmt.Sprintf(" · avoiding %d rejected pattern(s)", len(feedback))
+		}
+		d.Log.report("generate", len(res.Passed), budget, note)
 
-		qs, err := d.Gen.Questions(ctx, lesson, outline.EvidenceGraph, c, want, opt.ForceCalc)
+		qs, err := d.Gen.Questions(ctx, lesson, outline.EvidenceGraph, c, feedback, want, opt.ForceCalc)
 		if err != nil {
 			return nil, fmt.Errorf("generate from chunk %s: %w", c.ID, err)
 		}
@@ -439,43 +427,36 @@ func GenerateExam(ctx context.Context, outline *Outline, lesson Lesson, chunks [
 			res.Questions = append(res.Questions, q)
 			keep(res, q, c, lesson, lessonName, toppedUp, vec, &acceptedVecs)
 			d.Log.report("gate", len(res.Passed), budget, gateNote(rep))
-
-			// A question with concrete gate feedback gets one correction chance.
-			// The retry sees deterministic discrepancies plus the sourced
-			// judge's per-choice semantic labels; it is then audited from scratch.
-			current, currentReport := q, rep
-			for attempt := 0; opt.Repair && attempt < maxRepairs && !currentReport.Passed() && currentReport.Repairable(); attempt++ {
-				res.RepairAttempts++
-				fixed, ok, err := d.Gen.Repair(ctx, current, c, currentReport.Failures(), opt.ForceCalc)
-				if err != nil {
-					return nil, fmt.Errorf("repair from chunk %s: %w", c.ID, err)
-				}
-				if !ok {
-					d.Log.report("repair", len(res.Passed), budget, "model declined")
-					break
-				}
-				fixed.ChunkID = c.ID
-				fixed.Attempt = current.Attempt + 1
-				frep := RunCheapGates(fixed, c, d.Eval)
-				fvec := stemVector(ctx, fixed, d)
-				frep.add(gateDistinct(fixed, res.Passed, fvec, acceptedVecs))
-				if err := AddJudgeGates(ctx, frep, fixed, c, d.Judge); err != nil {
-					return nil, err
-				}
-				fixed.Report = frep
-				res.Questions = append(res.Questions, fixed)
-				if frep.Passed() {
-					res.RepairsAccepted++
-				}
-				keep(res, fixed, c, lesson, lessonName, toppedUp, fvec, &acceptedVecs)
-				d.Log.report("repair", len(res.Passed), budget, gateNote(frep))
-				current, currentReport = fixed, frep
+			if !rep.Passed() {
+				feedback = appendRejectedDraft(feedback, q, rep)
 			}
 		}
 	}
 
 	res.Ceiling = len(res.Passed) < budget
 	return res, nil
+}
+
+const maxRejectedDrafts = 4
+
+func appendRejectedDraft(memory []RejectedDraft, q Question, report *GateReport) []RejectedDraft {
+	choices := make([]string, len(q.Choices))
+	for i, choice := range q.Choices {
+		choices[i] = excerpt(choice.Content, 179)
+	}
+	failures := report.Failures()
+	for i := range failures {
+		failures[i].Reason = excerpt(failures[i].Reason, 239)
+		failures[i].ChoiceVerdicts = append([]ChoiceVerdict(nil), failures[i].ChoiceVerdicts...)
+		for j := range failures[i].ChoiceVerdicts {
+			failures[i].ChoiceVerdicts[j].Reason = excerpt(failures[i].ChoiceVerdicts[j].Reason, 159)
+		}
+	}
+	memory = append(memory, RejectedDraft{Stem: excerpt(q.Stem, 239), Choices: choices, Failures: failures})
+	if len(memory) > maxRejectedDrafts {
+		memory = append([]RejectedDraft(nil), memory[len(memory)-maxRejectedDrafts:]...)
+	}
+	return memory
 }
 
 // stemVector embeds a question stem for the duplicate check. Returns nil when

@@ -128,9 +128,6 @@ type Question struct {
 	// Filled in by us, not by the model.
 	ChunkID string      `json:"-"`
 	Report  *GateReport `json:"-"`
-	// Attempt is 0 for a first draft and 1 for one that came back through the
-	// repair loop after a deterministic gate rejected it.
-	Attempt int `json:"-"`
 }
 
 // CorrectIndex returns the index of the single correct choice, or -1 if the
@@ -185,23 +182,6 @@ type GateReport struct {
 func (r *GateReport) Passed() bool {
 	for _, res := range r.Results {
 		if !res.Pass {
-			return false
-		}
-	}
-	return true
-}
-
-// Repairable reports whether every failure has concrete feedback that the
-// generator can act on in one bounded retry. Besides deterministic failures,
-// the blind judge can identify missing context and the sourced judge can name
-// ambiguous, equivalent, or unsupported choices.
-func (r *GateReport) Repairable() bool {
-	fails := r.Failures()
-	if len(fails) == 0 {
-		return false
-	}
-	for _, f := range fails {
-		if !f.Deterministic && f.Gate != GateBlindAnswer && f.Gate != GateSingleValid {
 			return false
 		}
 	}

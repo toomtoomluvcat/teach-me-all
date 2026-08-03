@@ -231,6 +231,14 @@ Hard requirements for every question:
   least one item with a clearly different, source-contradicted process or
   entity. Do not swap an item for a near-synonym. If the passage cannot support
   three unambiguous false sets, do not write that question.
+- When the user message includes rejected draft memory, treat it as a negative
+  constraint. Do not repair, paraphrase, or lightly vary those drafts. Ask a
+  materially different question and avoid every failure pattern listed there.
+- Ask only about subject matter. Never ask about learning objectives,
+  assessment guidelines or criteria, classroom/teaching activities, videos,
+  tests, pedagogy, or chapter numbering. Those are document metadata, even when
+  the passage explicitly states them. If a passage contains only teacher
+  guidance, return no questions.
 - All four choices are the same kind of thing and roughly the same length. Do
   not make the correct answer the longest or the most detailed.
 - "All of the above", "none of the above", and "both A and B" are forbidden.
@@ -260,7 +268,7 @@ Return exactly this JSON shape. Do not use a field named "question" instead of
 func QuestionSystem() string { return questionSystem }
 
 // QuestionPrompt builds the generation message.
-func QuestionPrompt(lesson Lesson, graph *EvidenceGraph, c Chunk, want int, forceCalc bool) string {
+func QuestionPrompt(lesson Lesson, graph *EvidenceGraph, c Chunk, feedback []RejectedDraft, want int, forceCalc bool) string {
 	s := fmt.Sprintf("Lesson: %s\n\n", lesson.Title)
 	if graph != nil {
 		var focus []string
@@ -274,6 +282,9 @@ func QuestionPrompt(lesson Lesson, graph *EvidenceGraph, c Chunk, want int, forc
 		}
 	}
 	s += fmt.Sprintf("Passage (page %d):\n\n%s\n\n", c.Page, c.Text)
+	if len(feedback) > 0 {
+		s += rejectionMemoryBlock(feedback)
+	}
 	s += fmt.Sprintf("Write up to %d question(s) from this passage. ", want)
 	s += "If the passage only supports fewer, write fewer. "
 	if forceCalc {
@@ -285,154 +296,25 @@ func QuestionPrompt(lesson Lesson, graph *EvidenceGraph, c Chunk, want int, forc
 	return s
 }
 
-// --- repair -----------------------------------------------------------------
-
-const repairSystem = `A question you wrote failed an automatic check. Fix it.
-
-The feedback may come from deterministic checks or from two independent
-reviewers: one checks whether the stem is understandable without hidden
-context, and one audits every choice against the source passage. Treat every
-listed failure and per-choice status as a concrete defect to fix.
-
-Rules for the fix:
-- Keep the question if it is salvageable. Change only what the check objected
-  to. Do not write a different question because it is easier.
-- On any single_defensible failure, rewrite all three distractors. Make each
-  one contradict a different source fact in a way a student can explain. Do
-  not preserve a distractor merely because an earlier audit called it
-  unsupported: the complete option set must survive a fresh audit.
-- A synonym, paraphrase, broader wording, or narrower wording of the correct
-  answer is not a valid distractor.
-- If the blind reviewer found missing context, make the stem self-contained
-  without revealing the answer.
-- Do not merely move the correct-answer marker to silence a reviewer. Preserve
-  the source-supported answer and repair the defective wording or distractor.
-- If the arithmetic disagrees, work out which is actually wrong — the
-  expression or the answer. Both are your own; one of them does not match the
-  passage. Rewrite whichever is wrong and make the correct choice contain the
-  value the expression really produces.
-- If the quote was not found in the passage, copy a different sentence
-  character for character from the passage below. Do not retype it from memory.
-  Do not paraphrase. Do not fix its spelling or spacing.
-- If nothing in the passage supports the question, return {"questions":[]}
-  rather than inventing support.
-
-Return the whole question, not a patch. Use exactly this JSON shape; choices
-must be objects using content and is_correct, never strings or an options field:
-{"questions":[{"kind":"mcq_single","stem":"...","choices":[{"content":"...","is_correct":true},{"content":"...","is_correct":false},{"content":"...","is_correct":false},{"content":"...","is_correct":false}],"explanation":"...","source_quote":"...","difficulty":"easy","skill":"recall"}]}`
-
-func RepairSystem() string { return repairSystem }
-
-// RepairPrompt hands the model its own question back with the exact objection.
-func RepairPrompt(q Question, c Chunk, failures []GateResult) string {
+func rejectionMemoryBlock(feedback []RejectedDraft) string {
 	var b strings.Builder
-
-	b.WriteString("Passage (page ")
-	fmt.Fprintf(&b, "%d):\n\n%s\n\n", c.Page, c.Text)
-
-	b.WriteString("Your question:\n")
-	fmt.Fprintf(&b, "  stem: %s\n", q.Stem)
-	for i, ch := range q.Choices {
-		mark := " "
-		if ch.IsCorrect {
-			mark = "*"
+	b.WriteString("Rejected draft memory (negative constraints; do not repair or repeat these):\n")
+	for i, draft := range feedback {
+		fmt.Fprintf(&b, "%d. rejected stem: %s\n", i+1, draft.Stem)
+		if len(draft.Choices) > 0 {
+			fmt.Fprintf(&b, "   rejected choices: %s\n", strings.Join(draft.Choices, " | "))
 		}
-		fmt.Fprintf(&b, "  %s %d. %s\n", mark, i, ch.Content)
-	}
-	fmt.Fprintf(&b, "  source_quote: %q\n", q.SourceQuote)
-	if q.Calculation != nil {
-		fmt.Fprintf(&b, "  calculation: %s  (you said this equals %g)\n",
-			q.Calculation.Expression, q.Calculation.Expected)
-	}
-
-	b.WriteString("\nWhat failed:\n")
-	semanticRepair := false
-	for _, f := range failures {
-		fmt.Fprintf(&b, "  - %s: %s\n", f.Gate, f.Reason)
-		if f.Gate == GateBlindAnswer || (f.Gate == GateSingleValid && len(f.ChoiceVerdicts) == len(q.Choices)) {
-			semanticRepair = true
-		}
-		for _, verdict := range f.ChoiceVerdicts {
-			fmt.Fprintf(&b, "      choice %d: %s — %s\n", verdict.Index+1, verdict.Status, verdict.Reason)
-		}
-	}
-	if semanticRepair {
-		b.WriteString("\nThis failure is repairable. Return exactly one repaired question; do not return an empty questions list.\n")
-		correct := q.CorrectIndex()
-		for _, f := range failures {
-			for _, verdict := range f.ChoiceVerdicts {
-				if verdict.Index == correct || verdict.Index < 0 || verdict.Index >= len(q.Choices) || verdict.Status == ChoiceUnsupported {
+		for _, failure := range draft.Failures {
+			fmt.Fprintf(&b, "   failed %s: %s\n", failure.Gate, failure.Reason)
+			for _, verdict := range failure.ChoiceVerdicts {
+				if verdict.Status == ChoiceUnsupported {
 					continue
 				}
-				fmt.Fprintf(&b, "MANDATORY REPLACEMENT choice %d: do not return %q; write materially different text that is false from the passage.\n",
-					verdict.Index+1, q.Choices[verdict.Index].Content)
+				fmt.Fprintf(&b, "     choice %d was %s: %s\n", verdict.Index+1, verdict.Status, verdict.Reason)
 			}
 		}
 	}
-
-	return b.String()
-}
-
-// DistractorRepairSchema is deliberately smaller than QuestionSchema. A
-// semantic option failure does not authorize the model to rewrite the stem,
-// evidence, explanation, or correct answer.
-func DistractorRepairSchema(numChoices int) map[string]any {
-	return obj(map[string]any{
-		"replacements": map[string]any{
-			"type":     "array",
-			"minItems": numChoices - 1,
-			"maxItems": numChoices - 1,
-			"items": obj(map[string]any{
-				"index":   map[string]any{"type": "integer", "minimum": 0, "maximum": numChoices - 1},
-				"content": str("a materially new distractor that is clearly false from the passage"),
-			}, "index", "content"),
-		},
-	}, "replacements")
-}
-
-const distractorRepairSystem = `You repair only the distractors of a multiple-choice question.
-
-The correct answer, stem, quote, and explanation are locked. Return one new
-distractor for every non-correct index. Every replacement must:
-- be materially different from its forbidden previous text;
-- contradict a different fact, relation, or ordering in the passage;
-- not be a synonym, paraphrase, broader/narrower restatement, or reasonable
-  ordinary-language equivalent of the correct answer;
-- remain plausible enough to test understanding rather than look nonsensical.
-
-Do not replace one listed item with a synonym or a closely related sub-action.
-For a set-membership question, replace an item with a clearly different
-source-contradicted category. For a sequence question whose stem explicitly
-asks for order, prefer swapping two named stages. If the stem does not ask for
-order, reordering the same items is still equivalent and is forbidden.
-
-Use zero-based indices and exactly this JSON shape:
-{"replacements":[{"index":1,"content":"..."}]}`
-
-func DistractorRepairSystem() string { return distractorRepairSystem }
-
-func DistractorRepairPrompt(q Question, c Chunk, verdicts []ChoiceVerdict) string {
-	var b strings.Builder
-	fmt.Fprintf(&b, "Passage (page %d):\n\n%s\n\n", c.Page, c.Text)
-	fmt.Fprintf(&b, "Stem (locked): %s\n", q.Stem)
-	correct := q.CorrectIndex()
-	if correct >= 0 {
-		fmt.Fprintf(&b, "Correct answer (preserve exactly): %s\n", q.Choices[correct].Content)
-	}
-	byIndex := make(map[int]ChoiceVerdict, len(verdicts))
-	for _, verdict := range verdicts {
-		byIndex[verdict.Index] = verdict
-	}
-	var indices []string
-	for i, choice := range q.Choices {
-		if i == correct {
-			continue
-		}
-		indices = append(indices, fmt.Sprintf("%d", i))
-		verdict := byIndex[i]
-		fmt.Fprintf(&b, "FORBIDDEN %d: %q (audit: %s — %s)\n", i, choice.Content, verdict.Status, verdict.Reason)
-	}
-	fmt.Fprintf(&b, "\nReturn replacements for indices %s. Do not return any other question fields.\n", strings.Join(indices, ", "))
+	b.WriteString("Write a materially different question that avoids all patterns above.\n\n")
 	return b.String()
 }
 
