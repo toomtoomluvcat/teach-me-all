@@ -30,7 +30,9 @@ func main(){
 
 	h := handler.New(sqlDB)
 
-	app := fiber.New()
+	app := fiber.New(fiber.Config{
+		BodyLimit: 50*1024*1024,
+	})
 	routes.Setup(app,h)
 
 	log.Fatal(app.Listen(":8080"))	

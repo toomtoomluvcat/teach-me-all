@@ -7,7 +7,7 @@ import (
 func CorsConfig() cors.Config {
 	return cors.Config{
 		AllowOrigins:[] string{
-			"http://localhost:3000",
+			"*",
 		},
 		AllowHeaders: []string{
 			"Origin"," Content-Type","Accept","Authorization",

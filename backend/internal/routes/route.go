@@ -20,6 +20,7 @@ func Setup(app *fiber.App,h *handler.Handlers){
 	user.Get("/:id/courses",h.Course.GetCoursesByUserID)
 
 	course := api.Group("/courses")
+	course.Post("/files",h.Course.CreateCourseByPDF)
 	course.Get("/:id",h.Course.GetCourseByID)
 
 	exam := api.Group("/exams")

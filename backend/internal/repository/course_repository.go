@@ -23,6 +23,9 @@ func NewCourseRepository(db *gorm.DB) CourseRepository {
 	return &courseRepository{db: db}
 }
 
+func (r *courseRepository) CreateCourseByPDF(ctx context.Context,){
+	
+}
 
 func (r *courseRepository) GetCoursesByUserID(ctx context.Context,id string) ([]dto.CourseResponse,error){
 	var courses []models.Course
