@@ -402,7 +402,17 @@ even if they would need to have studied the material to know the answer. Needing
 knowledge is fine. Needing context you were not given is not.
 
 Then, separately, guess which choice is correct and say how confident you are.
-A high-confidence guess with no source material is worth knowing about.`
+A high-confidence guess with no source material is worth knowing about.
+
+Both guess fields are required on every reply, including replies where the
+question is not interpretable. guess_confidence must be exactly one of "low",
+"medium" or "high" — never empty, never any other word. Answer it about
+yourself: "high" means you are sure of the answer from what you already know,
+without the material. Do not be modest; an accurate "high" here is more useful
+than a cautious "medium".
+
+Return exactly this JSON shape, with no other top-level keys:
+{"interpretable":true,"reason":"...","guessed_index":0,"guess_confidence":"high"}`
 
 func BlindSystem() string { return blindSystem }
 

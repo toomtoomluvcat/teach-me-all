@@ -61,6 +61,17 @@ func TestGateNeedsSourceFailsOnlyAConfidentCorrectBlindGuess(t *testing.T) {
 		})
 	}
 
+	// An absent confidence must be visible, not a quiet pass. The first run with
+	// this gate reported "the passage is needed" 17 times while deciding nothing,
+	// because the provider omitted the field.
+	blank := gateNeedsSource(q, BlindVerdict{GuessedIndex: 1, GuessConfidence: ""})
+	if !blank.Pass {
+		t.Fatalf("a missing confidence failed the question: %s", blank.Reason)
+	}
+	if !strings.Contains(blank.Reason, "NOT JUDGED") {
+		t.Fatalf("a missing confidence was reported as a real verdict: %s", blank.Reason)
+	}
+
 	// A question with no single correct choice is already rejected by
 	// gateWellFormed. Failing it twice for one defect makes the reported reason
 	// harder to read, not more accurate.

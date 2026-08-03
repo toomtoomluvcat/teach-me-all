@@ -279,6 +279,17 @@ func gateNeedsSource(q Question, v BlindVerdict) GateResult {
 		return res
 	}
 
+	// A missing confidence makes this gate inert, and an inert gate that reports
+	// "pass" is worse than no gate: the first run with this check shipped 15
+	// questions and every needs_the_source line said the passage was needed,
+	// because DeepSeek omitted the field entirely and "" is not "high". Say so
+	// where it will be read.
+	if strings.TrimSpace(v.GuessConfidence) == "" {
+		res.Pass = true
+		res.Reason = "NOT JUDGED — the blind judge returned no confidence, so this gate decided nothing"
+		return res
+	}
+
 	if v.GuessedIndex == correct && strings.EqualFold(v.GuessConfidence, "high") {
 		res.Reason = "answerable without the passage: the judge picked it correctly, with high confidence, having seen no source"
 		return res
