@@ -21,10 +21,28 @@ type Chunk struct {
 	StartOff int
 	EndOff   int
 	Text     string
+	// SourceRole is a deterministic document-structure hint. It is used only
+	// to keep intentional pre-learning check statements from becoming evidence.
+	SourceRole SourceRole
+
+	// GenerationDirective is an optional internal benchmark instruction. It is
+	// not source evidence and is never persisted in the extraction cache.
+	GenerationDirective string `json:"-"`
 
 	// LessonID is filled in by pass 1 once the outline exists.
 	LessonID string
 }
+
+// SourceRole identifies a small number of source sections that must not be
+// treated as factual evidence. An empty value means unknown and remains
+// backwards-compatible with callers that construct Chunk values directly.
+type SourceRole string
+
+const (
+	SourceRoleUnknown          SourceRole = ""
+	SourceRoleCore             SourceRole = "core"
+	SourceRolePrelearningCheck SourceRole = "prelearning_check"
+)
 
 // TopicKind is what the map step says a passage is.
 //
@@ -255,6 +273,7 @@ type GateName string
 
 const (
 	GateWellFormed     GateName = "well_formed"
+	GateSourceRole     GateName = "source_role"
 	GateQuote          GateName = "quote_verbatim"
 	GateBlindAnswer    GateName = "answerable_blind"
 	GateSourceSpecific GateName = "source_specific"

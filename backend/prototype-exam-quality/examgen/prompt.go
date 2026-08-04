@@ -57,17 +57,18 @@ func TopicSchema() map[string]any {
 	}, "kind", "topics")
 }
 
-const topicSystem = `You are indexing a textbook so it can be split into lessons.
+const topicSystem = `You are indexing an educational source so it can be split into lessons.
 
-Read the passage, say what it is, and name the topics it covers. Rules:
+The source may be a student textbook, reference work, teacher guide, lab manual,
+or mixed document in any subject. Do not assume what kind of source or subject
+this is from prior tasks. Read the passage, say what it is, and name the topics
+it covers. Rules:
 - Name only topics the passage actually covers. Do not infer topics from a
   heading that has no material under it.
 - Write the titles in the same language as the passage.
 - A title is a noun phrase, not a sentence, and not a question.
 
-Then set kind — one judgement about the whole passage, not about each topic.
-Many textbooks are teacher's editions, so a passage can be well-written prose
-and still teach the learner nothing:
+Then set kind — one judgement about the whole passage, not about each topic:
 
 - "content" — subject matter a learner is meant to understand. Facts,
   mechanisms, definitions, worked examples, experimental results, and the
@@ -81,20 +82,15 @@ and still teach the learner nothing:
 - "non_content" — page furniture: covers, front matter, tables of contents,
   running headers, indexes.
 
-Judge what the passage IS, not what it is about. A page of answers to chapter
-exercises is apparatus even though every answer is about the subject. A
-laboratory activity that explains what happens and why is content even though a
-teacher runs it.
-
-Most of this book is a teacher's edition, so subject matter usually arrives
-wrapped in instructions to the teacher: "the teacher should explain that...",
-"have the students search for...", "ครูควรชี้แจงว่า...", "ครูให้นักเรียนอธิบาย...".
-That wrapper is not what the passage is. If the passage explains the subject
-anywhere inside it — states a mechanism, names a structure and its function,
-gives data or a reason — it is content, no matter who is being addressed. Mark
-apparatus only when the passage would still say nothing about the subject after
-you removed the instructions: a bare list of answers, a scoring table, a
-checklist of objectives, a schedule.
+Judge what the passage IS, not what it is about. A page of answers to exercises
+is apparatus even though every answer is about the subject. A laboratory or
+worked example that explains what happens and why is content even if a teacher
+would normally facilitate it. If the passage explains the subject anywhere
+inside it — states a mechanism, names an entity and its function, gives data or
+a reason, or demonstrates a method — it is content. Mark apparatus only when
+the passage would still say nothing about the subject after removing the
+instructions: a bare answer key, scoring table, checklist of objectives,
+schedule, or teacher-only procedure.
 
 When you cannot decide, choose content.`
 
@@ -214,7 +210,7 @@ func OutlinePrompt(graph EvidenceGraph) string {
 // than by asking nicely in the prompt.
 func QuestionSchema(forceCalc bool) map[string]any {
 	calc := obj(map[string]any{
-		"expression": str("the arithmetic to solve this question, as a plain expression using only numbers, + - * / ( ) and decimal points. No variables, no functions, no units. Example: (1200*0.07)/12"),
+		"expression": str("the arithmetic to solve this question, as a plain expression using numbers, + - * / ^, parentheses, decimal points, pi, and only these functions: sin, cos, tan, sqrt, abs, exp, ln. No variables or units. Trigonometric arguments are in radians. Example: (1200*0.07)/12 or 20*sin(30*pi/180)"),
 		"expected":   map[string]any{"type": "number", "description": "the value that expression produces"},
 	}, "expression", "expected")
 
@@ -222,9 +218,9 @@ func QuestionSchema(forceCalc bool) map[string]any {
 		"kind":         enum("question shape", string(KindMCQSingle)),
 		"stem":         str("the question itself, understandable on its own without seeing the passage"),
 		"explanation":  str("why the correct choice is correct, in the source language"),
-		"source_quote": str("a sentence copied CHARACTER FOR CHARACTER from the passage that makes the correct answer true. Must appear in the passage exactly."),
-		"difficulty":   enum("how hard this is for someone who has read the passage once", "easy", "medium", "hard"),
-		"skill":        enum("what the question tests", "recall", "understanding", "application", "calculation"),
+		"source_quote": str("an exact contiguous substring copied CHARACTER FOR CHARACTER from the passage that makes the correct answer true; prefer a complete sentence, but a shorter exact span is allowed. Must appear exactly."),
+		"difficulty":   enum("honest reasoning load: easy=one direct inference or operation, medium=one relationship with a meaningful distinction, hard=two linked inferences or competing constraints", "easy", "medium", "hard"),
+		"skill":        enum("honest reasoning mode: recall=fact, understanding=interpretation, application=new situation using a source relationship, calculation=numerical computation", "recall", "understanding", "application", "calculation"),
 		"choices": map[string]any{
 			"type":     "array",
 			"minItems": 4,
@@ -251,64 +247,75 @@ func QuestionSchema(forceCalc bool) map[string]any {
 	}, "questions")
 }
 
-const questionSystem = `You write multiple-choice exam questions from a passage of a textbook.
+const questionSystem = `You are a domain-agnostic assessment writer. The source may
+teach any subject: science, mathematics, medicine, engineering, history,
+language, economics, or something else. Infer the domain, entities, notation,
+units, and relationships from the supplied passage. Never apply a biology-only
+template or import facts, vocabulary, or question patterns from a different
+subject.
 
-The single most important rule: a student must be able to read your question,
-understand exactly what is being asked, and answer it — without the passage in
-front of them and without guessing what you meant.
+The passage is the only evidence. A good question is self-contained for the
+student, but its answer must depend on a specific fact, relationship, sequence,
+condition, number, named entity, or example actually present in this passage.
+Do not reward yourself for merely asking a question that a knowledgeable model
+could answer from general subject knowledge.
+
+Choose honest labels:
+- recall: retrieve one source fact, name, value, or definition.
+- understanding: interpret, explain, classify, compare, or predict from a
+  relationship stated in the source.
+- application: apply a source relationship to a genuinely new situation or
+  changed values. It must require the student to predict, choose, compare, or
+  calculate an outcome in that situation. A stem that only asks for a name,
+  definition, force, component, label, or unchanged property is recall or
+  understanding, not application. A stem that only asks "what is", "which is",
+  or repeats a source example is not application unless the student must use the
+  relationship to decide something new.
+- calculation: compute a numerical result. Use this only when the arithmetic is
+  necessary to answer.
+- easy: one direct inference or operation; medium: one relationship plus a
+  meaningful distinction; hard: at least two linked inferences, constraints,
+  or transformations. For easy application, change a condition or value from
+  the source and ask for an outcome, not a named fact. For hard application,
+  use at least two given inputs or conditions and make the student carry out at
+  least two linked transformations or decisions. If one sentence of the source
+  or one unchanged relationship answers it, it is not hard.
 
 Hard requirements for every question:
-- The stem stands alone. Never write "according to the passage", "in the text
-  above", "this value", "the diagram", or anything that points at material the
-  student cannot see. Name the thing you are asking about.
-- Exactly one choice is correct. The other three must be wrong for a reason a
-  student could articulate — not wrong because they are nonsense.
-- A distractor must not be a synonym, paraphrase, ordinary-language restatement,
-  or merely broader/narrower wording of the correct answer. If two choices could
-  mean the same thing under a reasonable interpretation, rewrite one of them.
-- If the stem asks which items comprise a set, each distractor must replace at
-  least one item with a clearly different, source-contradicted process or
-  entity. Do not swap an item for a near-synonym. If the passage cannot support
-  three unambiguous false sets, do not write that question.
-- When the user message includes rejected draft memory, treat it as a negative
-  constraint. Do not repair, paraphrase, or lightly vary those drafts. Ask a
-  materially different question and avoid every failure pattern listed there.
-- The answer must depend on something this passage actually says. Anchor it to
-  a number, a named structure, an order of steps, a condition, or a stated
-  cause-and-effect that appears in the passage. A student who knows the subject
-  in general, but has not read this passage, should not be able to answer
-  reliably. Before writing a question, ask yourself whether a good student could
-  answer it from general knowledge alone; if so, do not write it — find a
-  specific the passage supplies and ask about that instead.
-- Ask only about subject matter. Never ask about learning objectives,
-  assessment guidelines or criteria, classroom/teaching activities, videos,
-  tests, pedagogy, or chapter numbering. Those are document metadata, even when
-  the passage explicitly states them. If a passage contains only teacher
-  guidance, return no questions.
-- All four choices are the same kind of thing and roughly the same length. Do
-  not make the correct answer the longest or the most detailed.
-- "All of the above", "none of the above", and "both A and B" are forbidden.
-- source_quote is copied character for character from the passage. Do not
-  paraphrase it, do not fix its punctuation, do not translate it. If nothing in
-  the passage supports your question, do not write the question.
+- The stem stands alone. Never point at invisible material with phrases such as
+  "according to the passage", "the text above", "this value", or "the diagram".
+- Exactly one choice is correct. The other three must be plausible and wrong for
+  a reason a student could articulate. Keep choices parallel in type and length.
+- Do not use all/none of the above, both A and B, synonyms of the answer, or
+  choices that merely restate the stem with one word or number changed.
+- Ask about subject matter only. Exclude learning objectives, assessment rules,
+  teacher instructions, classroom activities, videos, tests, and chapter
+  numbering. If the passage has no teachable subject matter, return no questions.
+- When rejected draft memory is supplied, avoid every listed failure pattern and
+  ask a materially different question; do not lightly repair a rejected draft.
+- Within one response, vary the source relationship and answer target. Do not
+  ask the same scenario or principle twice with different numbers or wording.
+- source_quote is an exact contiguous substring copied character for character
+  from this passage. Do not paraphrase, translate, or repair punctuation. Use
+  core explanatory text, not answer keys or pre-learning checks.
 - Write in the same language as the passage.
 
+For application questions, include enough scenario facts for the student to use
+the source relationship, and make the explanation show the reasoning in order.
+For hard application, the explanation must expose at least two linked steps.
+
 For calculation questions:
-- Do not do the arithmetic yourself. Put the arithmetic in
-  calculation.expression as a plain expression and put the result you believe
-  it produces in calculation.expected. The expression will be evaluated
-  independently and your question is discarded if it disagrees.
-- calculation.expected must be a bare JSON number — not a quoted string and
-  not a number with a unit.
-- The correct choice must contain that computed number.
-- Every number in the expression must come from the passage or from the stem.
-  Do not invent inputs.
+	- Put the arithmetic in calculation.expression using numbers, + - * / ^,
+	  parentheses, decimal points, pi, and only these functions: sin, cos, tan,
+	  sqrt, abs, exp, ln. Trigonometric arguments are in radians. No variables,
+	  units, or other functions. The expression is checked independently.
+- calculation.expected is a bare JSON number, not a string and not a unit.
+- The correct choice contains the computed number and unit when a unit exists.
+- Every input number comes from the passage or the stem; never invent hidden
+  constants, conversions, or assumptions.
 
-Write fewer, better questions. A passage that supports two good questions gets
-two questions, not six padded ones.
-
-Return exactly this JSON shape. Do not use a field named "question" instead of
-"stem", do not use "correct_index", and do not make choices plain strings:
+Write fewer, better questions. If the passage supports fewer good questions,
+return fewer. Return exactly this JSON shape:
 {"questions":[{"kind":"mcq_single","stem":"...","choices":[{"content":"...","is_correct":true},{"content":"...","is_correct":false},{"content":"...","is_correct":false},{"content":"...","is_correct":false}],"explanation":"...","source_quote":"...","difficulty":"easy","skill":"recall"}]}`
 
 func QuestionSystem() string { return questionSystem }
@@ -316,6 +323,7 @@ func QuestionSystem() string { return questionSystem }
 // QuestionPrompt builds the generation message.
 func QuestionPrompt(lesson Lesson, graph *EvidenceGraph, c Chunk, feedback []RejectedDraft, want int, forceCalc bool) string {
 	s := fmt.Sprintf("Lesson: %s\n\n", lesson.Title)
+	s += "The subject and domain are inferred from this passage. Use no preselected subject template.\n\n"
 	if graph != nil {
 		var focus []string
 		for _, concept := range graph.Concepts {
@@ -326,6 +334,9 @@ func QuestionPrompt(lesson Lesson, graph *EvidenceGraph, c Chunk, feedback []Rej
 		if len(focus) > 0 {
 			s += "Concepts evidenced by this passage:\n" + strings.Join(focus, "\n") + "\n\n"
 		}
+	}
+	if directive := strings.TrimSpace(c.GenerationDirective); directive != "" {
+		s += "Target for this generation call (follow exactly if the passage supports it): " + directive + "\n\n"
 	}
 	s += fmt.Sprintf("Passage (page %d):\n\n%s\n\n", c.Page, c.Text)
 	if len(feedback) > 0 {

@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"regexp"
+	"strconv"
 	"strings"
 )
 
@@ -67,8 +69,8 @@ type ChoiceVerdict struct {
 	Reason string       `json:"reason"`
 }
 
-// Judge is the model-backed half of the source-dependency gate. The pipeline
-// never lets it see the generator's reasoning.
+// Judge is retained for optional/advisory source evaluation. The production
+// QC path below is deliberately deterministic and does not call it.
 type Judge interface {
 	JudgeAgainstSource(ctx context.Context, q Question, source string) (SourcedVerdict, error)
 }
@@ -78,9 +80,9 @@ type Evaluator interface {
 	Eval(expr string) (float64, error)
 }
 
-// minQuoteRunes stops a model from satisfying gate 1 with a quote so short it
-// matches by accident. Anything shorter is not evidence of grounding.
-const minQuoteRunes = 25
+// minQuoteRunes stops a model from satisfying the QC with a one-word quote,
+// while allowing short exact named facts such as "ไฮดรา พลานาเรีย".
+const minQuoteRunes = 12
 
 // minNumericQuoteRunes is the floor for a quote carrying numbers. A worked
 // calculation cites itself in very few characters — "1200 * 0.07 = 84 baht" is
@@ -107,10 +109,11 @@ func quoteFloor(quote string) int {
 // quantities get rounded by the model in the choice text.
 const arithmeticTolerance = 1e-6
 
-// RunGates applies the cheap checks plus the source-dependency check to one
-// question and returns the report.
-// It never returns an error for a failing question — failure is data. It
-// returns an error only when the judge itself is unreachable.
+// RunGates applies the deterministic QC checks to one question and returns the
+// report. The Judge parameter remains for source compatibility with callers
+// that may run the advisory source evaluation separately.
+// It never returns an error for a failing question — failure is data. The QC
+// path itself has no network dependency.
 func RunGates(ctx context.Context, q Question, chunk Chunk, j Judge, ev Evaluator) (*GateReport, error) {
 	rep := RunCheapGates(q, chunk, ev)
 	if err := AddJudgeGates(ctx, rep, q, chunk, j); err != nil {
@@ -124,35 +127,37 @@ func RunGates(ctx context.Context, q Question, chunk Chunk, j Judge, ev Evaluato
 func RunCheapGates(q Question, chunk Chunk, ev Evaluator) *GateReport {
 	rep := &GateReport{}
 	rep.add(gateWellFormed(q))
+	rep.add(gateSourceRole(chunk))
 	rep.add(gateQuote(q, chunk))
 	rep.add(gateArithmetic(q, ev))
 	return rep
 }
 
-// AddJudgeGates appends the one model-backed verdict this experiment needs:
-// whether the answer depends on a fact specific to the source passage. The
-// blind-clarity and per-choice semantic audits remain available for a later
-// quality pass, but are deliberately out of this measurement path.
-//
-// This ordering is the cheapest optimisation available. The judges are 45% of
-// wall clock, and on a measured run 7 questions were duplicates and 4 misquoted
-// the source; every one of those was sent to two judges anyway, purely to
-// confirm a verdict Go had already reached. A question that fails a check Go is
-// certain about cannot be rescued by a judge that likes it.
-func AddJudgeGates(ctx context.Context, rep *GateReport, q Question, chunk Chunk, j Judge) error {
-	if len(rep.Failures()) > 0 {
-		rep.add(GateResult{Gate: GateSourceSpecific, Pass: true, Reason: "not asked — already rejected by a deterministic check"})
-		return nil
-	}
-
-	sourced, err := j.JudgeAgainstSource(ctx, q, chunk.Text)
-	if err != nil {
-		rep.add(GateResult{Gate: GateSourceSpecific, Reason: "judge did not answer: " + err.Error()})
-		return nil
-	}
-	rep.add(gateSourceSpecific(q, chunk, sourced))
-
+// AddJudgeGates is kept as a compatibility hook, but the core gate is QC-only:
+// a model judge must not decide whether a question is educationally good or
+// whether its answer is sufficiently passage-specific. Those are advisory
+// evaluation concerns, not hard production checks.
+func AddJudgeGates(_ context.Context, _ *GateReport, _ Question, _ Chunk, _ Judge) error {
 	return nil
+}
+
+// gateSourceRole is a narrow structural QC check. It does not decide whether
+// a question is educationally good; it only blocks a quote from a section
+// whose statements are explicitly presented for pre-learning checking.
+func gateSourceRole(chunk Chunk) GateResult {
+	res := GateResult{Gate: GateSourceRole, Deterministic: true}
+	role := chunk.SourceRole
+	if role == SourceRoleUnknown {
+		role = classifySourceRole(chunk.Text)
+	}
+	if role == SourceRolePrelearningCheck {
+		res.Reason = fmt.Sprintf("chunk %s, page %d is a pre-learning check/answer-key section", chunk.ID, chunk.Page)
+		return res
+	}
+
+	res.Pass = true
+	res.Reason = fmt.Sprintf("chunk %s, page %d is usable source text", chunk.ID, chunk.Page)
+	return res
 }
 
 // gateQuote is deterministic: the quote the model attributed to the source has
@@ -405,6 +410,13 @@ func choiceMentionsNumber(choice string, v float64) bool {
 		fmt.Sprintf("%.0f", v),
 		fmt.Sprintf("%g", v),
 	}
+	// Models often format large physical quantities as "1.04 × 10⁵". Match
+	// the same significant-digit scientific notation that would be accepted in
+	// ordinary decimal form, after normalising the Unicode presentation.
+	normalized := normalizeScientificNotation(choice)
+	for _, format := range []string{"%.0e", "%.1e", "%.2e", "%.3e", "%.4e"} {
+		candidates = append(candidates, normalizeScientificLiteral(fmt.Sprintf(format, v)))
+	}
 	// Strip thousands separators so "1,234" matches "1234".
 	haystack := strings.ReplaceAll(choice, ",", "")
 	for _, c := range candidates {
@@ -412,7 +424,64 @@ func choiceMentionsNumber(choice string, v float64) bool {
 			return true
 		}
 	}
+	for _, format := range []string{"%.0e", "%.1e", "%.2e", "%.3e", "%.4e"} {
+		c := normalizeScientificLiteral(fmt.Sprintf(format, v))
+		if c != "" && strings.Contains(normalized, c) {
+			return true
+		}
+	}
 	return false
+}
+
+var scientificNotationPattern = regexp.MustCompile(
+	`(?i)([-+]?(?:\d+(?:[.,]\d*)?|\.\d+))\s*(?:×|x|·|\*)\s*10\s*(?:\^\s*)?([+-]?\d+|[⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻]+)`,
+)
+
+func normalizeScientificNotation(s string) string {
+	return scientificNotationPattern.ReplaceAllStringFunc(s, func(match string) string {
+		parts := scientificNotationPattern.FindStringSubmatch(match)
+		if len(parts) != 3 {
+			return match
+		}
+		exponent, ok := parseExponent(parts[2])
+		if !ok {
+			return match
+		}
+		return strings.ReplaceAll(parts[1], ",", "") + "e" + strconv.Itoa(exponent)
+	})
+}
+
+func normalizeScientificLiteral(s string) string {
+	parts := strings.SplitN(strings.ToLower(s), "e", 2)
+	if len(parts) != 2 {
+		return s
+	}
+	exponent, err := strconv.Atoi(parts[1])
+	if err != nil {
+		return s
+	}
+	return parts[0] + "e" + strconv.Itoa(exponent)
+}
+
+func parseExponent(s string) (int, bool) {
+	if exponent, err := strconv.Atoi(s); err == nil {
+		return exponent, true
+	}
+	var b strings.Builder
+	for _, r := range s {
+		switch r {
+		case '⁺':
+			b.WriteRune('+')
+		case '⁻':
+			b.WriteRune('-')
+		case '⁰', '¹', '²', '³', '⁴', '⁵', '⁶', '⁷', '⁸', '⁹':
+			b.WriteString(strconv.Itoa(int(r - '⁰')))
+		default:
+			return 0, false
+		}
+	}
+	exponent, err := strconv.Atoi(b.String())
+	return exponent, err == nil
 }
 
 func trimZeros(s string) string {

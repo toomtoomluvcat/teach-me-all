@@ -19,13 +19,16 @@ func TestQuestionPromptIncludesSourceGroundedConceptFocus(t *testing.T) {
 	if strings.Contains(prompt, "การแลกเปลี่ยนแก๊ส") {
 		t.Fatalf("prompt included concept with no evidence in this chunk:\n%s", prompt)
 	}
-	if !strings.Contains(QuestionSystem(), "asks which items comprise a set") || !strings.Contains(QuestionSystem(), "do not write that question") {
-		t.Fatalf("question system does not prevent synonym-swapped list distractors:\n%s", QuestionSystem())
+	if !strings.Contains(QuestionSystem(), "choices that merely restate the stem") {
+		t.Fatalf("question system does not prevent restated distractors:\n%s", QuestionSystem())
 	}
-	for _, want := range []string{"learning objectives", "assessment guidelines", "document metadata"} {
+	for _, want := range []string{"learning objectives", "assessment rules", "numbering"} {
 		if !strings.Contains(QuestionSystem(), want) {
 			t.Fatalf("question system does not ban teacher-guide metadata %q:\n%s", want, QuestionSystem())
 		}
+	}
+	if !strings.Contains(QuestionSystem(), "pre-learning checks") || !strings.Contains(QuestionSystem(), "answer keys") {
+		t.Fatalf("question system does not restrict evidence to core text:\n%s", QuestionSystem())
 	}
 	blindProps := BlindSchema(4)["properties"].(map[string]any)
 	if _, ok := blindProps["guessed_index"]; ok {
@@ -39,6 +42,37 @@ func TestQuestionPromptIncludesSourceGroundedConceptFocus(t *testing.T) {
 	for _, unwanted := range []string{"choice_verdicts", "dependency_kind", "counterfactual", "dependency_reason"} {
 		if strings.Contains(SourcedSystem(), unwanted) {
 			t.Fatalf("source judge prompt still requests deferred field %q:\n%s", unwanted, SourcedSystem())
+		}
+	}
+}
+
+func TestQuestionSystemIsDomainAgnostic(t *testing.T) {
+	system := QuestionSystem()
+	for _, want := range []string{
+		"domain-agnostic",
+		"science, mathematics, medicine",
+		"Never apply a biology-only",
+		"genuinely new situation",
+		"name,",
+		"at least two linked inferences",
+		"same scenario or principle twice",
+	} {
+		if !strings.Contains(system, want) {
+			t.Fatalf("domain-agnostic contract omitted %q:\n%s", want, system)
+		}
+	}
+}
+
+func TestTopicSystemDoesNotAssumeBiologyOrTeacherEdition(t *testing.T) {
+	system := TopicSystem()
+	for _, want := range []string{"student textbook, reference work, teacher guide", "any subject", "Do not assume"} {
+		if !strings.Contains(system, want) {
+			t.Fatalf("topic classifier omitted dynamic-source rule %q:\n%s", want, system)
+		}
+	}
+	for _, unwanted := range []string{"Most of this book is a teacher's edition", "ครูควรชี้แจงว่า"} {
+		if strings.Contains(system, unwanted) {
+			t.Fatalf("topic classifier still contains source-specific assumption %q:\n%s", unwanted, system)
 		}
 	}
 }
@@ -88,5 +122,17 @@ func TestQuestionPromptCarriesSemanticFailureAsNegativeMemory(t *testing.T) {
 	}
 	if strings.Contains(prompt, "choice 2 was unsupported") {
 		t.Fatalf("generation prompt wasted tokens on already-invalid distractors:\n%s", prompt)
+	}
+}
+
+func TestQuestionPromptCarriesBenchmarkDirective(t *testing.T) {
+	prompt := QuestionPrompt(Lesson{Title: "Projectile Motion"}, nil, Chunk{
+		Page:                182,
+		Text:                "A projectile is launched at an angle.",
+		GenerationDirective: "Generate an easy application question.",
+	}, nil, 1, false)
+	if !strings.Contains(prompt, "Target for this generation call (follow exactly if the passage supports it)") ||
+		!strings.Contains(prompt, "Generate an easy application question.") {
+		t.Fatalf("benchmark directive missing from question prompt:\n%s", prompt)
 	}
 }

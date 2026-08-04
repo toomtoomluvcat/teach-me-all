@@ -37,6 +37,8 @@ type config struct {
 	doclingPython      string
 	doclingOCREngine   string
 	doclingOCRLang     string
+	doclingOCRMode     string
+	doclingFormulaMode string
 	doclingOCRFullPage bool
 	host               string
 	geminiHost         string
@@ -45,6 +47,7 @@ type config struct {
 	deepseekAPIKey     string
 	geminiMinInterval  time.Duration
 	forceCalc          bool
+	benchmark          string
 	scope              string
 	pages              string
 	budget             int
@@ -71,6 +74,8 @@ func main() {
 	flag.StringVar(&cfg.doclingPython, "docling-python", "", "Python with Docling installed; auto-detected from .scratch/docling-venv")
 	flag.StringVar(&cfg.doclingOCREngine, "docling-ocr-engine", "auto", "Docling OCR engine: auto | rapidocr | easyocr")
 	flag.StringVar(&cfg.doclingOCRLang, "docling-ocr-lang", "th,en", "Docling OCR languages; defaults to Thai + English")
+	flag.StringVar(&cfg.doclingOCRMode, "docling-ocr", "auto", "Docling OCR mode: auto | on | off; auto detects native PDF text")
+	flag.StringVar(&cfg.doclingFormulaMode, "docling-formulas", "auto", "Docling formula enrichment: auto | on | off")
 	flag.BoolVar(&cfg.doclingOCRFullPage, "docling-ocr-full-page", false, "force OCR over complete pages instead of only detected regions")
 	flag.StringVar(&cfg.model, "model", "", "generation and judge model (provider default when empty)")
 	// bge-m3, not nomic-embed-text. Measured on Thai question pairs,
@@ -86,6 +91,7 @@ func main() {
 	flag.StringVar(&cfg.deepseekHost, "deepseek-host", "https://api.deepseek.com", "DeepSeek API host")
 	flag.StringVar(&cfg.deepseekAPIKey, "deepseek-api-key", "", "DeepSeek API key (prefer DEEPSEEK_API_KEY)")
 	flag.BoolVar(&cfg.forceCalc, "force-calc", false, "generate calculation questions only")
+	flag.StringVar(&cfg.benchmark, "benchmark", "", "run benchmark suite: all | application-easy | application-hard | calculation")
 	flag.StringVar(&cfg.scope, "scope", "", "free-text focus; chunks are ranked against this instead of the lesson title")
 	flag.StringVar(&cfg.pages, "pages", "", "page range, e.g. 10-40")
 	flag.IntVar(&cfg.budget, "budget", 0, "override the model's own question budget")
@@ -252,7 +258,8 @@ func run(ctx context.Context, cfg config) error {
 			result, err := pdfx.ExtractAuto(ctx, pdfx.AutoOptions{
 				PDF: cfg.pdfPath, OutputDir: extractionDir(cfg), From: from, To: to,
 				Python: cfg.doclingPython, OCREngine: cfg.doclingOCREngine,
-				OCRLanguage: cfg.doclingOCRLang, OCRFullPage: cfg.doclingOCRFullPage,
+				OCRLanguage: cfg.doclingOCRLang, OCRMode: cfg.doclingOCRMode,
+				FormulaMode: cfg.doclingFormulaMode, OCRFullPage: cfg.doclingOCRFullPage,
 				Progress: renderProgress,
 			})
 			return extractionCache{Pages: result.Pages, Mode: result.Mode, Prepared: result.Prepared}, err
@@ -260,7 +267,8 @@ func run(ctx context.Context, cfg config) error {
 			result, err := pdfx.ExtractDocling(ctx, pdfx.DoclingOptions{
 				Python: cfg.doclingPython, PDF: cfg.pdfPath, OutputDir: extractionDir(cfg),
 				From: from, To: to, OCREngine: cfg.doclingOCREngine,
-				OCRLanguage: cfg.doclingOCRLang, OCRFullPage: cfg.doclingOCRFullPage,
+				OCRLanguage: cfg.doclingOCRLang, OCRMode: cfg.doclingOCRMode,
+				FormulaMode: cfg.doclingFormulaMode, OCRFullPage: cfg.doclingOCRFullPage,
 				Progress: renderProgress,
 			})
 			mode := "docling"
@@ -352,6 +360,9 @@ func run(ctx context.Context, cfg config) error {
 		return err
 	}
 	outline, chunks := oc.Outline, oc.Chunks
+	if strings.TrimSpace(cfg.benchmark) != "" {
+		return runBenchmark(ctx, cfg, outline, chunks, deps)
+	}
 
 	// --- step 3: pick a lesson, generate, review ----------------------------
 	for {
@@ -621,7 +632,11 @@ func parsePages(s string) (int, int, error) {
 }
 
 func scratchDir(cfg config) string {
-	h := sha1.Sum([]byte(cfg.pdfPath + "|" + cfg.extract + "|" + cfg.pages))
+	h := sha1.Sum([]byte(strings.Join([]string{
+		cfg.pdfPath, cfg.extract, cfg.pages, cfg.doclingOCRMode,
+		cfg.doclingFormulaMode, cfg.doclingOCREngine, cfg.doclingOCRLang,
+		strconv.FormatBool(cfg.doclingOCRFullPage),
+	}, "|")))
 	return filepath.Join(".scratch", hex.EncodeToString(h[:8]))
 }
 

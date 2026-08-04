@@ -7,6 +7,67 @@ import (
 	"testing"
 )
 
+func TestGateQuoteAllowsShortExactNamedFact(t *testing.T) {
+	q := Question{SourceQuote: "ไฮดรา พลานาเรีย"}
+	report := RunCheapGates(q, Chunk{ID: "p16-c22", Page: 16, Text: q.SourceQuote}, nil)
+	for _, result := range report.Results {
+		if result.Gate == GateQuote {
+			if !result.Pass {
+				t.Fatalf("short exact named fact failed quote QC: %s", result.Reason)
+			}
+			return
+		}
+	}
+	t.Fatal("quote QC result was not recorded")
+}
+
+func TestGateQuoteStillRejectsAccidentalSingleToken(t *testing.T) {
+	q := Question{SourceQuote: "ไฮดรา"}
+	report := RunCheapGates(q, Chunk{ID: "p16-c22", Page: 16, Text: q.SourceQuote}, nil)
+	for _, result := range report.Results {
+		if result.Gate == GateQuote {
+			if result.Pass {
+				t.Fatal("single-token quote passed quote QC")
+			}
+			return
+		}
+	}
+	t.Fatal("quote QC result was not recorded")
+}
+
+func TestGateSourceRoleRejectsPrelearningCheck(t *testing.T) {
+	quote := "น้ำดีสร้างจากถุงน้ำดีแล้วส่งไปที่ลำไส้เล็กช่วยให้ลิพิดแตกตัว"
+	q := Question{SourceQuote: quote}
+	report := RunCheapGates(q, Chunk{
+		ID:         "p19-c1",
+		Page:       19,
+		Text:       quote,
+		SourceRole: SourceRolePrelearningCheck,
+	}, nil)
+	for _, result := range report.Results {
+		if result.Gate == GateSourceRole {
+			if result.Pass || !strings.Contains(result.Reason, "pre-learning check") {
+				t.Fatalf("pre-learning check was not rejected: %#v", result)
+			}
+			return
+		}
+	}
+	t.Fatal("source-role QC result was not recorded")
+}
+
+func TestChunkPagesLabelsPrelearningCheckByHeading(t *testing.T) {
+	chunks := ChunkPages([]Page{{
+		Number: 19,
+		Text:   "เฉลยตรวจสอบความรู้ก่อนเรียน\n\n1. ข้อความตามความเข้าใจของนักเรียน",
+	}}, ChunkOptions{TargetRunes: 200, OverlapRunes: 0})
+	if len(chunks) != 1 {
+		t.Fatalf("ChunkPages() returned %d chunks, want 1", len(chunks))
+	}
+	if chunks[0].SourceRole != SourceRolePrelearningCheck {
+		t.Fatalf("SourceRole = %q, want %q", chunks[0].SourceRole, SourceRolePrelearningCheck)
+	}
+}
+
 type semanticChoiceJudge struct {
 	sourced SourcedVerdict
 }
@@ -127,7 +188,51 @@ func (partialSourceJudge) JudgeAgainstSource(context.Context, Question, string) 
 	}, errors.New("choice audit incomplete")
 }
 
-func TestAddJudgeGatesRecordsOnlySourceFailureWhenJudgeErrors(t *testing.T) {
+type countingSourceJudge struct {
+	calls int
+}
+
+func (*countingSourceJudge) JudgeBlind(context.Context, Question) (BlindVerdict, error) {
+	return BlindVerdict{Interpretable: true}, nil
+}
+
+func (j *countingSourceJudge) JudgeAgainstSource(context.Context, Question, string) (SourcedVerdict, error) {
+	j.calls++
+	return passingSourceVerdict(), nil
+}
+
+func TestRunGatesIsDeterministicQCOnly(t *testing.T) {
+	quote := testQuote()
+	q := Question{
+		Kind:        KindMCQSingle,
+		Stem:        "Which process is described by the passage?",
+		SourceQuote: quote,
+		Choices: []Choice{
+			{Content: "It increases the measured value", IsCorrect: true},
+			{Content: "It decreases the measured value"},
+			{Content: "It keeps the measured value stable"},
+			{Content: "It removes the measured value"},
+		},
+	}
+	judge := &countingSourceJudge{}
+	report, err := RunGates(context.Background(), q, Chunk{ID: "p1-c1", Page: 1, Text: quote}, judge, Arith{})
+	if err != nil {
+		t.Fatalf("RunGates() error = %v", err)
+	}
+	if judge.calls != 0 {
+		t.Fatalf("source judge calls = %d, want zero in QC-only mode", judge.calls)
+	}
+	for _, result := range report.Results {
+		if result.Gate == GateSourceSpecific || result.Gate == GateBlindAnswer || result.Gate == GateSingleValid {
+			t.Fatalf("non-QC gate ran: %#v", result)
+		}
+	}
+	if !report.Passed() {
+		t.Fatalf("valid question failed QC: %#v", report.Failures())
+	}
+}
+
+func TestAddJudgeGatesDoesNotInvokeModelJudge(t *testing.T) {
 	quote := "เมื่อหายใจออกปกติจะมีปริมาตรอากาศที่ตกค้างในปอดเป็น 2,400 mL"
 	q := Question{
 		Kind:        KindMCQSingle,
@@ -156,12 +261,12 @@ func TestAddJudgeGatesRecordsOnlySourceFailureWhenJudgeErrors(t *testing.T) {
 			t.Fatalf("deferred gate %q still ran: %#v", result.Gate, result)
 		}
 	}
-	if source.Pass || !strings.Contains(source.Reason, "choice audit incomplete") {
-		t.Fatalf("source gate = %#v, want the judge error", source)
+	if source.Gate != "" {
+		t.Fatalf("source gate = %#v, want no model-backed gate in QC mode", source)
 	}
 }
 
-func TestRunGatesCorePathUsesOnlySourceDependencyJudge(t *testing.T) {
+func TestRunGatesCorePathUsesOnlyDeterministicQC(t *testing.T) {
 	quote := "เมื่อหายใจออกปกติจะมีปริมาตรอากาศที่ตกค้างในปอดเป็น 2,400 mL"
 	q := Question{
 		Kind:        KindMCQSingle,

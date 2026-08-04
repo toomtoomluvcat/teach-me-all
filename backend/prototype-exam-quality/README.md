@@ -25,32 +25,36 @@ chunks ──pass 1 (map-reduce)──> evidence graph ──> course outline (l
                                        │
 chunks of that lesson ──pass 2──> MCQ (JSON-schema constrained)
                                        │
-                              deterministic + model gates
+                              deterministic QC gates
                                        │
        failures ──bounded rejection memory ──next generate / top-up─┘
                                        │
                           every question kept, pass or fail
 ```
 
-## The four gates
+## The five QC gates
 
 | # | Checks | Judged by |
 |---|--------|-----------|
-| 1 | `source_quote` is a verbatim substring of the cited chunk | **Go** — no model involved |
-| 2 | Question is answerable with the source hidden | model, second pass |
-| 3 | Every choice is audited against the source; exactly one is supported and no distractor is equivalent or ambiguous | model, second pass |
+| 1 | Structural shape, exactly one correct choice, and no teacher-guide metadata | **Go** — no model involved |
+| 2 | Cited chunk is not an explicit pre-learning check / answer-key section | **Go** — no model involved |
+| 3 | `source_quote` is a verbatim substring of the cited chunk | **Go** — no model involved |
 | 4 | `calculation.expression` evaluates to the answer the model marked correct | **Go** — no model involved |
+| 5 | Question is not a duplicate of an accepted question | **Go + embedder** — no judge involved |
 
-Gate 4 is a backstop, not the primary defence. Before generating, the model
+The QC gates are deliberately a backstop, not a complete educational-quality
+grader. Before generating, the model
 calls a `calc` tool that Go answers, so it never computes anything itself
 (`llm/calctool.go`). The gate then re-checks, because an expression in the
 database can be re-verified years later and a tool call that already happened
 cannot. Tools and a `format` schema are mutually exclusive in Ollama, so
 generation runs as two turns — see VERDICT.md.
 
-Gates 1 and 4 are the trustworthy ones — they are deterministic and re-runnable
-forever. Gates 2 and 3 are LLM-as-judge and should be treated as advisory,
-especially on a 4B model. Eyeball the first 20 failures before believing them.
+The source-dependency and per-choice semantic judges remain available for
+advisory evaluation, but they are not hard gates in the core path. This keeps
+the acceptance rule focused on catching malformed, fabricated, duplicated, or
+arithmetically wrong generations rather than asking the generator to grade its
+own educational quality.
 
 Pass 1 gives every concept a stable graph ID with page/chunk provenance and
 evidenced `co_occurs` / `follows` edges. Generation sees only concepts supported
@@ -126,6 +130,8 @@ Flags:
 | `--docling-python` | auto-detected | Python executable containing Docling; overrides `DOCLING_PYTHON` |
 | `--docling-ocr-engine` | `auto` | auto selects EasyOCR because the default language set includes Thai; pass `rapidocr` explicitly for a Latin-only speed test |
 | `--docling-ocr-lang` | `th,en` | comma-separated OCR languages |
+| `--docling-ocr` | `auto` | `auto` uses the PDF's native text layer for digital PDFs and enables OCR for scanned PDFs; `on`/`off` override it |
+| `--docling-formulas` | `auto` | conservative by default; auto warns when formula-like prose is detected, while `on` runs Docling's heavier formula-to-LaTeX pass |
 | `--docling-ocr-full-page` | `false` | OCR the complete page; normally leave off so native PDF text stays native |
 | `--calc-tool` | `true` | model calls a calculator before writing calculation questions. Took arithmetic failures from 5 to 0 — see VERDICT.md |
 | `--model` | provider default | generation + judge model; Ollama defaults to `scb10x/typhoon2.5-qwen3-4b`, Gemini to `gemini-2.5-flash`, DeepSeek to `deepseek-chat` |
@@ -216,10 +222,12 @@ and returns values. That is what makes it liftable.
 
 ## What extraction actually does
 
-`auto` is **Docling standard pipeline + pypdfium2**. It recovers reading order,
-tables, native text, OCR text, and figure crops in one local pass. EasyOCR
-`th,en` is the default so Thai remains supported for bitmap text and scans.
-The same result supplies Markdown for reading and plain text for exam chunks.
+`auto` is **Docling standard pipeline + pypdfium2**. It first inspects the PDF's
+embedded text layer. Digital PDFs keep native PDFium text and do not pay the OCR
+cost; scanned or mixed PDFs enable OCR. The same result supplies Markdown for
+reading and native-layer text for exam chunks when it is reliable. Formula
+recognition is deliberately opt-in with `--docling-formulas on` because its VLM
+model is substantially heavier than the normal extraction path.
 There is deliberately no text-only or LLM OCR fallback: a Docling failure is an
 extraction failure, not permission to silently return a lower-quality document.
 

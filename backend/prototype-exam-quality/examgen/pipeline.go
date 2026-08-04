@@ -305,6 +305,9 @@ type ExamOptions struct {
 	// Scope is an optional free-text focus. When set, chunks are ranked by
 	// similarity to it instead of to the lesson title.
 	Scope string
+	// GenerationDirective is an optional benchmark-only instruction appended to
+	// the question prompt. Normal production generation leaves it empty.
+	GenerationDirective string
 	// PerChunk is how many questions to ask for from one chunk at a time.
 	PerChunk int
 	// MaxChunkVisits caps total work so a lesson that cannot fill its budget
@@ -398,7 +401,9 @@ func GenerateExam(ctx context.Context, outline *Outline, lesson Lesson, chunks [
 		}
 		d.Log.report("generate", len(res.Passed), budget, note)
 
-		qs, err := d.Gen.Questions(ctx, lesson, outline.EvidenceGraph, c, feedback, want, opt.ForceCalc)
+		generationChunk := c
+		generationChunk.GenerationDirective = opt.GenerationDirective
+		qs, err := d.Gen.Questions(ctx, lesson, outline.EvidenceGraph, generationChunk, feedback, want, opt.ForceCalc)
 		if err != nil {
 			return nil, fmt.Errorf("generate from chunk %s: %w", c.ID, err)
 		}
@@ -430,10 +435,9 @@ func GenerateExam(ctx context.Context, outline *Outline, lesson Lesson, chunks [
 		for i, q := range qs {
 			q.ChunkID = c.ID
 
-			// Cheap checks and the duplicate check first, judges last. Two judge
-			// calls cost seconds. On a measured run the duplicate check alone
-			// rejected 7 of 16, and every one of those had already been through
-			// both judges.
+			// Run the deterministic QC checks before accepting a draft. The
+			// source-dependency and semantic judges are advisory experiments, not
+			// part of the production acceptance path.
 			rep := cheap[i]
 			vec := vectorsByQuestion[i]
 			rep.add(gateDistinct(q, res.Passed, vec, acceptedVecs))

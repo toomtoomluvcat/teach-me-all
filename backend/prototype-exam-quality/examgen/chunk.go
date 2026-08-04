@@ -61,11 +61,12 @@ func ChunkPages(pages []Page, opt ChunkOptions) []Chunk {
 			body := strings.TrimSpace(string(runes[start:end]))
 			if body != "" {
 				out = append(out, Chunk{
-					ID:       fmt.Sprintf("p%d-c%d", p.Number, len(out)),
-					Page:     p.Number,
-					StartOff: start,
-					EndOff:   end,
-					Text:     body,
+					ID:         fmt.Sprintf("p%d-c%d", p.Number, len(out)),
+					Page:       p.Number,
+					StartOff:   start,
+					EndOff:     end,
+					Text:       body,
+					SourceRole: classifySourceRole(body),
 				})
 			}
 
@@ -82,6 +83,18 @@ func ChunkPages(pages []Page, opt ChunkOptions) []Chunk {
 		}
 	}
 	return out
+}
+
+// classifySourceRole uses only explicit section headings. The textbook's
+// pre-learning answer key contains intentionally true/false statements, so
+// those statements are not safe evidence even though they are verbatim text.
+// Everything else stays usable; semantic quality is not inferred here.
+func classifySourceRole(text string) SourceRole {
+	compact := strings.Join(strings.Fields(text), "")
+	if strings.Contains(compact, "ตรวจสอบความรู้ก่อนเรียน") {
+		return SourceRolePrelearningCheck
+	}
+	return SourceRoleCore
 }
 
 // backOffToBoundary walks backwards from end looking for a natural break,

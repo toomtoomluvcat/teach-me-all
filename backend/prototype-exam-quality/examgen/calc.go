@@ -7,14 +7,15 @@ import (
 	"strings"
 )
 
-// Arith is a deliberately tiny arithmetic evaluator: numbers, + - * / ^, unary
-// sign, and parentheses. Nothing else parses.
+// Arith is a deliberately small, safe arithmetic evaluator. It accepts
+// numbers, + - * / ^, unary sign, parentheses, pi, and a short whitelist of
+// math functions commonly used in textbook calculations. Nothing else parses.
 //
 // This is hand-written rather than pulled from an expression library on
 // purpose. The expressions it evaluates are written by a language model and
-// will be stored in the database and re-evaluated for years. A grammar that
-// cannot express a function call, a variable, or a property access cannot be
-// talked into doing anything except arithmetic, no matter what the model emits.
+// will be stored in the database and re-evaluated for years. A grammar with
+// no variables, property access, or arbitrary calls cannot be talked into
+// doing anything except the explicitly supported arithmetic.
 type Arith struct{}
 
 // Eval implements Evaluator.
@@ -187,7 +188,7 @@ func (p *parser) power() (float64, error) {
 	return math.Pow(base, exp), nil
 }
 
-// primary := number | '(' expr ')'
+// primary := number | constant | function '(' expr ')' | '(' expr ')'
 func (p *parser) primary() (float64, error) {
 	p.skipSpace()
 	if p.eof() {
@@ -206,7 +207,66 @@ func (p *parser) primary() (float64, error) {
 		p.i++
 		return v, nil
 	}
+	if isLetter(p.peek()) {
+		name := p.identifier()
+		if name == "pi" {
+			return math.Pi, nil
+		}
+		if p.peek() != '(' {
+			return 0, fmt.Errorf("unknown identifier %q", name)
+		}
+		p.i++
+		arg, err := p.expr()
+		if err != nil {
+			return 0, err
+		}
+		p.skipSpace()
+		if p.peek() != ')' {
+			return 0, fmt.Errorf("missing closing parenthesis for %s", name)
+		}
+		p.i++
+		return applyFunction(name, arg)
+	}
 	return p.number()
+}
+
+func (p *parser) identifier() string {
+	start := p.i
+	for !p.eof() && (isLetter(p.peek()) || isDigit(p.peek()) || p.peek() == '_') {
+		p.i++
+	}
+	return strings.ToLower(string(p.src[start:p.i]))
+}
+
+func isLetter(r rune) bool {
+	return (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z')
+}
+
+func applyFunction(name string, arg float64) (float64, error) {
+	switch name {
+	case "sin":
+		return math.Sin(arg), nil
+	case "cos":
+		return math.Cos(arg), nil
+	case "tan":
+		return math.Tan(arg), nil
+	case "sqrt":
+		if arg < 0 {
+			return 0, fmt.Errorf("sqrt domain error")
+		}
+		return math.Sqrt(arg), nil
+	case "abs":
+		return math.Abs(arg), nil
+	case "exp":
+		return math.Exp(arg), nil
+	case "ln":
+		if arg <= 0 {
+			return 0, fmt.Errorf("ln domain error")
+		}
+		return math.Log(arg), nil
+	default:
+		return 0, fmt.Errorf("unsupported function %q", name)
+	}
 }
 
 func (p *parser) number() (float64, error) {

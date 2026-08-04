@@ -31,6 +31,8 @@ type DoclingOptions struct {
 	To          int
 	OCREngine   string
 	OCRLanguage string
+	OCRMode     string
+	FormulaMode string
 	OCRFullPage bool
 	Progress    ProgressFunc
 	Runner      DoclingRunner
@@ -41,6 +43,8 @@ type DoclingResult struct {
 	Prepared          PreparedBundle
 	ResolvedOCREngine string
 	ResolvedOCRLang   []string
+	ResolvedOCRMode   string
+	ResolvedFormula   string
 }
 
 // DoclingRunner keeps subprocess behavior injectable so tests need neither
@@ -63,6 +67,8 @@ func (ExecDoclingRunner) Run(ctx context.Context, executable string, args ...str
 type doclingPayload struct {
 	ResolvedOCREngine string         `json:"resolved_ocr_engine"`
 	ResolvedOCRLang   []string       `json:"resolved_ocr_lang"`
+	ResolvedOCRMode   string         `json:"resolved_ocr_mode"`
+	ResolvedFormula   string         `json:"resolved_formula_mode"`
 	Pages             []doclingPage  `json:"pages"`
 	Assets            []doclingAsset `json:"assets"`
 	Warnings          []string       `json:"warnings"`
@@ -124,6 +130,8 @@ func ExtractDocling(ctx context.Context, opts DoclingOptions) (DoclingResult, er
 		"--to-page", strconv.Itoa(opts.To),
 		"--ocr-engine", engine,
 		"--ocr-lang", language,
+		"--ocr-mode", defaultMode(opts.OCRMode, "auto"),
+		"--formula-mode", defaultMode(opts.FormulaMode, "auto"),
 	}
 	if opts.OCRFullPage {
 		args = append(args, "--ocr-full-page")
@@ -179,6 +187,8 @@ finished:
 		Pages:             make([]examgen.Page, 0, len(payload.Pages)),
 		ResolvedOCREngine: payload.ResolvedOCREngine,
 		ResolvedOCRLang:   payload.ResolvedOCRLang,
+		ResolvedOCRMode:   payload.ResolvedOCRMode,
+		ResolvedFormula:   payload.ResolvedFormula,
 		Prepared: PreparedBundle{
 			DocumentMarkdownPath: "document.md",
 			DocumentJSONPath:     "docling.json",
@@ -234,6 +244,14 @@ finished:
 		opts.Progress("extract/docling", len(result.Pages), len(result.Pages), fmt.Sprintf("%s; %d figures", payload.ResolvedOCREngine, len(result.Prepared.Assets)))
 	}
 	return result, nil
+}
+
+func defaultMode(value, fallback string) string {
+	value = strings.TrimSpace(strings.ToLower(value))
+	if value == "" {
+		return fallback
+	}
+	return value
 }
 
 func selectedPageCount(from, to int) int {

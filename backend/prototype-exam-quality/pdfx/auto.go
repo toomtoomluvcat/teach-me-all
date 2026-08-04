@@ -19,6 +19,8 @@ type AutoOptions struct {
 	Python        string
 	OCREngine     string
 	OCRLanguage   string
+	OCRMode       string
+	FormulaMode   string
 	OCRFullPage   bool
 	Progress      ProgressFunc
 	DoclingRunner DoclingRunner
@@ -42,6 +44,8 @@ func ExtractAuto(ctx context.Context, opts AutoOptions) (AutoResult, error) {
 		To:          opts.To,
 		OCREngine:   opts.OCREngine,
 		OCRLanguage: opts.OCRLanguage,
+		OCRMode:     opts.OCRMode,
+		FormulaMode: opts.FormulaMode,
 		OCRFullPage: opts.OCRFullPage,
 		Progress:    opts.Progress,
 		Runner:      opts.DoclingRunner,
@@ -50,7 +54,9 @@ func ExtractAuto(ctx context.Context, opts AutoOptions) (AutoResult, error) {
 		return AutoResult{}, fmt.Errorf("auto extraction requires Docling: %w", err)
 	}
 	mode := "docling"
-	if result.ResolvedOCREngine != "" {
+	if result.ResolvedOCRMode != "" {
+		mode += "/" + result.ResolvedOCRMode
+	} else if result.ResolvedOCREngine != "" {
 		mode += "/" + result.ResolvedOCREngine
 	}
 	return AutoResult{Pages: result.Pages, Mode: mode, Prepared: &result.Prepared}, nil

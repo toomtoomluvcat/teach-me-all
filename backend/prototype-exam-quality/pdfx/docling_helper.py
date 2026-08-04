@@ -34,6 +34,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--resolved-mode", default="docling")
     parser.add_argument("--ocr-engine", choices=("auto", "rapidocr", "easyocr"), default="auto")
     parser.add_argument("--ocr-lang", default="auto")
+    parser.add_argument("--ocr-mode", choices=("auto", "on", "off"), default="auto")
+    parser.add_argument("--formula-mode", choices=("auto", "on", "off"), default="auto")
     parser.add_argument("--ocr-full-page", action="store_true")
     args = parser.parse_args()
     if not args.check and (not args.pdf or not args.output_dir):
@@ -88,6 +90,80 @@ def choose_ocr(engine: str, lang_value: str):
         LOG.warning("RapidOCR does not provide the requested Thai model; using English OCR")
         langs = [lang for lang in langs if lang != "th"] or ["en"]
     return engine, langs, RapidOcrOptions(lang=langs, force_full_page_ocr=False)
+
+
+def inspect_native_text(
+    pdf: str, first: int, last: int
+) -> tuple[int, int, str, dict[int, str]]:
+    """Inspect the embedded text layer without running layout or OCR."""
+    import pypdfium2 as pdfium
+
+    document = pdfium.PdfDocument(pdf)
+    total_pages = len(document)
+    start = max(first, 1)
+    end = min(last if last > 0 else total_pages, total_pages)
+    native_pages = 0
+    samples: list[str] = []
+    page_text: dict[int, str] = {}
+    for page_number in range(start, end + 1):
+        text = document[page_number - 1].get_textpage().get_text_range()
+        page_text[page_number] = text
+        compact = re.sub(r"\s+", "", text)
+        if len(compact) >= 40:
+            native_pages += 1
+        samples.append(text)
+    return native_pages, max(0, end - start + 1), "\n".join(samples), page_text
+
+
+def resolve_ocr(mode: str, native_pages: int, selected_pages: int) -> tuple[bool, str]:
+    if mode == "on":
+        return True, "on"
+    if mode == "off":
+        return False, "off"
+    # A mixed PDF is safer with OCR enabled: pages without a text layer still
+    # need to be readable. A wholly native PDF can use the backend text layer.
+    enabled = selected_pages == 0 or native_pages == 0
+    return enabled, "on" if enabled else "off"
+
+
+def resolve_formula(mode: str, native_text: str) -> tuple[bool, str, bool]:
+    if mode == "on":
+        return True, "on", True
+    if mode == "off":
+        return False, "off", False
+    # Formula glyphs are often absent from the PDF text layer, but the prose
+    # around them usually survives. This keeps formula VLM work off for plain
+    # prose while enabling it for math/physics-like source automatically.
+    signal = re.search(
+        r"(?i)\b(equation|formula|mathematically|proportional|variable|symbol)\b|"
+        r"\b(write as|defined mathematically|in equation form)\b",
+        native_text,
+    )
+    # Formula VLM loading is intentionally explicit. Auto detection only tells
+    # the caller that the document would benefit from the heavier pass.
+    return False, "off", signal is not None
+
+
+def markdown_to_plain(markdown: str) -> str:
+    """Flatten page Markdown while preserving LaTeX and meaningful text."""
+    markdown = markdown.replace("\r\n", "\n").replace("\r", "\n")
+    markdown = re.sub(r"<!--\s*formula-not-decoded\s*-->", "", markdown, flags=re.I)
+    markdown = re.sub(r"!\[[^\]]*\]\([^)]*\)", "", markdown)
+    markdown = re.sub(r"\[([^\]]+)\]\([^)]*\)", r"\1", markdown)
+    lines: list[str] = []
+    for line in markdown.splitlines():
+        line = re.sub(r"^\s{0,3}#{1,6}\s*", "", line)
+        line = re.sub(r"^\s*(?:[-*+]\s+|\d+[.)]\s+)", "", line)
+        line = re.sub(r"[ \t]+", " ", line).strip()
+        if line and line not in {"|", "---"}:
+            lines.append(line)
+    return "\n".join(lines).strip()
+
+
+def native_text_to_plain(text: str) -> str:
+    """Use the PDF text layer without preserving its artificial line wraps."""
+    text = text.replace("\r", "\n")
+    return re.sub(r"\s+", " ", text).strip()
 
 
 def portable_markdown(text: str, root: Path, page_file: bool = False) -> str:
@@ -179,7 +255,7 @@ def convert(args) -> dict:
     from docling.backend.pypdfium2_backend import PyPdfiumDocumentBackend
     from docling.datamodel.base_models import InputFormat
     from docling.datamodel.document import ConversionStatus
-    from docling.datamodel.pipeline_options import PdfPipelineOptions
+    from docling.datamodel.pipeline_options import OcrAutoOptions, PdfPipelineOptions
     from docling.datamodel.settings import settings
     from docling.document_converter import DocumentConverter, PdfFormatOption
     from docling.pipeline.standard_pdf_pipeline import StandardPdfPipeline
@@ -202,15 +278,40 @@ def convert(args) -> dict:
     pages_dir.mkdir(parents=True, exist_ok=True)
 
     settings.perf.page_batch_size = 1
-    engine, langs, ocr_options = choose_ocr(args.ocr_engine, args.ocr_lang)
-    if args.ocr_full_page:
-        ocr_options.force_full_page_ocr = True
-    LOG.info("Docling extraction: engine=%s lang=%s page_batch_size=1", engine, ",".join(langs))
-    print(f"stage extraction/docling engine={engine} lang={','.join(langs)}", file=sys.stderr)
+    first = args.from_page if args.from_page > 0 else 1
+    last = args.to_page if args.to_page > 0 else 0
+    native_pages, selected_pages, native_text, native_page_text = inspect_native_text(
+        args.pdf, first, last
+    )
+    ocr_enabled, resolved_ocr_mode = resolve_ocr(args.ocr_mode, native_pages, selected_pages)
+    if not ocr_enabled and native_pages == selected_pages and selected_pages > 0:
+        resolved_ocr_mode = "native"
+    formula_enabled, resolved_formula_mode, formula_signal = resolve_formula(
+        args.formula_mode, native_text
+    )
+    if ocr_enabled:
+        engine, langs, ocr_options = choose_ocr(args.ocr_engine, args.ocr_lang)
+        if args.ocr_full_page:
+            ocr_options.force_full_page_ocr = True
+    else:
+        engine, langs, ocr_options = "disabled", [], OcrAutoOptions()
+    LOG.info(
+        "Docling extraction: native_pages=%d/%d ocr=%s formula=%s engine=%s lang=%s",
+        native_pages, selected_pages, resolved_ocr_mode, resolved_formula_mode,
+        engine, ",".join(langs),
+    )
+    print(
+        f"stage extraction/docling native={native_pages}/{selected_pages} "
+        f"ocr={resolved_ocr_mode} formulas={resolved_formula_mode} "
+        f"engine={engine} lang={','.join(langs)}",
+        file=sys.stderr,
+    )
 
     pipeline_options = PdfPipelineOptions(
         do_table_structure=True,
-        do_ocr=True,
+        do_ocr=ocr_enabled,
+        do_formula_enrichment=formula_enabled,
+        force_backend_text=not ocr_enabled and not formula_enabled,
         ocr_options=ocr_options,
         generate_picture_images=True,
         generate_page_images=False,
@@ -225,9 +326,7 @@ def convert(args) -> dict:
         allowed_formats=[InputFormat.PDF],
         format_options={InputFormat.PDF: format_option},
     )
-    first = args.from_page if args.from_page > 0 else 1
-    last = args.to_page if args.to_page > 0 else sys.maxsize
-    result = converter.convert(args.pdf, page_range=(first, last))
+    result = converter.convert(args.pdf, page_range=(first, last or sys.maxsize))
     if result.status not in (ConversionStatus.SUCCESS, ConversionStatus.PARTIAL_SUCCESS):
         raise RuntimeError(f"Docling conversion status: {result.status}")
     document = result.document
@@ -263,7 +362,12 @@ def convert(args) -> dict:
         text_path = f"pages/page-{page_no:04d}.txt"
         markdown = portable_markdown(section, root, page_file=True)
         write_text(root / markdown_path, markdown)
-        plain = document.export_to_text(page_no=page_no, traverse_pictures=True)
+        if not ocr_enabled and not formula_enabled:
+            plain = native_text_to_plain(native_page_text.get(page_no, ""))
+        else:
+            plain = markdown_to_plain(markdown)
+        if not plain:
+            plain = document.export_to_text(page_no=page_no, traverse_pictures=True)
         write_text(root / text_path, plain)
         page_records.append(
             {
@@ -310,14 +414,23 @@ def convert(args) -> dict:
         }
         assets.append(asset)
 
+    warnings = [
+        f"native text pages: {native_pages}/{selected_pages}",
+        f"OCR: {resolved_ocr_mode}; formulas: {resolved_formula_mode}",
+    ]
+    if formula_signal and not formula_enabled:
+        warnings.append("formula-like prose detected; rerun with --docling-formulas on")
     manifest = build_manifest(args, page_records, assets, sha256_file(Path(args.pdf)))
+    manifest["warnings"] = warnings
     write_text(root / "manifest.json", json.dumps(manifest, ensure_ascii=False, indent=2))
     result = {
         "resolved_ocr_engine": engine,
         "resolved_ocr_lang": langs,
+        "resolved_ocr_mode": resolved_ocr_mode,
+        "resolved_formula_mode": resolved_formula_mode,
         "pages": page_records,
         "assets": assets,
-        "warnings": [],
+        "warnings": warnings,
     }
     print(f"stage extraction/docling pages={len(page_records)} assets={len(assets)}", file=sys.stderr)
     return result

@@ -44,6 +44,9 @@ func TestExtractAutoReturnsStructuredDoclingResult(t *testing.T) {
 	if !slices.Contains(runner.args, "--ocr-lang") || !slices.Contains(runner.args, "th,en") {
 		t.Fatalf("Docling args omitted Thai/English OCR: %v", runner.args)
 	}
+	if !slices.Contains(runner.args, "--ocr-mode") || !slices.Contains(runner.args, "--formula-mode") {
+		t.Fatalf("Docling args omitted adaptive extraction modes: %v", runner.args)
+	}
 }
 
 func TestExtractAutoSurfacesDoclingFailureWithoutFallback(t *testing.T) {
