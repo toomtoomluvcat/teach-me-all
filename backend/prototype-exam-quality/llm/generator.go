@@ -2,10 +2,80 @@ package llm
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"strings"
 
 	"protoexam/examgen"
 )
+
+// stringListish is a tolerant wire decoder for model metadata. The prompt and
+// schema ask for arrays, but hosted models sometimes compress a one-item list
+// to a string or return a small variable map. These fields are descriptive
+// hints only; provenance still goes through NormalizeEvidenceGraph.
+type stringListish []string
+
+func (s *stringListish) UnmarshalJSON(data []byte) error {
+	trimmed := strings.TrimSpace(string(data))
+	if trimmed == "" || trimmed == "null" {
+		*s = nil
+		return nil
+	}
+	var list []string
+	if strings.HasPrefix(trimmed, "[") {
+		if err := json.Unmarshal(data, &list); err == nil {
+			*s = stringListish(list)
+			return nil
+		}
+		var raw []json.RawMessage
+		if err := json.Unmarshal(data, &raw); err != nil {
+			return err
+		}
+		for _, item := range raw {
+			var value string
+			if err := json.Unmarshal(item, &value); err == nil && strings.TrimSpace(value) != "" {
+				list = append(list, strings.TrimSpace(value))
+				continue
+			}
+			list = append(list, strings.TrimSpace(string(item)))
+		}
+		*s = stringListish(list)
+		return nil
+	}
+	var one string
+	if err := json.Unmarshal(data, &one); err == nil {
+		*s = stringListish(splitListish(one))
+		return nil
+	}
+	var object map[string]json.RawMessage
+	if err := json.Unmarshal(data, &object); err != nil {
+		return err
+	}
+	for key, raw := range object {
+		var value string
+		if err := json.Unmarshal(raw, &value); err == nil && strings.TrimSpace(value) != "" {
+			list = append(list, key+": "+strings.TrimSpace(value))
+		} else {
+			list = append(list, key+": "+strings.TrimSpace(string(raw)))
+		}
+	}
+	*s = stringListish(list)
+	return nil
+}
+
+func splitListish(value string) []string {
+	parts := strings.FieldsFunc(value, func(r rune) bool { return r == ',' || r == ';' || r == '|' })
+	if len(parts) == 0 && strings.TrimSpace(value) != "" {
+		return []string{strings.TrimSpace(value)}
+	}
+	out := make([]string, 0, len(parts))
+	for _, part := range parts {
+		if part = strings.TrimSpace(part); part != "" {
+			out = append(out, part)
+		}
+	}
+	return out
+}
 
 // Generator adapts the Ollama client to examgen.Generator.
 type Generator struct {
@@ -80,6 +150,146 @@ func (g *Generator) Outline(ctx context.Context, graph examgen.EvidenceGraph) (*
 	return outline, membership, nil
 }
 
+// CompileEvidence turns topic-level graph nodes into source-bound atomic
+// claims. It is batched by rune count so a large textbook does not become one
+// document-sized prompt, while each atom still retains its exact chunk ID.
+func (g *Generator) CompileEvidence(ctx context.Context, graph examgen.EvidenceGraph, chunks []examgen.Chunk) (examgen.EvidenceGraph, error) {
+	ctx = WithLabel(ctx, "outline/compile")
+	var rawAtoms []examgen.EvidenceAtom
+	for _, batch := range evidenceBatches(chunks) {
+		var out struct {
+			Atoms []struct {
+				SourceChunkID string        `json:"source_chunk_id"`
+				ChunkID       string        `json:"chunk_id"`
+				EvidenceChunk string        `json:"evidence_chunk_id"`
+				ConceptIDs    []string      `json:"concept_ids"`
+				Claim         string        `json:"claim"`
+				EvidenceQuote string        `json:"evidence_quote"`
+				Relation      string        `json:"relation"`
+				Conditions    stringListish `json:"conditions"`
+				Variables     stringListish `json:"variables"`
+				QuestionForms stringListish `json:"question_forms"`
+			} `json:"atoms"`
+		}
+		msgs := []Message{
+			{Role: "system", Content: examgen.EvidenceCompileSystem()},
+			{Role: "user", Content: examgen.EvidenceCompilePrompt(graph, batch)},
+		}
+		if err := g.c.ChatJSON(ctx, g.model, msgs, examgen.EvidenceCompileSchema(), genOptions(32768, 0), &out); err != nil {
+			return examgen.EvidenceGraph{}, err
+		}
+		for _, atom := range out.Atoms {
+			chunkID := atom.SourceChunkID
+			if chunkID == "" {
+				chunkID = atom.ChunkID
+			}
+			if chunkID == "" {
+				chunkID = atom.EvidenceChunk
+			}
+			rawAtoms = append(rawAtoms, examgen.EvidenceAtom{
+				ChunkID:       chunkID,
+				ConceptIDs:    atom.ConceptIDs,
+				Claim:         atom.Claim,
+				Quote:         atom.EvidenceQuote,
+				Relation:      atom.Relation,
+				Conditions:    []string(atom.Conditions),
+				Variables:     []string(atom.Variables),
+				QuestionForms: []string(atom.QuestionForms),
+			})
+		}
+	}
+	return examgen.NormalizeEvidenceGraph(graph, chunks, rawAtoms)
+}
+
+const (
+	evidenceBatchMaxChunks = 24
+	evidenceBatchMaxRunes  = 28_000
+)
+
+func evidenceBatches(chunks []examgen.Chunk) [][]examgen.Chunk {
+	var batches [][]examgen.Chunk
+	for start := 0; start < len(chunks); {
+		end := start
+		runes := 0
+		for end < len(chunks) && end-start < evidenceBatchMaxChunks {
+			next := examgen.RuneLen(chunks[end].Text) + examgen.RuneLen(chunks[end].ID) + 32
+			if end > start && runes+next > evidenceBatchMaxRunes {
+				break
+			}
+			runes += next
+			end++
+		}
+		batches = append(batches, chunks[start:end])
+		start = end
+	}
+	return batches
+}
+
+// PlanQuestions creates one lesson-level coverage plan before the pipeline
+// starts making individual question calls. It is optional at the interface
+// boundary so the lightweight test generators do not need a planning model.
+func (g *Generator) PlanQuestions(ctx context.Context, lesson examgen.Lesson, graph *examgen.EvidenceGraph, chunks []examgen.Chunk, budget int) (examgen.QuestionPlan, error) {
+	ctx = WithLabel(ctx, "question-plan")
+	var out examgen.QuestionPlan
+	msgs := []Message{
+		{Role: "system", Content: examgen.QuestionPlanSystem()},
+		{Role: "user", Content: examgen.QuestionPlanPrompt(lesson, graph, chunks, budget)},
+	}
+	if err := g.c.ChatJSON(ctx, g.model, msgs, examgen.QuestionPlanSchema(), genOptions(16384, 0), &out); err != nil {
+		return examgen.QuestionPlan{}, err
+	}
+	return out, nil
+}
+
+// QuestionsSet writes the complete set against the graph-derived contract and
+// the lesson's bounded two-hop context. This is the path that can keep target variety
+// across chunks instead of resetting the writer on every generation call.
+func (g *Generator) QuestionsSet(ctx context.Context, lesson examgen.Lesson, graph *examgen.EvidenceGraph, chunks []examgen.Chunk, contract examgen.CoverageContract, feedback []examgen.RejectedDraft, forceCalc bool) ([]examgen.Question, error) {
+	ctx = WithLabel(ctx, "generate-set")
+	var out struct {
+		Questions []examgen.Question `json:"questions"`
+	}
+	user := examgen.QuestionSetPrompt(lesson, graph, chunks, contract, feedback, forceCalc)
+	if g.UseCalcTool {
+		var selected []string
+		seen := map[string]bool{}
+		for _, slot := range contract.Slots {
+			if slot.Skill != "calculation" && slot.Skill != "application" {
+				continue
+			}
+			for _, id := range slot.SourceChunkIDs {
+				if seen[id] {
+					continue
+				}
+				for _, chunk := range chunks {
+					if chunk.ID == id {
+						selected = append(selected, chunk.Text)
+						seen[id] = true
+						break
+					}
+				}
+			}
+		}
+		if len(selected) > 0 {
+			facts, err := g.ComputeFacts(ctx, examgen.Chunk{Page: 0, Text: strings.Join(selected, "\n\n")}, forceCalc)
+			if err == nil {
+				user += FactsBlock(facts)
+			}
+		}
+	}
+	msgs := []Message{
+		{Role: "system", Content: examgen.QuestionSetSystem()},
+		{Role: "user", Content: user},
+	}
+	if err := g.c.ChatJSON(ctx, g.model, msgs, examgen.QuestionSetSchema(forceCalc), genOptions(32768, 0.35), &out); err != nil {
+		return nil, err
+	}
+	for i := range out.Questions {
+		dropEmptyCalculation(&out.Questions[i])
+	}
+	return out.Questions, nil
+}
+
 func (g *Generator) Questions(ctx context.Context, lesson examgen.Lesson, graph *examgen.EvidenceGraph, c examgen.Chunk, feedback []examgen.RejectedDraft, want int, forceCalc bool) ([]examgen.Question, error) {
 	var out struct {
 		Questions []examgen.Question `json:"questions"`
@@ -91,10 +301,9 @@ func (g *Generator) Questions(ctx context.Context, lesson examgen.Lesson, graph 
 	user := examgen.QuestionPrompt(lesson, graph, c, feedback, want, forceCalc)
 	if g.UseCalcTool {
 		facts, err := g.ComputeFacts(ctx, c, forceCalc)
-		if err != nil {
-			return nil, fmt.Errorf("calc tool: %w", err)
+		if err == nil {
+			user += FactsBlock(facts)
 		}
-		user += FactsBlock(facts)
 	}
 
 	// Phase B: schema-constrained generation. Tools are deliberately absent —

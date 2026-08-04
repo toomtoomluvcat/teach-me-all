@@ -290,6 +290,54 @@ func TestRunGatesCorePathUsesOnlyDeterministicQC(t *testing.T) {
 	}
 }
 
+func TestGateUnitCheckMatchesPhysicalAnswerUnit(t *testing.T) {
+	q := Question{
+		Calculation: &Calculation{Expression: "8/2", Expected: 4, Unit: "m/s^2"},
+		Choices: []Choice{
+			{Content: "4 m/s²", IsCorrect: true},
+			{Content: "4 m/s"},
+			{Content: "4 N"},
+			{Content: "4 kg"},
+		},
+	}
+	got := gateUnitCheck(q)
+	if !got.Pass {
+		t.Fatalf("matching unit failed: %#v", got)
+	}
+
+	q.Choices[0].Content = "4 m/s"
+	got = gateUnitCheck(q)
+	if got.Pass || !strings.Contains(got.Reason, "missing") {
+		t.Fatalf("missing unit passed: %#v", got)
+	}
+}
+
+func TestGateArithmeticAcceptsVerifiedNumericSubstepForSymbolicAnswer(t *testing.T) {
+	q := Question{
+		Skill:       "calculation",
+		Calculation: &Calculation{Expression: "2-8", Expected: -6},
+		Choices:     []Choice{{Content: "1/b^6", IsCorrect: true}, {Content: "b^6"}},
+	}
+	got := gateArithmetic(q, Arith{})
+	if !got.Pass {
+		t.Fatalf("symbolic answer failed after numeric substep was verified: %#v", got)
+	}
+}
+
+func TestRunCheapGatesIncludesUnitCheck(t *testing.T) {
+	q := Question{Calculation: &Calculation{Expression: "2+2", Expected: 4, Unit: "N"}, Choices: []Choice{{Content: "4", IsCorrect: true}}}
+	report := RunCheapGates(q, Chunk{}, Arith{})
+	for _, result := range report.Results {
+		if result.Gate == GateUnit {
+			if result.Pass {
+				t.Fatal("unit check passed a keyed choice with no unit")
+			}
+			return
+		}
+	}
+	t.Fatal("unit check result was not recorded")
+}
+
 func TestRunGatesRejectsDistractorEquivalentToCorrectChoice(t *testing.T) {
 	quote := "ประกอบด้วยการกิน การย่อย การดูดซึม และการถ่ายอุจจาระ"
 	q := Question{

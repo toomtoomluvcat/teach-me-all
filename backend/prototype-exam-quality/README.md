@@ -23,7 +23,7 @@ chunks ──pass 1 (map-reduce)──> evidence graph ──> course outline (l
                                        │
                         you pick a lesson in the TUI
                                        │
-chunks of that lesson ──pass 2──> MCQ (JSON-schema constrained)
+      graph atoms + bounded 2-hop context ──set pass──> MCQ set (JSON-schema constrained)
                                        │
                               deterministic QC gates
                                        │
@@ -66,6 +66,15 @@ told to ask a materially different question rather than paraphrase the rejected
 one. The generation contract also excludes learning objectives, assessment
 guidance, and classroom activities; a deterministic pre-judge gate catches
 known Thai and English teacher-guide phrases if the model ignores that rule.
+
+When `--set-generation` is enabled, pass 1 adds a compile step that splits the
+graph into atomic claims (`A###`) with exact chunk provenance, supported
+question forms, and source-stated conditions. The selected lesson receives its
+own chunks plus bounded two-hop context from adjacent concepts. A
+deterministic coverage contract (`S##`) then gives the writer one distinct
+atom/operation per target. Questions must return the slot, atom, and cited
+chunk IDs, so a verbatim quote cannot silently drift away from the evidence it
+is meant to support.
 
 Anthropic cannot enable citations and structured outputs at the same time
 (400 error), so `source_quote` + server-side substring check is what production
@@ -147,6 +156,11 @@ Flags:
 | `--extract-only` | `false` | stop after extraction and dump the full text — needs no Ollama at all |
 | `--scope` | *(none)* | free-text focus; chunks are ranked against this instead of the lesson title |
 | `--budget` | *(model decides)* | override how many questions the lesson should have |
+| `--per-chunk` | `2` | questions requested per generation call; larger values approximate set-level generation |
+| `--question-plan` | `false` | create a lesson-level coverage plan and feed its current slot to each generation call |
+| `--graph-compile` | `false` | compile content chunks into source-bound atomic claims before outline/generation |
+| `--set-generation` | `false` | use graph atoms, bounded two-hop cross-lesson context, and a set-level coverage contract in one generation call; implies graph compilation |
+| `--set-candidates` | `3` | generate independent set candidates and keep the highest deterministic QC/diversity score |
 
 **Run `--extract-only` first.** It makes no LLM API calls and tells you whether
 the rest of the pipeline has a chance:

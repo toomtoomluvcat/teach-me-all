@@ -24,3 +24,18 @@ func TestCheckWellFormedRejectsTeacherGuideMetadataQuestion(t *testing.T) {
 		t.Fatalf("reason = %q, want teacher-guide metadata", got.Reason)
 	}
 }
+
+func TestCheckWellFormedAcceptsImperativeMathStem(t *testing.T) {
+	q := Question{
+		Stem: "Simplify the expression t^23 / t^15 using the quotient rule.",
+		Choices: []Choice{
+			{Content: "t^8", IsCorrect: true},
+			{Content: "t^38"},
+			{Content: "t^15"},
+			{Content: "t^23"},
+		},
+	}
+	if got := CheckWellFormed(q); !got.Pass {
+		t.Fatalf("imperative math stem was rejected: %#v", got)
+	}
+}

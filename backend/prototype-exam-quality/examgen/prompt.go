@@ -203,6 +203,140 @@ func OutlinePrompt(graph EvidenceGraph) string {
 	return b.String()
 }
 
+// EvidenceCompileSystem is deliberately separate from question writing. Its
+// job is to turn prose into source-bound claims and possible reasoning modes;
+// it must not solve an assessment or invent facts from general knowledge.
+func EvidenceCompileSystem() string {
+	return `You are compiling a domain-agnostic educational source into atomic evidence.
+The source may teach any subject. Infer the domain from the supplied passages.
+Split each passage into the smallest meaningful teachable claims: definitions,
+mechanisms, relationships, equations, conditions, sequences, observations, or
+worked-example rules. Preserve the exact source chunk ID for every atom.
+
+Rules:
+- Every claim must be directly supported by one supplied chunk.
+- evidence_quote must be an exact contiguous substring from that same chunk;
+  never paraphrase it.
+- Do not merge unrelated claims or add facts from memory.
+- relation is a short label such as definition, equation, causal, sequence,
+  condition, comparison, direction, observation, or example.
+- variables and conditions name only quantities or constraints present in the
+  passage.
+- question_forms lists honest forms the claim supports: recall, understanding,
+  application, calculation. Use calculation only when the passage gives
+  enough numbers or an explicit equation.
+- Return no atom for page furniture, learning objectives, answer keys, or
+  assessment instructions.`
+}
+
+func EvidenceCompileSchema() map[string]any {
+	atom := obj(map[string]any{
+		"source_chunk_id": str("exact supplied chunk ID containing this claim"),
+		"concept_ids": map[string]any{
+			"type":  "array",
+			"items": str("one supplied concept ID"),
+		},
+		"claim":          str("one short source-supported teachable claim"),
+		"evidence_quote": str("exact contiguous substring copied character-for-character from the same source chunk that supports the claim"),
+		"relation":       enum("relationship type", "definition", "equation", "causal", "sequence", "condition", "comparison", "direction", "observation", "example"),
+		"conditions":     map[string]any{"type": "array", "items": str("source-stated constraint")},
+		"variables":      map[string]any{"type": "array", "items": str("source-stated variable or quantity")},
+		"question_forms": map[string]any{"type": "array", "minItems": 1, "maxItems": 4, "items": enum("supported reasoning form", "recall", "understanding", "application", "calculation")},
+	}, "source_chunk_id", "concept_ids", "claim", "evidence_quote", "relation", "conditions", "variables", "question_forms")
+	return obj(map[string]any{
+		"atoms": map[string]any{
+			"type":     "array",
+			"minItems": 1,
+			"maxItems": 80,
+			"items":    atom,
+		},
+	}, "atoms")
+}
+
+func EvidenceCompilePrompt(graph EvidenceGraph, chunks []Chunk) string {
+	var b strings.Builder
+	b.WriteString("Concept IDs available in the graph:\n")
+	for _, concept := range graph.Concepts {
+		fmt.Fprintf(&b, "- %s: %s\n", concept.ID, concept.Title)
+	}
+	b.WriteString("\nPassages to compile:\n")
+	for _, chunk := range chunks {
+		fmt.Fprintf(&b, "[%s | page %d]\n%s\n\n", chunk.ID, chunk.Page, chunk.Text)
+	}
+	b.WriteString("Return one atom per distinct teachable claim. Do not draft questions.")
+	return b.String()
+}
+
+func QuestionSetSystem() string {
+	return questionSystem + `
+
+You are writing a complete assessment set, not independent questions. The
+coverage contract is authoritative. Use each slot at most once and do not
+reuse the same claim, relationship, or scenario with different numbers. Every
+question must return its exact coverage_slot_id, evidence_atom_id, and
+evidence_chunk_id from the supplied contract/context. A quote being present is
+not enough: it must support the answer target. If a slot is not supported by
+its atom and chunk, omit that slot rather than substituting a repeated one. For
+a calculation slot, set skill to exactly calculation and make
+calculation.expression/expected mandatory. For every other slot, set skill to
+exactly the slot skill and omit calculation unless arithmetic is necessary. Do
+not turn a definition or symbolic algebra rule into a recall question just to
+fill a calculation slot; instead apply the rule to explicit numeric values or
+omit the slot. Never duplicate choice text.`
+}
+
+func QuestionSetSchema(forceCalc bool) map[string]any {
+	schema := QuestionSchema(forceCalc)
+	root := schema["properties"].(map[string]any)
+	questions := root["questions"].(map[string]any)
+	item := questions["items"].(map[string]any)
+	properties := item["properties"].(map[string]any)
+	properties["coverage_slot_id"] = str("exact coverage slot ID from the contract")
+	properties["evidence_atom_id"] = str("exact evidence atom ID from the contract")
+	properties["evidence_chunk_id"] = str("exact source chunk ID containing the quote")
+	properties["operation"] = str("short description of the reasoning operation used")
+	required := append([]string{}, item["required"].([]string)...)
+	required = append(required, "coverage_slot_id", "evidence_atom_id", "evidence_chunk_id", "operation")
+	item["required"] = required
+	return schema
+}
+
+func QuestionSetPrompt(lesson Lesson, graph *EvidenceGraph, chunks []Chunk, contract CoverageContract, feedback []RejectedDraft, forceCalc bool) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "Lesson: %s\n\n", lesson.Title)
+	if contract.Variant > 0 {
+		fmt.Fprintf(&b, "This is candidate set %d. Explore a different valid question angle where the evidence supports it; do not mention candidate selection in the questions.\n\n", contract.Variant)
+	}
+	b.WriteString("Coverage contract (one slot per distinct question):\n")
+	for _, slot := range contract.Slots {
+		fmt.Fprintf(&b, "- %s atom=%s chunk=%s skill=%s difficulty=%s operation=%s target=%s evidence_quote=%q\n",
+			slot.ID, slot.AtomID, strings.Join(slot.SourceChunkIDs, ","), slot.Skill, slot.Difficulty, slot.Operation, slot.Target, slot.EvidenceQuote)
+	}
+	b.WriteString("\nCompiled evidence atoms:\n")
+	if graph != nil {
+		for _, atom := range graph.Atoms {
+			if !containsString(contract.ContextChunkIDs, atom.ChunkID) {
+				continue
+			}
+			fmt.Fprintf(&b, "- %s chunk=%s concepts=%s relation=%s claim=%s evidence_quote=%q\n", atom.ID, atom.ChunkID, strings.Join(atom.ConceptIDs, ","), atom.Relation, atom.Claim, atom.Quote)
+		}
+	}
+	b.WriteString("\nSource context (the cited quote must come from the exact evidence_chunk_id):\n")
+	for _, chunk := range chunks {
+		fmt.Fprintf(&b, "[%s | page %d]\n%s\n\n", chunk.ID, chunk.Page, chunk.Text)
+	}
+	if len(feedback) > 0 {
+		b.WriteString(rejectionMemoryBlock(feedback))
+	}
+	fmt.Fprintf(&b, "Write up to %d questions, one for each supported slot. Keep the set varied and return empty only for an unsupported slot. ", len(contract.Slots))
+	if forceCalc {
+		b.WriteString("Every returned question must be a calculation with a valid calculation expression.")
+	} else {
+		b.WriteString("For slots marked calculation, calculation.expression and calculation.expected are mandatory. Use calculation only when arithmetic is necessary and supported by the atom.")
+	}
+	return b.String()
+}
+
 // --- pass 2: question generation --------------------------------------------
 
 // QuestionSchema constrains generation. forceCalc drops the non-calculation
@@ -212,6 +346,7 @@ func QuestionSchema(forceCalc bool) map[string]any {
 	calc := obj(map[string]any{
 		"expression": str("the arithmetic to solve this question, as a plain expression using numbers, + - * / ^, parentheses, decimal points, pi, and only these functions: sin, cos, tan, sqrt, abs, exp, ln. No variables or units. Trigonometric arguments are in radians. Example: (1200*0.07)/12 or 20*sin(30*pi/180)"),
 		"expected":   map[string]any{"type": "number", "description": "the value that expression produces"},
+		"unit":       str("the physical unit of the answer, such as m/s^2 or N; empty for a dimensionless ratio or coefficient"),
 	}, "expression", "expected")
 
 	question := map[string]any{

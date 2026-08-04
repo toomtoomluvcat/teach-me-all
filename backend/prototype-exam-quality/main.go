@@ -51,6 +51,11 @@ type config struct {
 	scope              string
 	pages              string
 	budget             int
+	perChunk           int
+	questionPlan       bool
+	graphCompile       bool
+	setGeneration      bool
+	setCandidates      int
 	fresh              bool
 	extractOnly        bool
 	calcTool           bool
@@ -95,6 +100,11 @@ func main() {
 	flag.StringVar(&cfg.scope, "scope", "", "free-text focus; chunks are ranked against this instead of the lesson title")
 	flag.StringVar(&cfg.pages, "pages", "", "page range, e.g. 10-40")
 	flag.IntVar(&cfg.budget, "budget", 0, "override the model's own question budget")
+	flag.IntVar(&cfg.perChunk, "per-chunk", 0, "questions requested per generation call; 0 uses the default")
+	flag.BoolVar(&cfg.questionPlan, "question-plan", false, "plan lesson-level coverage slots before generating questions")
+	flag.BoolVar(&cfg.graphCompile, "graph-compile", false, "compile source chunks into atomic evidence claims")
+	flag.BoolVar(&cfg.setGeneration, "set-generation", false, "generate a complete question set from graph evidence and cross-lesson context")
+	flag.IntVar(&cfg.setCandidates, "set-candidates", 3, "independent set candidates to generate and score when --set-generation is enabled")
 	flag.BoolVar(&cfg.fresh, "fresh", false, "ignore the cache")
 	flag.BoolVar(&cfg.extractOnly, "extract-only", false, "stop after extraction; needs no models and no Ollama")
 	flag.BoolVar(&cfg.filterTopics, "filter-topics", true, "drop chunks pass 1 classified as teacher-guide apparatus or page furniture; set false for a source that really is mostly exercises")
@@ -320,6 +330,7 @@ func run(ctx context.Context, cfg config) error {
 
 	deps := examgen.Deps{
 		Gen:           gen,
+		CompileGraph:  cfg.graphCompile || cfg.setGeneration,
 		Judge:         llm.NewJudge(modelClient, cfg.model),
 		Eval:          examgen.Arith{},
 		Log:           examgen.Progress(safeProgress()),
@@ -343,7 +354,11 @@ func run(ctx context.Context, cfg config) error {
 	// keys and assessment rubrics as concepts, with nothing left in the code able
 	// to tell which ones they are. Reusing it would silently serve lessons the
 	// current pipeline would never have produced.
-	oc, err := cachedT(cfg, "outline-v3", func() (outlineCache, error) {
+	outlineCacheName := "outline-v3"
+	if deps.CompileGraph {
+		outlineCacheName = "outline-v4"
+	}
+	oc, err := cachedT(cfg, outlineCacheName, func() (outlineCache, error) {
 		clear()
 		header("STEP 2 — reading the whole document (pass 1)")
 		mapPlan := "one model call each"
@@ -381,6 +396,12 @@ func run(ctx context.Context, cfg config) error {
 		opt.ForceCalc = cfg.forceCalc
 		opt.Scope = cfg.scope
 		opt.Budget = cfg.budget
+		opt.PlanFirst = cfg.questionPlan
+		opt.SetGeneration = cfg.setGeneration
+		opt.SetCandidates = cfg.setCandidates
+		if cfg.perChunk > 0 {
+			opt.PerChunk = cfg.perChunk
+		}
 
 		clear()
 		header("STEP 3 — generating and gating: " + lesson.Title)
@@ -571,12 +592,16 @@ func writeRun(cfg config, res *examgen.ExamResult) error {
 		Gates  []examgen.GateResult `json:"gates"`
 	}
 	out := struct {
-		Lesson    string     `json:"lesson"`
-		Budget    int        `json:"budget"`
-		PassRate  float64    `json:"pass_rate"`
-		Ceiling   bool       `json:"ceiling"`
-		Questions []reported `json:"questions"`
-	}{Lesson: res.Lesson.Title, Budget: res.Budget, PassRate: res.PassRate(), Ceiling: res.Ceiling}
+		Lesson           string                    `json:"lesson"`
+		Budget           int                       `json:"budget"`
+		PassRate         float64                   `json:"pass_rate"`
+		Ceiling          bool                      `json:"ceiling"`
+		SetCandidates    int                       `json:"set_candidates,omitempty"`
+		SelectedSetScore int                       `json:"selected_set_score,omitempty"`
+		Plan             *examgen.QuestionPlan     `json:"plan,omitempty"`
+		Contract         *examgen.CoverageContract `json:"contract,omitempty"`
+		Questions        []reported                `json:"questions"`
+	}{Lesson: res.Lesson.Title, Budget: res.Budget, PassRate: res.PassRate(), Ceiling: res.Ceiling, SetCandidates: res.SetCandidates, SelectedSetScore: res.SelectedSetScore, Plan: res.Plan, Contract: res.Contract}
 
 	for _, q := range res.Questions {
 		r := reported{Question: q}

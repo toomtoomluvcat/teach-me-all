@@ -54,6 +54,7 @@ var pedagogyPhrases = []string{
 var questionWords = []string{
 	"อะไร", "ใด", "ไหน", "ทำไม", "อย่างไร", "เท่าใด", "เท่าไร", "กี่", "เพราะเหตุใด", "ข้อใด",
 	"what", "which", "how", "why", "when", "who", "where", "calculate", "find the",
+	"simplify", "solve", "evaluate", "convert", "write the answer", "determine", "reduce",
 }
 
 // Tunables. Each was set from the failure it was written for, not from taste.

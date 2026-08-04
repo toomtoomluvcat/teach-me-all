@@ -193,6 +193,7 @@ type Choice struct {
 type Calculation struct {
 	Expression string  `json:"expression"`
 	Expected   float64 `json:"expected"`
+	Unit       string  `json:"unit,omitempty"`
 }
 
 // UnmarshalJSON tolerates a number wrapped in JSON quotes. Some hosted models
@@ -247,6 +248,13 @@ type Question struct {
 	Skill       string       `json:"skill"`
 	Calculation *Calculation `json:"calculation,omitempty"`
 
+	// Set-generation provenance. The per-chunk path leaves these empty; the
+	// set path requires them so a question can be traced to one graph atom and
+	// one exact source chunk.
+	CoverageSlotID  string `json:"coverage_slot_id,omitempty"`
+	EvidenceAtomID  string `json:"evidence_atom_id,omitempty"`
+	EvidenceChunkID string `json:"evidence_chunk_id,omitempty"`
+
 	// Filled in by us, not by the model.
 	ChunkID string      `json:"-"`
 	Report  *GateReport `json:"-"`
@@ -279,7 +287,9 @@ const (
 	GateSourceSpecific GateName = "source_specific"
 	GateSingleValid    GateName = "single_defensible"
 	GateArithmetic     GateName = "arithmetic"
+	GateUnit           GateName = "unit_check"
 	GateDistinct       GateName = "not_a_duplicate"
+	GateCoverage       GateName = "coverage_contract"
 )
 
 // GateResult is the outcome of one check.

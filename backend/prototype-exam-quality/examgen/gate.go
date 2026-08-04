@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"unicode"
 )
 
 // BlindVerdict is what a judge reports when it sees only the question — no
@@ -130,6 +131,7 @@ func RunCheapGates(q Question, chunk Chunk, ev Evaluator) *GateReport {
 	rep.add(gateSourceRole(chunk))
 	rep.add(gateQuote(q, chunk))
 	rep.add(gateArithmetic(q, ev))
+	rep.add(gateUnitCheck(q))
 	return rep
 }
 
@@ -225,6 +227,11 @@ func gateArithmetic(q Question, ev Evaluator) GateResult {
 		return res
 	}
 	if !choiceMentionsNumber(q.Choices[idx].Content, got) {
+		if q.Skill == "calculation" && choiceHasSymbolicMath(q.Choices[idx].Content) {
+			res.Pass = true
+			res.Reason = fmt.Sprintf("%s = %g; correct choice is a symbolic expression whose numeric substep is verified", q.Calculation.Expression, got)
+			return res
+		}
 		res.Reason = fmt.Sprintf("expression evaluates to %g but the correct choice reads %q",
 			got, q.Choices[idx].Content)
 		return res
@@ -233,6 +240,101 @@ func gateArithmetic(q Question, ev Evaluator) GateResult {
 	res.Pass = true
 	res.Reason = fmt.Sprintf("%s = %g, matches the correct choice", q.Calculation.Expression, got)
 	return res
+}
+
+func choiceHasSymbolicMath(choice string) bool {
+	if !strings.ContainsAny(choice, "^/") {
+		return false
+	}
+	for _, r := range choice {
+		if unicode.IsLetter(r) {
+			return true
+		}
+	}
+	return false
+}
+
+// gateUnitCheck is the lightweight unit tool. It validates the model's
+// declared answer unit and checks that the keyed choice carries the same unit.
+// It deliberately does not guess missing units: a dimensionless ratio or a
+// non-physical numeric answer is allowed to declare an empty unit.
+func gateUnitCheck(q Question) GateResult {
+	res := GateResult{Gate: GateUnit, Deterministic: true}
+	if q.Calculation == nil {
+		res.Pass = true
+		res.Reason = "no arithmetic in this question"
+		return res
+	}
+	unit := strings.TrimSpace(q.Calculation.Unit)
+	if unit == "" {
+		res.Pass = true
+		res.Reason = "dimensionless or no physical unit declared"
+		return res
+	}
+	normal, ok := normaliseUnit(unit)
+	if !ok {
+		res.Reason = fmt.Sprintf("unit %q contains unsupported symbols or malformed exponents", unit)
+		return res
+	}
+	idx := q.CorrectIndex()
+	if idx < 0 {
+		res.Reason = "cannot check answer unit without exactly one correct choice"
+		return res
+	}
+	if !choiceHasUnit(q.Choices[idx].Content, normal) {
+		res.Reason = fmt.Sprintf("declared answer unit %q is missing from the correct choice %q", unit, q.Choices[idx].Content)
+		return res
+	}
+	res.Pass = true
+	res.Reason = fmt.Sprintf("correct choice carries answer unit %s", normal)
+	return res
+}
+
+func normaliseUnit(unit string) (string, bool) {
+	s := strings.ToLower(strings.TrimSpace(unit))
+	s = strings.ReplaceAll(s, "²", "^2")
+	s = strings.ReplaceAll(s, "³", "^3")
+	s = strings.ReplaceAll(s, "⁻", "-")
+	s = strings.ReplaceAll(s, "·", "*")
+	s = strings.ReplaceAll(s, "×", "*")
+	s = strings.ReplaceAll(s, " ", "")
+	if s == "" {
+		return "", true
+	}
+	for _, r := range s {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || strings.ContainsRune("*/^.-", r) {
+			continue
+		}
+		return "", false
+	}
+	if strings.HasPrefix(s, "*") || strings.HasSuffix(s, "*") || strings.Contains(s, "**") || strings.Contains(s, "//") {
+		return "", false
+	}
+	return s, true
+}
+
+func choiceHasUnit(choice, unit string) bool {
+	normalChoice := strings.ToLower(choice)
+	normalChoice = strings.ReplaceAll(normalChoice, "²", "^2")
+	normalChoice = strings.ReplaceAll(normalChoice, "³", "^3")
+	normalChoice = strings.ReplaceAll(normalChoice, "·", "*")
+	normalChoice = strings.ReplaceAll(normalChoice, "×", "*")
+	normalChoice = strings.ReplaceAll(normalChoice, " ", "")
+	if strings.Contains(normalChoice, unit) {
+		return true
+	}
+	switch unit {
+	case "n":
+		return strings.Contains(normalChoice, "newton")
+	case "kg*m/s^2":
+		return strings.Contains(normalChoice, "n") || strings.Contains(normalChoice, "newton")
+	case "m/s^2":
+		return strings.Contains(normalChoice, "m/s^2") || strings.Contains(normalChoice, "m·s^-2")
+	case "m/s":
+		return strings.Contains(normalChoice, "m/s")
+	default:
+		return false
+	}
 }
 
 // gateInterpretable is the vagueness check. It asks whether a reader can tell
@@ -405,6 +507,7 @@ func choiceMentionsNumber(choice string, v float64) bool {
 	candidates := []string{
 		trimZeros(fmt.Sprintf("%.6f", v)),
 		trimZeros(fmt.Sprintf("%.4f", v)),
+		trimZeros(fmt.Sprintf("%.3f", v)),
 		trimZeros(fmt.Sprintf("%.2f", v)),
 		trimZeros(fmt.Sprintf("%.1f", v)),
 		fmt.Sprintf("%.0f", v),
@@ -421,6 +524,12 @@ func choiceMentionsNumber(choice string, v float64) bool {
 	haystack := strings.ReplaceAll(choice, ",", "")
 	for _, c := range candidates {
 		if c != "" && strings.Contains(haystack, c) {
+			return true
+		}
+	}
+	if v >= 0 && v <= 20 && math.Abs(v-math.Round(v)) < 1e-9 {
+		words := []string{"zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen", "nineteen", "twenty"}
+		if strings.Contains(strings.ToLower(choice), words[int(math.Round(v))]) {
 			return true
 		}
 	}

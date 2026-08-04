@@ -42,3 +42,12 @@ func TestChoiceMentionsUnicodeScientificNotation(t *testing.T) {
 		t.Fatal("incorrect rounded scientific notation should not match")
 	}
 }
+
+func TestChoiceMentionsNumberWords(t *testing.T) {
+	if !choiceMentionsNumber("four times greater", 4) {
+		t.Fatal("number words should match a computed integer")
+	}
+	if choiceMentionsNumber("five times greater", 4) {
+		t.Fatal("wrong number word should not match")
+	}
+}

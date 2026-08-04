@@ -6,8 +6,9 @@ import (
 )
 
 type EvidenceGraph struct {
-	Concepts []ConceptNode `json:"concepts"`
-	Edges    []ConceptEdge `json:"edges"`
+	Concepts []ConceptNode  `json:"concepts"`
+	Edges    []ConceptEdge  `json:"edges"`
+	Atoms    []EvidenceAtom `json:"atoms,omitempty"`
 }
 
 type ConceptNode struct {
