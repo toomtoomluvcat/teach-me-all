@@ -21,7 +21,7 @@ $venvPython = Join-Path $Venv "Scripts\python.exe"
     "easyocr==1.7.2"
 if ($LASTEXITCODE -ne 0) { throw "Docling dependency install failed" }
 
-& $venvPython (Join-Path $PSScriptRoot "pdfx\docling_helper.py") --check
+& $venvPython (Join-Path $PSScriptRoot "pdfx\extract\docling_helper.py") --check
 if ($LASTEXITCODE -ne 0) { throw "Docling runtime check failed" }
 
 Write-Host "Docling runtime ready: $venvPython"

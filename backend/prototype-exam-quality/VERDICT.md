@@ -125,7 +125,7 @@ Four defects, all found by running rather than by reading:
    "DLD-01" arrives as three lines. Rebuilt line assembly from `GetTextByRow`
    plus glyph coordinates.
 2. **SARA AM loses its NIKHAHIT.** "คำจำกัดความ" extracts as "ค าจ ากัดความ".
-   Repaired in `pdfx.repairThai`. Without it every Thai question fails gate 1.
+   Repaired in the extraction repair layer. Without it every Thai question fails gate 1.
 3. **Gate 1 was comparing whitespace.** PDF extraction sprinkles spaces between
    Thai syllables; the model writes Thai without them. 12 of 15 correct quotes
    were being rejected over spacing alone. Comparison now ignores whitespace
@@ -150,7 +150,7 @@ better — it is that the Go path's damage leaves a space where the missing mark
 was, and a space is recoverable. Poppler's damage is silent.
 
 Also worth knowing: Git for Windows ships an Xpdf 4.00 binary called
-`pdftotext` that sits ahead of poppler on PATH and is worse at Thai. `pdfx`
+`pdftotext` that sits ahead of poppler on PATH and is worse at Thai. `pdfx/extract`
 looks for real poppler installs before falling back to PATH.
 
 **Correcting the model afterwards fails. Stopping it from doing arithmetic at

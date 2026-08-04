@@ -45,7 +45,7 @@ chunks ──pass 1 (map-reduce)──> evidence graph ──> course outline (l
 The QC gates are deliberately a backstop, not a complete educational-quality
 grader. Before generating, the model
 calls a `calc` tool that Go answers, so it never computes anything itself
-(`llm/calctool.go`). The gate then re-checks, because an expression in the
+(`llm/generation/calctool.go`). The gate then re-checks, because an expression in the
 database can be re-verified years later and a tool call that already happened
 cannot. Tools and a `format` schema are mutually exclusive in Ollama, so
 generation runs as two turns — see VERDICT.md.
@@ -113,13 +113,13 @@ Target machine is 6 GB VRAM, so models are loaded and unloaded one at a time.
 
 ```
 cd backend/prototype-exam-quality
-go run . --pdf ../../samples/algebra-en.pdf
+go run ./cmd/protoexam --pdf ../../samples/algebra-en.pdf
 ```
 
 Gemini example (PowerShell):
 
 ```powershell
-go run . --provider gemini --pdf ../../samples/algebra-en.pdf
+go run ./cmd/protoexam --provider gemini --pdf ../../samples/algebra-en.pdf
 ```
 
 DeepSeek example:
@@ -161,12 +161,13 @@ Flags:
 | `--graph-compile` | `false` | compile content chunks into source-bound atomic claims before outline/generation |
 | `--set-generation` | `false` | use graph atoms, bounded two-hop cross-lesson context, and a set-level coverage contract in one generation call; implies graph compilation |
 | `--set-candidates` | `3` | generate independent set candidates and keep the highest deterministic QC/diversity score |
+| `--contract-preflight` | `true` | repair/drop deterministic slot defects before generation; no model call |
 
 **Run `--extract-only` first.** It makes no LLM API calls and tells you whether
 the rest of the pipeline has a chance:
 
 ```
-go run . --pdf ../../samples/thai-book.pdf --extract-only
+go run ./cmd/protoexam --pdf ../../samples/thai-book.pdf --extract-only
 ```
 
 The built executable can be reused without rebuilding:
@@ -224,11 +225,11 @@ branch. Main keeps the decision, not the prototype.
 ## Layout
 
 ```
-main.go        TUI shell            — throwaway
-ui.go          frame rendering      — throwaway
-examgen/       pure logic           — LIFTABLE into production
-llm/           Ollama client        — mostly liftable
-pdfx/          extraction           — liftable, but see the risk note below
+cmd/protoexam/   process entrypoint — throwaway
+app/             CLI orchestration, TUI, cache/artifacts, benchmark — throwaway
+examgen/         model, evidence, gates, generation              — LIFTABLE
+llm/             core, providers, generation, judging            — mostly liftable
+pdfx/            extract, bundle                                  — liftable, see risk note
 ```
 
 `examgen/` must not import `llm/` concretely or print anything. It takes interfaces
@@ -264,7 +265,7 @@ extraction failure, not permission to silently return a lower-quality document.
   server, `github.com/klippa-app/go-pdfium` in `webassembly` mode rasterises
   with no cgo and no external binary, under MIT + Apache-2.0. Avoid `go-fitz`:
   it is AGPL and §13 reaches network users.
-- The arithmetic evaluator in `examgen/calc.go` is hand-written rather than
+- The arithmetic evaluator in `examgen/model/calc.go` is hand-written rather than
   pulled from an expression library. A grammar that cannot express a function
   call or a variable cannot be talked into doing anything but arithmetic, and
   these expressions come from a language model and get stored and re-run for

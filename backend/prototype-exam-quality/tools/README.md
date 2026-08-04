@@ -1,5 +1,11 @@
 # labelkit — blind labelling for the question-quality comparison
 
+For easier human labelling, open [`label-sheet.html`](label-sheet.html). It
+shows the current 45-question baseline immediately, supports keyboard shortcuts
+`1`–`6`, autosaves in the browser, and exports a `sheet-labelled.csv` that can
+be scored by the commands below. The bundled baseline is from 2026-08-03; use
+the file picker inside the page when labelling a newer CSV.
+
 Three sets of questions (ours, NotebookLM given only the lesson pages,
 NotebookLM given the whole book) get merged, shuffled and stripped down to
 stem + four choices. A human labels all of them without knowing which tool
