@@ -240,14 +240,18 @@ func (c *Calculation) UnmarshalJSON(data []byte) error {
 
 // Question is what the model is asked to emit, plus what we learn about it.
 type Question struct {
-	Kind        Kind         `json:"kind"`
-	Stem        string       `json:"stem"`
-	Choices     []Choice     `json:"choices"`
-	Explanation string       `json:"explanation"`
-	SourceQuote string       `json:"source_quote"`
-	Difficulty  string       `json:"difficulty"`
-	Skill       string       `json:"skill"`
-	Calculation *Calculation `json:"calculation,omitempty"`
+	Kind        Kind     `json:"kind"`
+	Stem        string   `json:"stem"`
+	Choices     []Choice `json:"choices"`
+	Explanation string   `json:"explanation"`
+	SourceQuote string   `json:"source_quote"`
+	Difficulty  string   `json:"difficulty"`
+	Skill       string   `json:"skill"`
+	// RequiresCalculation is orthogonal to Skill. It says the student must do
+	// arithmetic; Skill still describes the cognitive demand (for example,
+	// application + calculation + hard).
+	RequiresCalculation bool         `json:"requires_calculation"`
+	Calculation         *Calculation `json:"calculation,omitempty"`
 	// Demand metadata is deliberately compact. It gives deterministic QC a
 	// handle on the claimed reasoning load instead of trusting a long prose
 	// explanation to look multi-step.
@@ -301,7 +305,19 @@ func (q *Question) UnmarshalJSON(data []byte) error {
 			return fmt.Errorf("distractor_reasons: %w", err)
 		}
 	}
+	// Legacy artifacts used skill=calculation. Preserve those artifacts while
+	// exposing the new orthogonal flag to every caller.
+	if q.Calculation != nil || strings.EqualFold(strings.TrimSpace(q.Skill), "calculation") {
+		q.RequiresCalculation = true
+	}
 	return nil
+}
+
+// NeedsCalculation is the compatibility-aware calculation flag. New output
+// should use RequiresCalculation; the legacy skill value remains readable so
+// old benchmark artifacts do not silently lose arithmetic metadata.
+func (q Question) NeedsCalculation() bool {
+	return q.RequiresCalculation || q.Calculation != nil || strings.EqualFold(strings.TrimSpace(q.Skill), "calculation")
 }
 
 func decodeDemandStringList(raw json.RawMessage) ([]string, error) {

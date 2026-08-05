@@ -85,6 +85,15 @@ LLM judge มี bias และความแปรปรวน; งาน [G-E
 
 ## Dynamic workflow และ cost policy
 
+### Calculation เป็น orthogonal flag
+
+Arithmetic เป็น operation/tool requirement ไม่ใช่ cognitive skill. Runtime schema
+จึงใช้ `skill ∈ {recall, understanding, application}` คู่กับ
+`requires_calculation: bool` และ optional `calculation` payload. นี่ทำให้โจทย์
+ที่คิดเลขยังแยกได้ว่าเป็น direct understanding หรือ multi-step application และ
+ไม่บังคับให้ทุกวิชาที่มีตัวเลขใช้ template เดียวกัน. `skill: calculation` จาก
+artifact เก่าถูกอ่านเป็น legacy alias ของ flag เท่านั้น
+
 ```text
 PDF/document
   → extract + diagnostics
@@ -125,6 +134,11 @@ hard/application targeted rerun หลังเพิ่ม support atoms:
 นี่เป็นหลักฐานว่า contract ช่วยกัน recall ที่ติดป้าย hard ได้ แต่ยังไม่ใช่
 หลักฐานว่า semantic quality ถึง NotebookLM แล้ว. ต้องอ่านตัวอย่างที่ผ่านและ
 failure rows; ห้ามสรุปจาก gate summary อย่างเดียว
+
+Orthogonal-flag smoke หลัง refactor: Scientific Notation ได้ `2/4` accepted และ
+numeric verified `2/4`; ทุกข้อที่มี arithmetic ใช้ `skill=understanding` หรือ
+`application` คู่กับ `requires_calculation=true`. Sociology application-hard ได้
+`3/4` accepted โดยทุก draft ใช้ `requires_calculation=false`.
 
 ## สิ่งที่ยังต้องทำต่อ
 

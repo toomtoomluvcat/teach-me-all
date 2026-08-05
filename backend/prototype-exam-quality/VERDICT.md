@@ -35,6 +35,10 @@ independent reviewer or calibrated human sample on the same source before a
 quality claim is closed. See `E:\contribute\teach-me-all\docs\HANDOFF.md` and
 `E:\contribute\teach-me-all\docs\research\exam-quality-research-2026-08.md`.
 
+The question schema now keeps `skill` limited to cognitive demand and represents
+arithmetic separately as `requires_calculation`; old `skill: calculation` JSON is
+accepted only as a compatibility alias.
+
 ## Setup
 
 | | |

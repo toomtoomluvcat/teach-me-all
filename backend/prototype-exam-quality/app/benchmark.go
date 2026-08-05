@@ -12,13 +12,14 @@ import (
 )
 
 type benchmarkCase struct {
-	Name             string
-	LessonContains   string
-	Scope            string
-	Directive        string
-	ForceCalc        bool
-	TargetSkill      string
-	TargetDifficulty string
+	Name                string
+	LessonContains      string
+	Scope               string
+	Directive           string
+	ForceCalc           bool
+	TargetSkill         string
+	TargetDifficulty    string
+	RequiresCalculation bool
 }
 
 func benchmarkCases(selection string, lessonHint string, scopeHint string) ([]benchmarkCase, error) {
@@ -50,12 +51,12 @@ func benchmarkCases(selection string, lessonHint string, scopeHint string) ([]be
 		TargetDifficulty: "medium",
 	}
 	calculation := benchmarkCase{
-		Name:           "calculation",
-		LessonContains: "newton",
-		Scope:          "net force mass acceleration weight worked calculation",
-		Directive:      "Generate calculation questions only. Use explicit numerical values that appear in the passage or stem and show a solvable expression in calculation.expression. The correct choice must be a decimal/integer numeric answer, never a radical, variable, or symbolic identity. Set skill to calculation. Prefer applied physics scenarios over definition questions.",
-		ForceCalc:      true,
-		TargetSkill:    "calculation",
+		Name:                "calculation",
+		LessonContains:      "newton",
+		Scope:               "net force mass acceleration weight worked calculation",
+		Directive:           "Generate questions that require arithmetic. Use explicit numerical values that appear in the passage or stem and show a solvable expression in calculation.expression. Set requires_calculation=true and keep skill honest as understanding or application; never use calculation as a skill. The correct choice must be a decimal/integer numeric answer, never a radical, variable, or symbolic identity. Prefer applied physics scenarios over definition questions.",
+		ForceCalc:           true,
+		RequiresCalculation: true,
 	}
 
 	switch strings.ToLower(strings.TrimSpace(selection)) {
@@ -104,12 +105,12 @@ func genericBenchmarkCases(selection, lessonHint, scopeHint string) ([]benchmark
 		TargetDifficulty: "medium",
 	}
 	calculation := benchmarkCase{
-		Name:           "calculation",
-		LessonContains: lessonHint,
-		Scope:          focus + " numerical rule equation worked example",
-		Directive:      "Generate calculation questions only. Use explicit numerical values that appear in the passage or stem and show a solvable expression in calculation.expression. The correct choice must be a decimal/integer numeric answer, never a radical, variable, or symbolic identity. Set skill to calculation. Prefer an applied scenario over a definition question.",
-		ForceCalc:      true,
-		TargetSkill:    "calculation",
+		Name:                "calculation",
+		LessonContains:      lessonHint,
+		Scope:               focus + " numerical rule equation worked example",
+		Directive:           "Generate questions that require arithmetic. Use explicit numerical values that appear in the passage or stem and show a solvable expression in calculation.expression. Set requires_calculation=true and keep skill honest as understanding or application; never use calculation as a skill. The correct choice must be a decimal/integer numeric answer, never a radical, variable, or symbolic identity. Prefer an applied scenario over a definition question.",
+		ForceCalc:           true,
+		RequiresCalculation: true,
 	}
 
 	switch strings.ToLower(strings.TrimSpace(selection)) {
@@ -210,7 +211,7 @@ func runBenchmark(ctx context.Context, cfg config, outline *examgen.Outline, chu
 					Lesson:     lesson.Title,
 					Budget:     budget,
 					Skipped:    true,
-					SkipReason: "source has no graph evidence that supports a calculation slot",
+					SkipReason: "source has no graph evidence that supports a numeric-required slot",
 				}
 				report.Cases = append(report.Cases, caseResult)
 				fmt.Printf("%s%s: skipped — %s%s\n", yellow, benchmark.Name, caseResult.SkipReason, reset)
@@ -257,7 +258,7 @@ func makeBenchmarkCaseResult(benchmark benchmarkCase, res *examgen.ExamResult) b
 		if passed {
 			out.Accepted++
 		}
-		if q.Calculation != nil {
+		if q.NeedsCalculation() {
 			out.CalculationDrafts++
 			if passed {
 				out.CalculationAccepted++
@@ -270,15 +271,21 @@ func makeBenchmarkCaseResult(benchmark benchmarkCase, res *examgen.ExamResult) b
 		if isDemandTarget && strings.TrimSpace(q.ChangedCondition) != "" {
 			out.ChangedCondition++
 		}
-		if gatePassed(q.Report, examgen.GateArithmetic) && q.Calculation != nil {
+		if gatePassed(q.Report, examgen.GateArithmetic) && q.NeedsCalculation() {
 			out.NumericVerified++
 		}
 		if gatePassed(q.Report, examgen.GateWellFormed) {
 			out.WellFormedPassed++
 		}
-		target := strings.EqualFold(strings.TrimSpace(q.Skill), benchmark.TargetSkill)
+		target := true
+		if benchmark.TargetSkill != "" {
+			target = strings.EqualFold(strings.TrimSpace(q.Skill), benchmark.TargetSkill)
+		}
 		if benchmark.TargetDifficulty != "" {
 			target = target && strings.EqualFold(strings.TrimSpace(q.Difficulty), benchmark.TargetDifficulty)
+		}
+		if benchmark.RequiresCalculation {
+			target = target && q.NeedsCalculation()
 		}
 		if target {
 			out.TargetDrafts++

@@ -18,16 +18,17 @@ type EvidenceCompiler interface {
 // CoverageSlot is a deterministic target for one question. It is not a draft:
 // it tells the writer which atom, operation, and source provenance to use.
 type CoverageSlot struct {
-	ID             string   `json:"id"`
-	AtomID         string   `json:"atom_id"`
-	SupportAtomIDs []string `json:"support_atom_ids,omitempty"`
-	SourceChunkIDs []string `json:"source_chunk_ids"`
-	ConceptIDs     []string `json:"concept_ids"`
-	Skill          string   `json:"skill"`
-	Difficulty     string   `json:"difficulty"`
-	Operation      string   `json:"operation"`
-	Target         string   `json:"target"`
-	EvidenceQuote  string   `json:"evidence_quote"`
+	ID                  string   `json:"id"`
+	AtomID              string   `json:"atom_id"`
+	SupportAtomIDs      []string `json:"support_atom_ids,omitempty"`
+	SourceChunkIDs      []string `json:"source_chunk_ids"`
+	ConceptIDs          []string `json:"concept_ids"`
+	Skill               string   `json:"skill"`
+	RequiresCalculation bool     `json:"requires_calculation"`
+	Difficulty          string   `json:"difficulty"`
+	Operation           string   `json:"operation"`
+	Target              string   `json:"target"`
+	EvidenceQuote       string   `json:"evidence_quote"`
 }
 
 // CoverageContract is the compact set-level contract sent to the writer.
@@ -46,16 +47,18 @@ type CoverageContract struct {
 	// as source contract data: all candidates must satisfy the same slots.
 	Variant int `json:"-"`
 	// RequiredSkill is an internal run target. It lets preflight drop an atom
-	// that cannot support an explicit calculation benchmark instead of silently
-	// downgrading the slot to a different skill.
+	// that cannot support an explicit cognitive-skill benchmark.
 	RequiredSkill string `json:"-"`
+	// RequiredCalculation is an internal run target. It makes arithmetic an
+	// orthogonal requirement rather than a fake skill value.
+	RequiredCalculation bool `json:"-"`
 }
 
 // PreflightCoverageContract repairs only deterministic contract defects before
 // the writer sees them. It never invents evidence: an invalid atom/chunk is
 // dropped, a mismatched quote is replaced only by the already-validated atom
 // quote, and a definition with no concrete numeric literal is not advertised
-// as a calculation slot.
+// as a numeric-required slot.
 func PreflightCoverageContract(contract CoverageContract, graph *EvidenceGraph, chunks []Chunk) CoverageContract {
 	if graph == nil {
 		return contract
@@ -115,17 +118,19 @@ func PreflightCoverageContract(contract CoverageContract, graph *EvidenceGraph, 
 			slot.EvidenceQuote = atom.Quote
 			contract.PreflightChanges = append(contract.PreflightChanges, fmt.Sprintf("repair %s: use atom %s exact quote", slot.ID, atom.ID))
 		}
-		slot.Skill = strings.ToLower(strings.TrimSpace(slot.Skill))
-		if slot.Skill == "calculation" && shouldDowngradeCalculation(atom) {
-			if contract.RequiredSkill == "calculation" {
+		if strings.EqualFold(strings.TrimSpace(slot.Skill), "calculation") {
+			slot.RequiresCalculation = true
+		}
+		slot.Skill = canonicalSkill(slot.Skill)
+		if slot.RequiresCalculation && shouldDowngradeCalculation(atom) {
+			if contract.RequiredCalculation {
 				contract.PreflightChanges = append(contract.PreflightChanges, fmt.Sprintf("drop %s: explicit calculation target has no concrete numeric evidence", slot.ID))
 				continue
 			}
 			fallback := fallbackSlotSkill(atom)
-			if fallback != slot.Skill {
-				contract.PreflightChanges = append(contract.PreflightChanges, fmt.Sprintf("downgrade %s: calculation -> %s; definition has no concrete numeric literal", slot.ID, fallback))
-				slot.Skill = fallback
-			}
+			contract.PreflightChanges = append(contract.PreflightChanges, fmt.Sprintf("downgrade %s: remove calculation flag and use %s; atom has no concrete numeric literal", slot.ID, fallback))
+			slot.RequiresCalculation = false
+			slot.Skill = fallback
 		}
 		if slot.Operation == "" {
 			slot.Operation = atom.Relation
@@ -156,6 +161,13 @@ func fallbackSlotSkill(atom EvidenceAtom) string {
 		}
 	}
 	return "understanding"
+}
+
+func canonicalSkill(skill string) string {
+	if strings.EqualFold(strings.TrimSpace(skill), "calculation") {
+		return "understanding"
+	}
+	return strings.ToLower(strings.TrimSpace(skill))
 }
 
 // NormalizeEvidenceGraph drops compiler output with unknown provenance and
@@ -392,7 +404,7 @@ func SlotLocalContextChunks(chunks []Chunk, graph *EvidenceGraph, contract Cover
 // prefers distinct claims/relations and cycles through available reasoning
 // modes before allowing a repeated mode.
 func BuildCoverageContract(lesson Lesson, graph *EvidenceGraph, contextChunks []Chunk, budget int) CoverageContract {
-	return buildCoverageContract(lesson, graph, contextChunks, budget, "", "")
+	return buildCoverageContract(lesson, graph, contextChunks, budget, "", "", false)
 }
 
 // BuildCoverageContractForRun applies explicit benchmark targets before atom
@@ -400,14 +412,15 @@ func BuildCoverageContract(lesson Lesson, graph *EvidenceGraph, contextChunks []
 // slot labels afterwards can leave an application slot pointing at an
 // understanding atom, which the coverage gate correctly rejects.
 func BuildCoverageContractForRun(lesson Lesson, graph *EvidenceGraph, contextChunks []Chunk, budget int, directive string, forceCalc bool) CoverageContract {
-	skill, difficulty := coverageDirectiveTargets(directive, forceCalc)
-	contract := buildCoverageContract(lesson, graph, contextChunks, budget, skill, difficulty)
+	skill, difficulty, requiresCalculation := coverageDirectiveTargets(directive, forceCalc)
+	contract := buildCoverageContract(lesson, graph, contextChunks, budget, skill, difficulty, requiresCalculation)
 	contract.GenerationDirective = directive
 	contract.RequiredSkill = skill
+	contract.RequiredCalculation = requiresCalculation
 	return contract
 }
 
-func buildCoverageContract(lesson Lesson, graph *EvidenceGraph, contextChunks []Chunk, budget int, requiredSkill, requiredDifficulty string) CoverageContract {
+func buildCoverageContract(lesson Lesson, graph *EvidenceGraph, contextChunks []Chunk, budget int, requiredSkill, requiredDifficulty string, requiredCalculation bool) CoverageContract {
 	contract := CoverageContract{Budget: budget}
 	for _, chunk := range contextChunks {
 		contract.ContextChunkIDs = append(contract.ContextChunkIDs, chunk.ID)
@@ -448,13 +461,14 @@ func buildCoverageContract(lesson Lesson, graph *EvidenceGraph, contextChunks []
 	usedSkills := map[string]bool{}
 	usedRelations := map[string]bool{}
 	usedConcepts := map[string]bool{}
-	preferred := []string{"understanding", "calculation", "application", "recall"}
+	numericAssigned := false
+	preferred := []string{"understanding", "application", "recall"}
 	for len(contract.Slots) < budget {
 		wantedSkill := requiredSkill
 		if wantedSkill == "" {
 			wantedSkill = preferred[len(contract.Slots)%len(preferred)]
 		}
-		picked := bestCoverageAtom(atoms, wantedSkill, requiredSkill != "", usedAtoms, usedClaims, usedRelations, usedConcepts)
+		picked := bestCoverageAtom(atoms, wantedSkill, requiredSkill != "", requiredCalculation, usedAtoms, usedClaims, usedRelations, usedConcepts)
 		if picked < 0 {
 			break
 		}
@@ -465,12 +479,12 @@ func buildCoverageContract(lesson Lesson, graph *EvidenceGraph, contextChunks []
 		for _, conceptID := range atom.ConceptIDs {
 			usedConcepts[conceptID] = true
 		}
-		skill := wantedSkill
-		if skill == "" {
-			skill = chooseForm(atom, wantedSkill)
+		skill := canonicalSkill(wantedSkill)
+		if skill == "" || (requiredSkill == "" && !supportsForm(atom, skill)) {
+			skill = chooseNonCalculationForm(atom)
 		}
 		if requiredSkill == "" && usedSkills[skill] {
-			for _, form := range []string{"understanding", "calculation", "application", "recall"} {
+			for _, form := range []string{"understanding", "application", "recall"} {
 				if supportsForm(atom, form) && !usedSkills[form] {
 					skill = form
 					break
@@ -478,11 +492,16 @@ func buildCoverageContract(lesson Lesson, graph *EvidenceGraph, contextChunks []
 			}
 		}
 		usedSkills[skill] = true
+		slotRequiresCalculation := requiredCalculation
+		if !slotRequiresCalculation && requiredSkill == "" && !numericAssigned && supportsForm(atom, "calculation") {
+			slotRequiresCalculation = true
+			numericAssigned = true
+		}
 		difficulty := requiredDifficulty
 		if difficulty == "" {
-			if requiredSkill == "" {
+			if requiredSkill == "" && !requiredCalculation {
 				difficulty = "easy"
-				if skill == "application" || skill == "calculation" {
+				if skill == "application" {
 					difficulty = "medium"
 				}
 			}
@@ -506,16 +525,17 @@ func buildCoverageContract(lesson Lesson, graph *EvidenceGraph, contextChunks []
 			}
 		}
 		contract.Slots = append(contract.Slots, CoverageSlot{
-			ID:             fmt.Sprintf("S%02d", len(contract.Slots)+1),
-			AtomID:         atom.ID,
-			SupportAtomIDs: supportIDs,
-			SourceChunkIDs: sourceChunkIDs,
-			ConceptIDs:     append([]string(nil), atom.ConceptIDs...),
-			Skill:          skill,
-			Difficulty:     difficulty,
-			Operation:      atom.Relation,
-			Target:         atom.Claim,
-			EvidenceQuote:  atom.Quote,
+			ID:                  fmt.Sprintf("S%02d", len(contract.Slots)+1),
+			AtomID:              atom.ID,
+			SupportAtomIDs:      supportIDs,
+			SourceChunkIDs:      sourceChunkIDs,
+			ConceptIDs:          append([]string(nil), atom.ConceptIDs...),
+			Skill:               skill,
+			RequiresCalculation: slotRequiresCalculation,
+			Difficulty:          difficulty,
+			Operation:           atom.Relation,
+			Target:              atom.Claim,
+			EvidenceQuote:       atom.Quote,
 		})
 	}
 	return contract
@@ -599,11 +619,11 @@ func sharesConcept(left, right []string) bool {
 	return false
 }
 
-func coverageDirectiveTargets(directive string, forceCalc bool) (skill, difficulty string) {
+func coverageDirectiveTargets(directive string, forceCalc bool) (skill, difficulty string, requiresCalculation bool) {
 	lower := strings.ToLower(strings.TrimSpace(directive))
 	switch {
-	case forceCalc || strings.Contains(lower, "skill to calculation") || strings.Contains(lower, "calculation questions only"):
-		skill = "calculation"
+	case forceCalc || strings.Contains(lower, "skill to calculation") || strings.Contains(lower, "calculation questions only") || strings.Contains(lower, "requires_calculation"):
+		requiresCalculation = true
 	case strings.Contains(lower, "skill to application") || strings.Contains(lower, "application questions"):
 		skill = "application"
 	}
@@ -613,7 +633,7 @@ func coverageDirectiveTargets(directive string, forceCalc bool) (skill, difficul
 	case strings.Contains(lower, "difficulty to easy") || strings.Contains(lower, "at easy level"):
 		difficulty = "easy"
 	}
-	return skill, difficulty
+	return skill, difficulty, requiresCalculation
 }
 
 // RepairQuestionProvenance fills omitted or inconsistent set provenance only
@@ -691,7 +711,7 @@ func stripQuoteMarks(s string) string {
 	return strings.Trim(s, " \t\r\n\"'“”‘’`")
 }
 
-func bestCoverageAtom(atoms []EvidenceAtom, wantedSkill string, requireForm bool, usedAtoms, usedClaims, usedRelations, usedConcepts map[string]bool) int {
+func bestCoverageAtom(atoms []EvidenceAtom, wantedSkill string, requireForm, requireCalculation bool, usedAtoms, usedClaims, usedRelations, usedConcepts map[string]bool) int {
 	best := -1
 	bestScore := -1 << 30
 	for i, atom := range atoms {
@@ -701,9 +721,15 @@ func bestCoverageAtom(atoms []EvidenceAtom, wantedSkill string, requireForm bool
 		if requireForm && !supportsForm(atom, wantedSkill) {
 			continue
 		}
+		if requireCalculation && !supportsForm(atom, "calculation") {
+			continue
+		}
 		score := relationPriority(atom.Relation)
 		if supportsForm(atom, wantedSkill) {
 			score += 100
+		}
+		if requireCalculation {
+			score += 80
 		}
 		if !usedRelations[strings.ToLower(atom.Relation)] {
 			score += 55
@@ -782,12 +808,21 @@ func chooseForm(atom EvidenceAtom, preferred string) string {
 	if supportsForm(atom, preferred) {
 		return preferred
 	}
-	for _, form := range []string{"understanding", "calculation", "application", "recall"} {
+	for _, form := range []string{"application", "understanding", "recall"} {
 		if supportsForm(atom, form) {
 			return form
 		}
 	}
 	return preferred
+}
+
+func chooseNonCalculationForm(atom EvidenceAtom) string {
+	for _, form := range []string{"application", "understanding", "recall"} {
+		if supportsForm(atom, form) {
+			return form
+		}
+	}
+	return "understanding"
 }
 
 func gateSetCoverage(q Question, contract CoverageContract, byChunk map[string]Chunk, usedSlots, usedAtoms map[string]bool) GateResult {
@@ -823,15 +858,19 @@ func gateSetCoverage(q Question, contract CoverageContract, byChunk map[string]C
 		res.Reason = fmt.Sprintf("cited evidence chunk %s is not in the set context", q.EvidenceChunkID)
 		return res
 	}
-	if slot.Skill == "calculation" && q.Calculation == nil {
-		res.Reason = fmt.Sprintf("calculation slot %s omitted calculation.expression/expected", slot.ID)
+	if slot.RequiresCalculation != q.NeedsCalculation() {
+		res.Reason = fmt.Sprintf("slot %s requires_calculation=%t, got %t", slot.ID, slot.RequiresCalculation, q.NeedsCalculation())
+		return res
+	}
+	if slot.RequiresCalculation && q.Calculation == nil {
+		res.Reason = fmt.Sprintf("numeric-required slot %s omitted calculation.expression/expected", slot.ID)
 		return res
 	}
 	if slot.Difficulty != "" && !strings.EqualFold(strings.TrimSpace(q.Difficulty), slot.Difficulty) {
 		res.Reason = fmt.Sprintf("slot %s requires difficulty %s, got %s", slot.ID, slot.Difficulty, q.Difficulty)
 		return res
 	}
-	if slot.Skill != "" && !strings.EqualFold(strings.TrimSpace(q.Skill), slot.Skill) {
+	if slot.Skill != "" && canonicalSkill(q.Skill) != canonicalSkill(slot.Skill) {
 		res.Reason = fmt.Sprintf("slot %s requires skill %s, got %s", slot.ID, slot.Skill, q.Skill)
 		return res
 	}

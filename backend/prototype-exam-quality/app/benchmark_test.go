@@ -22,3 +22,13 @@ func TestGenericBenchmarkCasesAreSubjectNeutral(t *testing.T) {
 		}
 	}
 }
+
+func TestCalculationBenchmarkTargetsFlagNotSkill(t *testing.T) {
+	cases, err := benchmarkCases("calculation", "eigenvalues", "linear algebra eigenvalues")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cases) != 1 || !cases[0].ForceCalc || !cases[0].RequiresCalculation || cases[0].TargetSkill != "" {
+		t.Fatalf("calculation benchmark = %#v, want numeric flag without calculation skill", cases)
+	}
+}

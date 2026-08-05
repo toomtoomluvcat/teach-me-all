@@ -212,9 +212,10 @@ func TestGateUnitCheckAcceptsNonPhysicsUnits(t *testing.T) {
 
 func TestGateArithmeticRejectsSymbolicOnlyAnswerForNumericCalculation(t *testing.T) {
 	q := Question{
-		Skill:       "calculation",
-		Calculation: &Calculation{Expression: "2-8", Expected: -6},
-		Choices:     []Choice{{Content: "1/b^6", IsCorrect: true}, {Content: "b^6"}},
+		Skill:               "understanding",
+		RequiresCalculation: true,
+		Calculation:         &Calculation{Expression: "2-8", Expected: -6},
+		Choices:             []Choice{{Content: "1/b^6", IsCorrect: true}, {Content: "b^6"}},
 	}
 	got := gateArithmetic(q, Arith{})
 	if got.Pass {
@@ -224,8 +225,10 @@ func TestGateArithmeticRejectsSymbolicOnlyAnswerForNumericCalculation(t *testing
 
 func TestGateArithmeticAllowsNormalThreeDecimalRounding(t *testing.T) {
 	q := Question{
-		Skill: "calculation", Calculation: &Calculation{Expression: "(20^2*0.866025)/9.8", Expected: 35.348},
-		Choices: []Choice{{Content: "35.348", IsCorrect: true}, {Content: "35.346"}},
+		Skill:               "application",
+		RequiresCalculation: true,
+		Calculation:         &Calculation{Expression: "(20^2*0.866025)/9.8", Expected: 35.348},
+		Choices:             []Choice{{Content: "35.348", IsCorrect: true}, {Content: "35.346"}},
 	}
 	if got := gateArithmetic(q, Arith{}); !got.Pass {
 		t.Fatalf("normal rounded numeric answer was rejected: %#v", got)

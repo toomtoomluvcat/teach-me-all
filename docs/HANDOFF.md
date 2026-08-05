@@ -43,6 +43,23 @@ judge call ใหม่:
 - DeepSeek ที่เห็น object แทน array ใน metadata ถูก normalize แบบ deterministic
   ก่อนเข้า gate; ไม่ได้ลดความเข้มของ gate
 
+### Calculation model หลัง refactor
+
+`calculation` ไม่ใช่ค่าใน `skill` อีกต่อไป เพราะมันเป็นวิธีดำเนินการ ไม่ใช่
+cognitive demand ของข้อสอบ. รูปแบบใหม่คือ:
+
+```text
+skill: recall | understanding | application
+difficulty: easy | medium | hard
+requires_calculation: true | false
+calculation: { expression, expected, unit } เมื่อ flag เป็น true
+```
+
+ดังนั้นโจทย์ฟิสิกส์ประยุกต์ยากอาจเป็น `application + hard + true` ขณะที่โจทย์
+แทนค่าสูตรตรง ๆ อาจเป็น `understanding + easy + true`. `--force-calc` หมายถึง
+บังคับ flag ไม่ได้บังคับ skill. JSON เก่าที่มี `skill: calculation` ยังอ่านได้และ
+ถูก map เป็น flag เพื่อไม่ทำให้ artifact เดิมเสีย
+
 ความหมายของตัวเลขในรายงานใหม่แยกเป็น `drafts` กับ `ship-ready` แล้ว: `drafts`
 รวม output จาก first attempt และ bounded repair; draft ที่เกิน/ไม่ตรง contract
 จะยังนับเป็น draft แต่ไม่นับเป็นข้อพร้อมใช้ จึงไม่เอา pass rate ของ gate ไปอ้าง
@@ -66,9 +83,19 @@ parallel 1 และอ่าน failure rows จริง ไม่ใช่ด
 target และผ่านเป็น ship-ready ทั้งหมด แต่ generation efficiency ยังเสีย draft
 สองข้อ และควรลด failure แบบนี้ในรอบถัดไปด้วย prompt/repair ที่เฉพาะจุด
 
-Calculation targeted checks: คณิตศาสตร์ 3/3 และสังคมวิทยา 3/3 numeric verified;
+Calculation targeted checks ก่อน orthogonal refactor: คณิตศาสตร์ 3/3 และสังคมวิทยา 3/3 numeric verified;
 ฟิสิกส์ 1/2 เพราะอีกข้อให้คำตอบเป็น radical (`20√3 m`) ซึ่งอาจถูกทางคณิตศาสตร์
 แต่ไม่ตรง product contract ที่ต้องการค่าตัวเลขใน choice — gate จึงกันไว้โดยตั้งใจ
+
+Post-refactor smoke test ยืนยัน schema ใหม่กับ DeepSeek แล้ว:
+
+- Scientific Notation: `2/4` ship-ready, `2/4` numeric verified; ข้อที่ผ่านมี
+  `skill=understanding/application` และ `requires_calculation=true`
+- Social Construction of Health: `3/4` ship-ready; ทุก draft เป็น
+  `skill=application`, `requires_calculation=false`
+
+ตัวเลขนี้เป็น smoke/regression ไม่ใช่การแทน baseline เดิม เพราะ generation เป็น
+  stochastic และรอบ math เป็น cold graph compile
 
 ## ตอบคำถามเรื่องการอ่านข้อสอบ
 
@@ -205,7 +232,8 @@ context ranking ซึ่งมีโอกาสลด token ของ writer �
 4. **บังคับ contract ให้ลึกขึ้น** — gate ตรวจ `Operation` ให้ตรง atom/slot และ
    เพิ่ม heuristic ราคาถูกสำหรับ application/hard เช่น ต้องมี changed condition,
    input/output หรือ operation ที่แตกต่างจริง ไม่รับข้อ recall ที่ติด label hard
-5. **ผูก calculator กับ slot** — ส่งเฉพาะ quote/variables ของ calculation slot
+5. **ผูก calculator กับ slot** — ส่งเฉพาะ quote/variables ของ slot ที่มี
+   `requires_calculation=true`
    แทนการรวมข้อความของทุก application/calculation chunk เป็นก้อนเดียว ลดค่า
    facts ที่ไม่เกี่ยวและลด prompt leakage โดยไม่เพิ่ม call
 

@@ -80,3 +80,21 @@ func TestQuestionUnmarshalNormalizesKeyedDemandLists(t *testing.T) {
 		t.Fatalf("normalized demand lists = %#v", q)
 	}
 }
+
+func TestQuestionCalculationIsOrthogonalToSkill(t *testing.T) {
+	var q Question
+	if err := json.Unmarshal([]byte(`{"skill":"application","requires_calculation":true}`), &q); err != nil {
+		t.Fatalf("unmarshal flagged question: %v", err)
+	}
+	if q.Skill != "application" || !q.RequiresCalculation || !q.NeedsCalculation() {
+		t.Fatalf("flagged question = %#v", q)
+	}
+
+	var legacy Question
+	if err := json.Unmarshal([]byte(`{"skill":"calculation"}`), &legacy); err != nil {
+		t.Fatalf("unmarshal legacy question: %v", err)
+	}
+	if !legacy.RequiresCalculation || !legacy.NeedsCalculation() {
+		t.Fatalf("legacy calculation was not mapped to the flag: %#v", legacy)
+	}
+}

@@ -292,8 +292,12 @@ func (g *Generator) QuestionsSet(ctx context.Context, lesson examgen.Lesson, gra
 	if g.UseCalcTool {
 		var selected []string
 		seen := map[string]bool{}
+		requiresCalculation := forceCalc
 		for _, slot := range contract.Slots {
-			if slot.Skill != "calculation" && slot.Skill != "application" {
+			if slot.RequiresCalculation {
+				requiresCalculation = true
+			}
+			if !slot.RequiresCalculation && slot.Skill != "application" {
 				continue
 			}
 			for _, id := range slot.SourceChunkIDs {
@@ -310,7 +314,7 @@ func (g *Generator) QuestionsSet(ctx context.Context, lesson examgen.Lesson, gra
 			}
 		}
 		if len(selected) > 0 {
-			facts, err := g.ComputeFacts(ctx, examgen.Chunk{Page: 0, Text: strings.Join(selected, "\n\n")}, forceCalc)
+			facts, err := g.ComputeFacts(ctx, examgen.Chunk{Page: 0, Text: strings.Join(selected, "\n\n")}, requiresCalculation)
 			if err == nil {
 				user += FactsBlock(facts)
 			}

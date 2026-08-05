@@ -150,7 +150,7 @@ Flags:
 | `--gemini-min-interval` | `13s` | minimum delay between Gemini requests; conservative for a 5-RPM free-tier project, pass `0s` to disable |
 | `--deepseek-host` | `https://api.deepseek.com` | DeepSeek API host |
 | `--deepseek-api-key` | `DEEPSEEK_API_KEY` | DeepSeek API key; the flag is useful for one-off runs |
-| `--force-calc` | `false` | only generate calculation questions |
+| `--force-calc` | `false` | require arithmetic on every question; keep `skill` as cognitive demand |
 | `--pages` | all | page range, e.g. `10-40` |
 | `--fresh` | `false` | ignore the cache and redo extraction/embedding |
 | `--extract-only` | `false` | stop after extraction and dump the full text — needs no Ollama at all |

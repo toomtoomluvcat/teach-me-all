@@ -89,7 +89,7 @@ func parseConfig() config {
 	flag.DurationVar(&cfg.geminiMinInterval, "gemini-min-interval", 13*time.Second, "minimum delay between Gemini requests; 0 disables throttling")
 	flag.StringVar(&cfg.deepseekHost, "deepseek-host", "https://api.deepseek.com", "DeepSeek API host")
 	flag.StringVar(&cfg.deepseekAPIKey, "deepseek-api-key", "", "DeepSeek API key (prefer DEEPSEEK_API_KEY)")
-	flag.BoolVar(&cfg.forceCalc, "force-calc", false, "generate calculation questions only")
+	flag.BoolVar(&cfg.forceCalc, "force-calc", false, "require arithmetic on every generated question (skill remains cognitive demand)")
 	flag.StringVar(&cfg.benchmark, "benchmark", "", "run benchmark suite: all | application-easy | application-medium | application-hard | calculation")
 	flag.StringVar(&cfg.benchmarkLesson, "benchmark-lesson", "", "lesson title fragment for a generic benchmark; enables subject-neutral directives")
 	flag.StringVar(&cfg.benchmarkScope, "benchmark-scope", "", "subject-neutral benchmark focus; defaults to the selected lesson title")
@@ -105,7 +105,7 @@ func parseConfig() config {
 	flag.BoolVar(&cfg.fresh, "fresh", false, "ignore the cache")
 	flag.BoolVar(&cfg.extractOnly, "extract-only", false, "stop after extraction; needs no models and no Ollama")
 	flag.BoolVar(&cfg.filterTopics, "filter-topics", true, "drop chunks pass 1 classified as teacher-guide apparatus or page furniture; set false for a source that really is mostly exercises")
-	flag.BoolVar(&cfg.calcTool, "calc-tool", true, "let the model use a calculator tool before writing calculation questions")
+	flag.BoolVar(&cfg.calcTool, "calc-tool", true, "let the model use a calculator tool before writing questions with arithmetic")
 	flag.IntVar(&cfg.parallel, "parallel", 4, "model calls in flight at once; Ollama also needs OLLAMA_NUM_PARALLEL to match")
 	flag.Parse()
 	return cfg

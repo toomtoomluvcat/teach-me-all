@@ -36,7 +36,7 @@ func TestLessonContextExpandsOneGraphHopInDocumentOrder(t *testing.T) {
 func TestBuildCoverageContractPrefersDistinctAtomsAndForms(t *testing.T) {
 	graph := &EvidenceGraph{
 		Atoms: []EvidenceAtom{
-			{ID: "A001", ChunkID: "c1", ConceptIDs: []string{"C001"}, Claim: "a equals v squared over r", Relation: "equation", QuestionForms: []string{"calculation", "application"}},
+			{ID: "A001", ChunkID: "c1", ConceptIDs: []string{"C001"}, Claim: "a equals v squared over r with v=10 and r=2", Relation: "equation", QuestionForms: []string{"calculation", "application"}},
 			{ID: "A002", ChunkID: "c2", ConceptIDs: []string{"C002"}, Claim: "acceleration points inward", Relation: "direction", QuestionForms: []string{"understanding"}},
 			{ID: "A003", ChunkID: "c3", ConceptIDs: []string{"C003"}, Claim: "friction supplies the force", Relation: "causal", QuestionForms: []string{"recall", "understanding"}},
 		},
@@ -46,14 +46,22 @@ func TestBuildCoverageContractPrefersDistinctAtomsAndForms(t *testing.T) {
 	if len(contract.Slots) != 3 {
 		t.Fatalf("slots = %#v", contract.Slots)
 	}
+	calculationFlags := 0
 	seenAtoms := map[string]bool{}
-	seenSkills := map[string]bool{}
 	for _, slot := range contract.Slots {
-		if seenAtoms[slot.AtomID] || seenSkills[slot.Skill] {
+		if seenAtoms[slot.AtomID] {
 			t.Fatalf("contract did not diversify: %#v", contract.Slots)
 		}
 		seenAtoms[slot.AtomID] = true
-		seenSkills[slot.Skill] = true
+		if slot.RequiresCalculation {
+			calculationFlags++
+			if slot.Skill == "calculation" {
+				t.Fatalf("calculation leaked into skill dimension: %#v", slot)
+			}
+		}
+	}
+	if calculationFlags != 1 {
+		t.Fatalf("default contract calculation flags = %d, want one numeric slot: %#v", calculationFlags, contract.Slots)
 	}
 }
 

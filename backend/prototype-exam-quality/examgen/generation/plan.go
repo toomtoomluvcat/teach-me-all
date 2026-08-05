@@ -9,12 +9,13 @@ import (
 // QuestionSlot is a set-level target, not a question. Planning these slots
 // before generation gives separate generation calls a shared coverage map.
 type QuestionSlot struct {
-	SourceChunkID string `json:"source_chunk_id"`
-	Skill         string `json:"skill"`
-	Difficulty    string `json:"difficulty"`
-	Focus         string `json:"focus"`
-	Target        string `json:"target"`
-	Scenario      string `json:"scenario"`
+	SourceChunkID       string `json:"source_chunk_id"`
+	Skill               string `json:"skill"`
+	RequiresCalculation bool   `json:"requires_calculation"`
+	Difficulty          string `json:"difficulty"`
+	Focus               string `json:"focus"`
+	Target              string `json:"target"`
+	Scenario            string `json:"scenario"`
 }
 
 type QuestionPlan struct {
@@ -37,19 +38,21 @@ question slots that a later writer can fill.
 Every slot must be supported by a specific source chunk. Across the set, vary
 the concept, relationship, answer target, and scenario. Do not plan the same
 fact, relationship, or scenario twice with different wording. Use application
-only for a genuinely new situation or changed condition; use calculation only
-when numerical work is necessary. Prefer fewer distinct slots over padding.`
+only for a genuinely new situation or changed condition; set
+requires_calculation=true when numerical work is necessary. Prefer fewer
+distinct slots over padding.`
 }
 
 func QuestionPlanSchema() map[string]any {
 	slot := obj(map[string]any{
-		"source_chunk_id": str("exact source chunk ID that supports this slot"),
-		"skill":           enum("honest reasoning mode", "recall", "understanding", "application", "calculation"),
-		"difficulty":      enum("honest reasoning load", "easy", "medium", "hard"),
-		"focus":           str("the distinct source concept or relationship to assess"),
-		"target":          str("what the student must identify, compare, predict, explain, or calculate"),
-		"scenario":        str("new situation or changed condition for application; empty for recall/understanding when not needed"),
-	}, "source_chunk_id", "skill", "difficulty", "focus", "target", "scenario")
+		"source_chunk_id":      str("exact source chunk ID that supports this slot"),
+		"skill":                enum("honest reasoning mode", "recall", "understanding", "application"),
+		"requires_calculation": map[string]any{"type": "boolean", "description": "true only when the student must do arithmetic"},
+		"difficulty":           enum("honest reasoning load", "easy", "medium", "hard"),
+		"focus":                str("the distinct source concept or relationship to assess"),
+		"target":               str("what the student must identify, compare, predict, explain, or calculate"),
+		"scenario":             str("new situation or changed condition for application; empty for recall/understanding when not needed"),
+	}, "source_chunk_id", "skill", "requires_calculation", "difficulty", "focus", "target", "scenario")
 	return obj(map[string]any{
 		"slots": map[string]any{
 			"type":     "array",

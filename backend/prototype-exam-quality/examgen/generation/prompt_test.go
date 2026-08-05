@@ -174,6 +174,15 @@ func TestQuestionSetSchemaForContractRestrictsProvenanceIDs(t *testing.T) {
 	if _, ok := properties["operation"]; !ok {
 		t.Fatal("set schema omitted the contract operation field")
 	}
+	if _, ok := properties["requires_calculation"]; !ok {
+		t.Fatal("set schema omitted the calculation flag")
+	}
+	questionSkill := properties["skill"].(map[string]any)
+	for _, value := range questionSkill["enum"].([]any) {
+		if value == "calculation" {
+			t.Fatal("calculation leaked back into the skill enum")
+		}
+	}
 	operation := properties["operation"].(map[string]any)
 	gotOperations, ok := operation["enum"].([]any)
 	if ok && len(gotOperations) != 0 {

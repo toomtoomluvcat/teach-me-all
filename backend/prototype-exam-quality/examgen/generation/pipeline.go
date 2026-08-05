@@ -91,7 +91,8 @@ func (d Deps) slots() int {
 type ExamOptions struct {
 	// Budget overrides the model's own question_budget when > 0.
 	Budget int
-	// ForceCalc restricts generation to calculation questions.
+	// ForceCalc requires arithmetic on every generated question. It does not
+	// change the cognitive Skill label.
 	ForceCalc bool
 	// Scope is an optional free-text focus. When set, chunks are ranked by
 	// similarity to it instead of to the lesson title.
@@ -573,8 +574,8 @@ func questionPlanDirective(plan *QuestionPlan, current int, accepted []Question)
 		} else if i == current {
 			status = "CURRENT — generate this slot if this passage supports it"
 		}
-		fmt.Fprintf(&b, "%d. [%s] skill=%s difficulty=%s focus=%s target=%s", i+1, status,
-			slot.Skill, slot.Difficulty, slot.Focus, slot.Target)
+		fmt.Fprintf(&b, "%d. [%s] skill=%s requires_calculation=%t difficulty=%s focus=%s target=%s", i+1, status,
+			slot.Skill, slot.RequiresCalculation, slot.Difficulty, slot.Focus, slot.Target)
 		if slot.Scenario != "" {
 			fmt.Fprintf(&b, " scenario=%s", slot.Scenario)
 		}

@@ -281,16 +281,14 @@ a slot that you do return, copy the slot's ID, atom ID, and chunk ID as one
 matched tuple; never mix IDs from different slots. Copy the slot's operation
 label exactly; it is a contract value, not a free-text explanation. Process slots in the listed
 order, and before returning JSON check that every returned question has a
-non-empty ID tuple, the exact slot skill/difficulty, and a verbatim quote from
+non-empty ID tuple, the exact slot skill/difficulty/calculation flag, and a verbatim quote from
 that slot's chunk. For medium or hard application, fill changed_condition and
 distractor_reasons; for hard application, copy every supporting atom ID and
 provide at least two distinct reasoning_steps. A retry request may list only missing slots: do not repeat
-questions that already passed. For a calculation slot, set skill to exactly calculation and make
-calculation.expression/expected mandatory. For every other slot, set skill to
-exactly the slot skill and omit calculation unless arithmetic is necessary. Do
-not turn a definition or symbolic algebra rule into a recall question just to
-fill a calculation slot; instead apply the rule to explicit numeric values or
-omit the slot. Never duplicate choice text.`
+questions that already passed. For a slot with requires_calculation=true, make
+calculation.expression/expected mandatory. For every slot, set skill and
+requires_calculation exactly to the contract values. Do not add arithmetic to
+a slot whose flag is false. Never duplicate choice text.`
 }
 
 func QuestionSetSchema(forceCalc bool) map[string]any {
@@ -320,12 +318,13 @@ func questionSetSchema(forceCalc bool, contract *CoverageContract) map[string]an
 		return ""
 	}))
 	properties["operation"] = contractIDSchema("copy the exact operation label from the assigned coverage slot", contractOperations(contract))
+	properties["requires_calculation"] = map[string]any{"type": "boolean", "description": "copy the exact requires_calculation flag from the assigned coverage slot"}
 	properties["supporting_atom_ids"] = map[string]any{
 		"type": "array", "maxItems": 3,
 		"items": contractIDSchema("exact supporting atom ID from the assigned hard slot", supportAtomIDs(contract)),
 	}
 	required := append([]string{}, item["required"].([]string)...)
-	required = append(required, "coverage_slot_id", "evidence_atom_id", "evidence_chunk_id", "operation")
+	required = append(required, "coverage_slot_id", "evidence_atom_id", "evidence_chunk_id", "operation", "requires_calculation")
 	if contractNeedsDemand(contract) {
 		required = append(required, "reasoning_steps", "changed_condition", "distractor_reasons")
 	}
@@ -415,8 +414,8 @@ func QuestionSetPrompt(lesson Lesson, graph *EvidenceGraph, chunks []Chunk, cont
 	}
 	b.WriteString("Coverage contract (one slot per distinct question):\n")
 	for _, slot := range contract.Slots {
-		fmt.Fprintf(&b, "- %s atom=%s support_atoms=%s chunk=%s skill=%s difficulty=%s operation=%s target=%s evidence_quote=%q\n",
-			slot.ID, slot.AtomID, strings.Join(slot.SupportAtomIDs, ","), strings.Join(slot.SourceChunkIDs, ","), slot.Skill, slot.Difficulty, slot.Operation, slot.Target, slot.EvidenceQuote)
+		fmt.Fprintf(&b, "- %s atom=%s support_atoms=%s chunk=%s skill=%s requires_calculation=%t difficulty=%s operation=%s target=%s evidence_quote=%q\n",
+			slot.ID, slot.AtomID, strings.Join(slot.SupportAtomIDs, ","), strings.Join(slot.SourceChunkIDs, ","), slot.Skill, slot.RequiresCalculation, slot.Difficulty, slot.Operation, slot.Target, slot.EvidenceQuote)
 	}
 	if atoms := contractEvidenceAtoms(graph, contract); len(atoms) > 0 {
 		b.WriteString("\nEvidence packet for the assigned slots:\n")
@@ -434,14 +433,14 @@ func QuestionSetPrompt(lesson Lesson, graph *EvidenceGraph, chunks []Chunk, cont
 	b.WriteString("Slot execution protocol:\n")
 	b.WriteString("1. Work through the slots in order; use one output object for one slot.\n")
 	b.WriteString("2. Copy the exact slot/atom/chunk ID tuple from that row; never invent or mix IDs.\n")
-	b.WriteString("3. Copy the row skill and difficulty exactly. If the row is unsupported, omit only that row.\n")
+	b.WriteString("3. Copy the row skill, difficulty, and requires_calculation flag exactly. If the row is unsupported, omit only that row.\n")
 	b.WriteString("4. For medium or hard application, fill changed_condition; for hard application, copy every support atom ID and provide at least two distinct reasoning_steps. For medium and hard questions, provide one short distractor_reason per wrong choice.\n")
 	b.WriteString("5. Before returning, verify every source_quote is verbatim in its cited chunk and every ID is non-empty.\n\n")
 	fmt.Fprintf(&b, "Write up to %d questions, one for each supported slot. Keep the set varied and return empty only for an unsupported slot. ", len(contract.Slots))
 	if forceCalc {
-		b.WriteString("Every returned question must be a calculation with a valid calculation expression.")
+		b.WriteString("Every returned question must set requires_calculation=true and include a valid calculation expression.")
 	} else {
-		b.WriteString("For slots marked calculation, calculation.expression and calculation.expected are mandatory. Use calculation only when arithmetic is necessary and supported by the atom.")
+		b.WriteString("For slots marked requires_calculation=true, calculation.expression and calculation.expected are mandatory. Use the calculation object exactly when the flag is true.")
 	}
 	return b.String()
 }
@@ -476,9 +475,9 @@ func contractEvidenceAtoms(graph *EvidenceGraph, contract CoverageContract) []Ev
 
 // --- pass 2: question generation --------------------------------------------
 
-// QuestionSchema constrains generation. forceCalc drops the non-calculation
-// escape hatch, implementing the --force-calc flag at the schema level rather
-// than by asking nicely in the prompt.
+// QuestionSchema constrains generation. forceCalc requires the arithmetic
+// object and the requires_calculation flag at the schema level rather than by
+// asking nicely in the prompt.
 func QuestionSchema(forceCalc bool) map[string]any {
 	calc := obj(map[string]any{
 		"expression": str("the arithmetic to solve this question, as a plain expression using numbers, + - * / ^, parentheses, decimal points, pi, and only these functions: sin, cos, tan, sqrt, abs, exp, ln. No variables or units. Trigonometric arguments are in radians. Example: (1200*0.07)/12 or 20*sin(30*pi/180)"),
@@ -487,12 +486,13 @@ func QuestionSchema(forceCalc bool) map[string]any {
 	}, "expression", "expected")
 
 	question := map[string]any{
-		"kind":         enum("question shape", string(KindMCQSingle)),
-		"stem":         str("the question itself, understandable on its own without seeing the passage"),
-		"explanation":  str("why the correct choice is correct, in the source language"),
-		"source_quote": str("an exact contiguous substring copied CHARACTER FOR CHARACTER from the passage that makes the correct answer true; prefer a complete sentence, but a shorter exact span is allowed. Must appear exactly."),
-		"difficulty":   enum("honest reasoning load: easy=one direct inference or operation, medium=one relationship with a meaningful distinction, hard=two linked inferences or competing constraints", "easy", "medium", "hard"),
-		"skill":        enum("honest reasoning mode: recall=fact, understanding=interpretation, application=new situation using a source relationship, calculation=numerical computation", "recall", "understanding", "application", "calculation"),
+		"kind":                 enum("question shape", string(KindMCQSingle)),
+		"stem":                 str("the question itself, understandable on its own without seeing the passage"),
+		"explanation":          str("why the correct choice is correct, in the source language"),
+		"source_quote":         str("an exact contiguous substring copied CHARACTER FOR CHARACTER from the passage that makes the correct answer true; prefer a complete sentence, but a shorter exact span is allowed. Must appear exactly."),
+		"difficulty":           enum("honest reasoning load: easy=one direct inference or operation, medium=one relationship with a meaningful distinction, hard=two linked inferences or competing constraints", "easy", "medium", "hard"),
+		"skill":                enum("honest reasoning mode: recall=fact, understanding=interpretation, application=new situation using a source relationship", "recall", "understanding", "application"),
+		"requires_calculation": map[string]any{"type": "boolean", "description": "true when arithmetic is necessary to answer; false otherwise"},
 		"reasoning_steps": map[string]any{
 			"type": "array", "maxItems": 4,
 			"items": str("one short, concrete reasoning step; required for hard and useful for medium"),
@@ -517,7 +517,7 @@ func QuestionSchema(forceCalc bool) map[string]any {
 		},
 	}
 
-	required := []string{"kind", "stem", "choices", "explanation", "source_quote", "difficulty", "skill"}
+	required := []string{"kind", "stem", "choices", "explanation", "source_quote", "difficulty", "skill", "requires_calculation"}
 	question["calculation"] = calc
 	if forceCalc {
 		required = append(required, "calculation")
@@ -556,8 +556,9 @@ definition, named part, label, or unchanged property is recall or
   understanding, not application. A stem that only asks "what is", "which is",
   or repeats a source example is not application unless the student must use the
   relationship to decide something new.
-- calculation: compute a numerical result. Use this only when the arithmetic is
-  necessary to answer.
+- requires_calculation: set true only when arithmetic is necessary to answer;
+  keep skill as recall, understanding, or application according to the
+  cognitive demand. Set false when the item can be answered without arithmetic.
 - easy: one direct inference or operation; medium: one relationship plus a
   meaningful distinction; hard: at least two linked inferences, constraints,
   or transformations. For easy application, change a condition or value from
@@ -603,7 +604,7 @@ For medium or hard application, fill the compact assessment contract fields;
 for hard application, the reasoning_steps must expose at least two necessary
 steps rather than merely adding connective words.
 
-For calculation questions:
+When requires_calculation=true:
 	- Put the arithmetic in calculation.expression using numbers, + - * / ^,
 	  parentheses, decimal points, pi, and only these functions: sin, cos, tan,
 	  sqrt, abs, exp, ln. Trigonometric arguments are in radians. No variables,
@@ -615,13 +616,13 @@ For calculation questions:
 	- The correct choice contains the computed number and unit when a unit exists.
 	- The correct choice contains a decimal or integer numeric approximation and
 	  the unit when a unit exists. Do not use radicals, variables, or symbolic
-	  expressions as the answer to a calculation slot.
+	  expressions as the answer to a calculation item.
 - Every input number comes from the passage or the stem; never invent hidden
   constants, conversions, or assumptions.
 
 Write fewer, better questions. If the passage supports fewer good questions,
 return fewer. Return exactly this JSON shape:
-{"questions":[{"kind":"mcq_single","stem":"...","choices":[{"content":"...","is_correct":true},{"content":"...","is_correct":false},{"content":"...","is_correct":false},{"content":"...","is_correct":false}],"explanation":"...","source_quote":"...","difficulty":"easy","skill":"recall"}]}`
+{"questions":[{"kind":"mcq_single","stem":"...","choices":[{"content":"...","is_correct":true},{"content":"...","is_correct":false},{"content":"...","is_correct":false},{"content":"...","is_correct":false}],"explanation":"...","source_quote":"...","difficulty":"easy","skill":"recall","requires_calculation":false}]}`
 
 func QuestionSystem() string { return questionSystem }
 
@@ -651,10 +652,10 @@ func QuestionPrompt(lesson Lesson, graph *EvidenceGraph, c Chunk, feedback []Rej
 	s += fmt.Sprintf("Write up to %d question(s) from this passage. ", want)
 	s += "If the passage only supports fewer, write fewer. "
 	if forceCalc {
-		s += "Every question must be a calculation question with a calculation expression. " +
+		s += "Every question must set requires_calculation=true and include a calculation expression. " +
 			"If this passage contains no numbers to compute with, return an empty list."
 	} else {
-		s += "Include a calculation only when the passage contains numbers worth computing with."
+		s += "Set requires_calculation=true only when arithmetic is necessary and the passage contains numbers worth computing with."
 	}
 	return s
 }

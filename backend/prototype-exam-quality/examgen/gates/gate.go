@@ -186,9 +186,13 @@ func gateQuote(q Question, chunk Chunk) GateResult {
 func gateArithmetic(q Question, ev Evaluator) GateResult {
 	res := GateResult{Gate: GateArithmetic, Deterministic: true}
 
-	if q.Calculation == nil {
+	if !q.NeedsCalculation() {
 		res.Pass = true
 		res.Reason = "no arithmetic in this question"
+		return res
+	}
+	if q.Calculation == nil {
+		res.Reason = "requires_calculation=true but calculation.expression/expected is missing"
 		return res
 	}
 	if ev == nil {
