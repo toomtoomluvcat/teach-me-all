@@ -59,7 +59,6 @@ type ExamResult = generation.ExamResult
 type QuestionSlot = generation.QuestionSlot
 type QuestionPlan = generation.QuestionPlan
 type LessonPlanner = generation.LessonPlanner
-type Judge = gates.Judge
 type Evaluator = gates.Evaluator
 type Arith = model.Arith
 
@@ -190,7 +189,4 @@ func QualityPrompt(lesson Lesson, chunks []Chunk, questions []Question) string {
 func CheckWellFormed(q Question) GateResult { return gates.CheckWellFormed(q) }
 func RunCheapGates(q Question, chunk Chunk, ev Evaluator) *GateReport {
 	return gates.RunCheapGates(q, chunk, ev)
-}
-func RunGates(ctx context.Context, q Question, chunk Chunk, j Judge, ev Evaluator) (*GateReport, error) {
-	return gates.RunGates(ctx, q, chunk, j, ev)
 }

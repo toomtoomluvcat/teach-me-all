@@ -1,8 +1,6 @@
 package generation
 
 import (
-	"context"
-
 	"protoexam/examgen/evidence"
 	"protoexam/examgen/gates"
 	"protoexam/examgen/model"
@@ -33,7 +31,6 @@ type CoverageSlot = evidence.CoverageSlot
 type ConceptNode = evidence.ConceptNode
 type ConceptEdge = evidence.ConceptEdge
 type EdgeKind = evidence.EdgeKind
-type Judge = gates.Judge
 type Evaluator = gates.Evaluator
 
 const (
@@ -103,10 +100,6 @@ func gateSetCoverage(q Question, contract CoverageContract, byChunk map[string]C
 func RunCheapGates(q Question, chunk Chunk, ev Evaluator) *GateReport {
 	return gates.RunCheapGates(q, chunk, ev)
 }
-func AddJudgeGates(ctx context.Context, rep *GateReport, q Question, chunk Chunk, j Judge) error {
-	return gates.AddJudgeGates(ctx, rep, q, chunk, j)
-}
-
 func gateDistinct(q Question, accepted []Question, vec []float32, acceptedVecs [][]float32) GateResult {
 	return gates.RunDistinctGate(q, accepted, vec, acceptedVecs)
 }

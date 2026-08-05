@@ -8,9 +8,8 @@ import (
 	"strings"
 )
 
-// Generator is the model-backed half of generation. Kept separate from Judge so
-// a future version can point them at two different models without touching this
-// file.
+// Generator is the model-backed half of generation. Advisory quality review is
+// kept outside the acceptance loop so deterministic QC stays cheap and clear.
 type Generator interface {
 	Topics(ctx context.Context, c Chunk) (ChunkTopics, error)
 	Outline(ctx context.Context, graph EvidenceGraph) (*Outline, []LessonConcepts, error)
@@ -66,7 +65,6 @@ type Deps struct {
 	Gen          Generator
 	CompileGraph bool
 	TopicBatcher TopicBatcher
-	Judge        Judge
 	Eval         Evaluator
 	Embedder     Embedder
 	Quality      QualityGrader
@@ -283,15 +281,11 @@ func GenerateExam(ctx context.Context, outline *Outline, lesson Lesson, chunks [
 		for i, q := range qs {
 			q.ChunkID = c.ID
 
-			// Run the deterministic QC checks before accepting a draft. The
-			// source-dependency and semantic judges are advisory experiments, not
-			// part of the production acceptance path.
+			// Run deterministic QC before accepting a draft. Semantic review is an
+			// advisory set-level signal, not part of the production acceptance path.
 			rep := cheap[i]
 			vec := vectorsByQuestion[i]
 			rep.Results = append(rep.Results, gateDistinct(q, res.Passed, vec, acceptedVecs))
-			if err := AddJudgeGates(ctx, rep, q, c, d.Judge); err != nil {
-				return nil, err
-			}
 			q.Report = rep
 			res.Questions = append(res.Questions, q)
 			passedBefore := len(res.Passed)

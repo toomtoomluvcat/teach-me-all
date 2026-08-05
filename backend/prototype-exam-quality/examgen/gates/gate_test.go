@@ -1,8 +1,6 @@
 package gates
 
 import (
-	"context"
-	"errors"
 	"strings"
 	"testing"
 )
@@ -166,130 +164,6 @@ func TestGateInterpretableNoLongerJudgesGuessability(t *testing.T) {
 	}
 }
 
-func (semanticChoiceJudge) JudgeBlind(context.Context, Question) (BlindVerdict, error) {
-	return BlindVerdict{Interpretable: true}, nil
-}
-
-func (j semanticChoiceJudge) JudgeAgainstSource(context.Context, Question, string) (SourcedVerdict, error) {
-	return j.sourced, nil
-}
-
-type partialSourceJudge struct{}
-
-func (partialSourceJudge) JudgeBlind(context.Context, Question) (BlindVerdict, error) {
-	return BlindVerdict{Interpretable: true}, nil
-}
-
-func (partialSourceJudge) JudgeAgainstSource(context.Context, Question, string) (SourcedVerdict, error) {
-	return SourcedVerdict{
-		SourceDependency: SourceDependencySpecific,
-		Evidence:         []string{"ปริมาตรอากาศที่ตกค้างในปอดเป็น 2,400 mL"},
-		Counterfactual:   true,
-	}, errors.New("choice audit incomplete")
-}
-
-type countingSourceJudge struct {
-	calls int
-}
-
-func (*countingSourceJudge) JudgeBlind(context.Context, Question) (BlindVerdict, error) {
-	return BlindVerdict{Interpretable: true}, nil
-}
-
-func (j *countingSourceJudge) JudgeAgainstSource(context.Context, Question, string) (SourcedVerdict, error) {
-	j.calls++
-	return passingSourceVerdict(), nil
-}
-
-func TestRunGatesIsDeterministicQCOnly(t *testing.T) {
-	quote := testQuote()
-	q := Question{
-		Kind:        KindMCQSingle,
-		Stem:        "Which process is described by the passage?",
-		SourceQuote: quote,
-		Choices: []Choice{
-			{Content: "It increases the measured value", IsCorrect: true},
-			{Content: "It decreases the measured value"},
-			{Content: "It keeps the measured value stable"},
-			{Content: "It removes the measured value"},
-		},
-	}
-	judge := &countingSourceJudge{}
-	report, err := RunGates(context.Background(), q, Chunk{ID: "p1-c1", Page: 1, Text: quote}, judge, Arith{})
-	if err != nil {
-		t.Fatalf("RunGates() error = %v", err)
-	}
-	if judge.calls != 0 {
-		t.Fatalf("source judge calls = %d, want zero in QC-only mode", judge.calls)
-	}
-	for _, result := range report.Results {
-		if result.Gate == GateSourceSpecific || result.Gate == GateBlindAnswer || result.Gate == GateSingleValid {
-			t.Fatalf("non-QC gate ran: %#v", result)
-		}
-	}
-	if !report.Passed() {
-		t.Fatalf("valid question failed QC: %#v", report.Failures())
-	}
-}
-
-func TestAddJudgeGatesDoesNotInvokeModelJudge(t *testing.T) {
-	quote := "เมื่อหายใจออกปกติจะมีปริมาตรอากาศที่ตกค้างในปอดเป็น 2,400 mL"
-	q := Question{
-		Kind:        KindMCQSingle,
-		Stem:        "ปริมาตรอากาศที่ตกค้างในปอดมีเท่าใด?",
-		SourceQuote: quote,
-		Choices: []Choice{
-			{Content: "2,400 mL", IsCorrect: true},
-			{Content: "1,200 mL"},
-			{Content: "3,600 mL"},
-			{Content: "4,800 mL"},
-		},
-	}
-	report := RunCheapGates(q, Chunk{ID: "p1-c1", Page: 1, Text: quote}, Arith{})
-	if failures := report.Failures(); len(failures) != 0 {
-		t.Fatalf("cheap gates rejected test question: %#v", failures)
-	}
-	if err := AddJudgeGates(context.Background(), report, q, Chunk{ID: "p1-c1", Page: 1, Text: quote}, partialSourceJudge{}); err != nil {
-		t.Fatalf("AddJudgeGates() error = %v", err)
-	}
-	var source GateResult
-	for _, result := range report.Results {
-		if result.Gate == GateSourceSpecific {
-			source = result
-		}
-		if result.Gate == GateBlindAnswer || result.Gate == GateSingleValid {
-			t.Fatalf("deferred gate %q still ran: %#v", result.Gate, result)
-		}
-	}
-	if source.Gate != "" {
-		t.Fatalf("source gate = %#v, want no model-backed gate in QC mode", source)
-	}
-}
-
-func TestRunGatesCorePathUsesOnlyDeterministicQC(t *testing.T) {
-	quote := "เมื่อหายใจออกปกติจะมีปริมาตรอากาศที่ตกค้างในปอดเป็น 2,400 mL"
-	q := Question{
-		Kind:        KindMCQSingle,
-		Stem:        "ปริมาตรอากาศที่ตกค้างในปอดมีเท่าใด?",
-		SourceQuote: quote,
-		Choices: []Choice{
-			{Content: "2,400 mL", IsCorrect: true},
-			{Content: "1,200 mL"},
-			{Content: "3,600 mL"},
-			{Content: "4,800 mL"},
-		},
-	}
-	report, err := RunGates(context.Background(), q, Chunk{ID: "p1-c1", Page: 1, Text: quote}, partialSourceJudge{}, Arith{})
-	if err != nil {
-		t.Fatalf("RunGates() error = %v", err)
-	}
-	for _, result := range report.Results {
-		if result.Gate == GateBlindAnswer || result.Gate == GateSingleValid {
-			t.Fatalf("deferred gate %q still ran: %#v", result.Gate, result)
-		}
-	}
-}
-
 func TestGateUnitCheckMatchesPhysicalAnswerUnit(t *testing.T) {
 	q := Question{
 		Calculation: &Calculation{Expression: "8/2", Expected: 4, Unit: "m/s^2"},
@@ -338,7 +212,7 @@ func TestRunCheapGatesIncludesUnitCheck(t *testing.T) {
 	t.Fatal("unit check result was not recorded")
 }
 
-func TestRunGatesRejectsDistractorEquivalentToCorrectChoice(t *testing.T) {
+func TestGateSingleDefensibleRejectsDistractorEquivalentToCorrectChoice(t *testing.T) {
 	quote := "ประกอบด้วยการกิน การย่อย การดูดซึม และการถ่ายอุจจาระ"
 	q := Question{
 		Kind:        KindMCQSingle,

@@ -1,7 +1,6 @@
 package gates
 
 import (
-	"context"
 	"fmt"
 	"math"
 	"strings"
@@ -9,12 +8,6 @@ import (
 
 	"protoexam/examgen/model"
 )
-
-// Judge is retained for optional/advisory source evaluation. The production
-// QC path below is deliberately deterministic and does not call it.
-type Judge interface {
-	JudgeAgainstSource(ctx context.Context, q Question, source string) (SourcedVerdict, error)
-}
 
 // Evaluator evaluates an arithmetic expression. Implemented in calc.go.
 type Evaluator interface {
@@ -50,19 +43,6 @@ func quoteFloor(quote string) int {
 // quantities get rounded by the model in the choice text.
 const arithmeticTolerance = 1e-6
 
-// RunGates applies the deterministic QC checks to one question and returns the
-// report. The Judge parameter remains for source compatibility with callers
-// that may run the advisory source evaluation separately.
-// It never returns an error for a failing question — failure is data. The QC
-// path itself has no network dependency.
-func RunGates(ctx context.Context, q Question, chunk Chunk, j Judge, ev Evaluator) (*GateReport, error) {
-	rep := RunCheapGates(q, chunk, ev)
-	if err := AddJudgeGates(ctx, rep, q, chunk, j); err != nil {
-		return nil, err
-	}
-	return rep, nil
-}
-
 // RunCheapGates runs everything Go can decide by itself. No model, no network,
 // microseconds.
 func RunCheapGates(q Question, chunk Chunk, ev Evaluator) *GateReport {
@@ -73,14 +53,6 @@ func RunCheapGates(q Question, chunk Chunk, ev Evaluator) *GateReport {
 	rep.Results = append(rep.Results, gateArithmetic(q, ev))
 	rep.Results = append(rep.Results, gateUnitCheck(q))
 	return rep
-}
-
-// AddJudgeGates is kept as a compatibility hook, but the core gate is QC-only:
-// a model judge must not decide whether a question is educationally good or
-// whether its answer is sufficiently passage-specific. Those are advisory
-// evaluation concerns, not hard production checks.
-func AddJudgeGates(_ context.Context, _ *GateReport, _ Question, _ Chunk, _ Judge) error {
-	return nil
 }
 
 // gateSourceRole is a narrow structural QC check. It does not decide whether

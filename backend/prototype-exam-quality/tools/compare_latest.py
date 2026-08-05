@@ -27,9 +27,6 @@ SOURCE_STYLES = {
     "ours": ("#155eef", "#e8f0ff", "#1146a8"),
     "nlm-whole": ("#9a6700", "#fff3cd", "#795b00"),
     "nlm-partial": ("#00897b", "#e0f7f4", "#00695c"),
-    "nlm-physics": ("#7c3aed", "#f0e9ff", "#5b21b6"),
-    "nlm-pages": ("#c2410c", "#ffeadf", "#9a3412"),
-    "nlm-book": ("#be123c", "#ffe4e6", "#9f1239"),
 }
 SKILL_TH = {"application": "ประยุกต์ใช้", "calculation": "คำนวณ"}
 DIFFICULTY_TH = {"easy": "ง่าย", "medium": "ปานกลาง", "hard": "ยาก"}
@@ -512,9 +509,6 @@ def main() -> int:
     parser.add_argument("--ours", type=Path, required=True, help="benchmark JSON")
     parser.add_argument("--nlm-whole", "--nlm-thai", dest="nlm_whole", type=Path)
     parser.add_argument("--nlm-partial", type=Path)
-    parser.add_argument("--nlm-physics", type=Path, help="legacy English export")
-    parser.add_argument("--nlm-pages", type=Path, help="legacy comparison export")
-    parser.add_argument("--nlm-book", type=Path, help="legacy comparison export")
     parser.add_argument("--out", type=Path, required=True)
     args = parser.parse_args()
 
@@ -535,18 +529,6 @@ def main() -> int:
             "NotebookLM · บางส่วน",
             "15 ข้อจากหัวข้อที่จำกัด · ภาษาไทย",
         )
-    if args.nlm_physics:
-        append_source(
-            sources,
-            args.nlm_physics,
-            "nlm-physics",
-            "NotebookLM · ฟิสิกส์",
-            "ชุดเก่า · ภาษาอังกฤษ",
-        )
-    if args.nlm_pages:
-        append_source(sources, args.nlm_pages, "nlm-pages", "NotebookLM · บางหน้า (เก่า)", "ชุดเก่า")
-    if args.nlm_book:
-        append_source(sources, args.nlm_book, "nlm-book", "NotebookLM · ทั้งเล่ม (เก่า)", "ชุดเก่า")
     if not sources:
         parser.error("ต้องระบุไฟล์ผลลัพธ์จาก NotebookLM อย่างน้อยหนึ่งไฟล์")
 

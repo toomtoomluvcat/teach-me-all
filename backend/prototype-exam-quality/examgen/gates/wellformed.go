@@ -377,7 +377,7 @@ func similarQuestions(q, other Question) bool {
 
 // gateDistinct rejects a question that asks what an already-accepted one asks.
 //
-// This one cannot live in RunGates: it is the only check that depends on the
+// This one cannot live in RunCheapGates: it is the only check that depends on the
 // rest of the exam rather than on the question alone. Reading a real run turned
 // up "what is creativity" three times in twelve questions, and two more that
 // were the same question about linguistic intelligence.

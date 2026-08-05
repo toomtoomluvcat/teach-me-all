@@ -121,7 +121,6 @@ func buildDependencies(cfg config, modelClient llm.ModelClient) examgen.Deps {
 	deps := examgen.Deps{
 		Gen:           gen,
 		CompileGraph:  cfg.graphCompile || cfg.setGeneration,
-		Judge:         llm.NewJudge(modelClient, cfg.model),
 		Eval:          examgen.Arith{},
 		Quality:       llm.NewQualityGrader(modelClient, cfg.model),
 		Log:           examgen.Progress(safeProgress()),

@@ -22,16 +22,6 @@ func (g batchTestGenerator) Questions(context.Context, Lesson, *EvidenceGraph, C
 	return append([]Question(nil), g.questions...), nil
 }
 
-type passingTestJudge struct{}
-
-func (passingTestJudge) JudgeBlind(context.Context, Question) (BlindVerdict, error) {
-	return BlindVerdict{Interpretable: true}, nil
-}
-
-func (passingTestJudge) JudgeAgainstSource(context.Context, Question, string) (SourcedVerdict, error) {
-	return passingSourceVerdict(), nil
-}
-
 type feedbackRecordingGenerator struct {
 	calls    int
 	feedback [][]RejectedDraft
@@ -60,40 +50,6 @@ func (g *feedbackRecordingGenerator) Questions(_ context.Context, _ Lesson, _ *E
 		q.Choices[2].Content = "intake, circulation, absorption, elimination"
 	}
 	return []Question{q}, nil
-}
-
-type semanticMemoryJudge struct{}
-
-func (semanticMemoryJudge) JudgeBlind(context.Context, Question) (BlindVerdict, error) {
-	return BlindVerdict{Interpretable: true}, nil
-}
-func (semanticMemoryJudge) JudgeAgainstSource(_ context.Context, q Question, _ string) (SourcedVerdict, error) {
-	statuses := []ChoiceStatus{ChoiceSupported, ChoiceUnsupported, ChoiceEquivalent, ChoiceUnsupported}
-	if strings.Contains(q.Choices[2].Content, "circulation") {
-		statuses[2] = ChoiceUnsupported
-	}
-	verdicts := make([]ChoiceVerdict, len(statuses))
-	for i, status := range statuses {
-		verdicts[i] = ChoiceVerdict{Index: i, Status: status, Reason: string(status)}
-	}
-	return SourcedVerdict{
-		BestIndex:        0,
-		ChoiceVerdicts:   verdicts,
-		SourceDependency: SourceDependencySpecific,
-		DependencyKind:   DependencyOrder,
-		Evidence:         []string{testQuote()},
-		Counterfactual:   true,
-	}, nil
-}
-
-func passingSourceVerdict() SourcedVerdict {
-	return SourcedVerdict{
-		BestIndex:        0,
-		SourceDependency: SourceDependencySpecific,
-		DependencyKind:   DependencyOrder,
-		Evidence:         []string{testQuote()},
-		Counterfactual:   true,
-	}
 }
 
 type recordingTestEmbedder struct {
@@ -237,7 +193,6 @@ func TestGenerateExamEmbedsOnlyCheapPassingQuestionsAsOneBatch(t *testing.T) {
 
 	res, err := GenerateExam(context.Background(), outline, lesson, []Chunk{chunk}, Deps{
 		Gen:      batchTestGenerator{questions: questions},
-		Judge:    passingTestJudge{},
 		Eval:     Arith{},
 		Embedder: embedder,
 	}, ExamOptions{Budget: 2, PerChunk: 3, MaxChunkVisits: 1})
@@ -252,29 +207,6 @@ func TestGenerateExamEmbedsOnlyCheapPassingQuestionsAsOneBatch(t *testing.T) {
 	}
 	if got := len(embedder.calls[0]); got != 2 {
 		t.Fatalf("texts in embedding batch = %d, want 2", got)
-	}
-}
-
-func TestGenerateExamDefersSemanticChoiceAudit(t *testing.T) {
-	gen := &feedbackRecordingGenerator{}
-	outline := &Outline{Lessons: []Lesson{{ID: "L01", Title: "Lesson", QuestionBudget: 1, ChunkIDs: []string{"c1", "c2"}}}}
-	lesson := outline.Lessons[0]
-	chunks := []Chunk{
-		{ID: "c1", Page: 1, Text: testQuote(), LessonID: lesson.ID},
-		{ID: "c2", Page: 2, Text: testQuote(), LessonID: lesson.ID},
-	}
-
-	res, err := GenerateExam(context.Background(), outline, lesson, chunks, Deps{
-		Gen: gen, Judge: semanticMemoryJudge{}, Eval: Arith{},
-	}, ExamOptions{Budget: 1, PerChunk: 1, MaxChunkVisits: 2})
-	if err != nil {
-		t.Fatalf("GenerateExam() error = %v", err)
-	}
-	if gen.calls != 1 || len(gen.feedback) != 1 || len(gen.feedback[0]) != 0 {
-		t.Fatalf("generation calls/feedback = %d/%#v", gen.calls, gen.feedback)
-	}
-	if len(res.Passed) != 1 || strings.Contains(res.Passed[0].Choices[2].Content, "circulation") {
-		t.Fatalf("passed = %#v, want the first question without deferred semantic retry", res.Passed)
 	}
 }
 
