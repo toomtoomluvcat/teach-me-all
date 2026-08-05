@@ -1,0 +1,232 @@
+นี่คือข้อสอบปรนัย 15 ข้อ ที่สร้างขึ้นจากแหล่งข้อมูล Physics ของ OpenStax โดยจำกัดเนื้อหาตามที่กำหนดครับ
+
+---
+
+### **ชุดที่ 1: EASY APPLICATION (การประยุกต์ใช้ระดับง่าย)**
+
+**ข้อ 1**
+นักท่องเที่ยวผลักกระเป๋าเดินทางมวล 20.0 kg บนพื้นลื่นด้วยแรงสุทธิ 40.0 N ความเร่งของกระเป๋าเดินทางใบนี้จะเป็นเท่าใด?
+A. 0.50 m/s²
+B. 2.00 m/s²
+C. 20.0 m/s²
+D. 800 m/s²
+**คำตอบ:** B
+**Skill:** application
+**Difficulty:** easy
+**คำอธิบาย:** ใช้ความสัมพันธ์จากกฎข้อที่สองของนิวตัน $a = F_{net}/m$ เพื่อคำนวณความเร่งในสถานการณ์ใหม่
+**Calculation Expression:** $a = \frac{40.0\text{ N}}{20.0\text{ kg}} = 2.00\text{ m/s}^2$
+**Supporting Quote:** "Mathematically, the second law is most often written as $F_{net} = ma$."
+
+***
+
+**ข้อ 2**
+หากคุณนำกล่องมวล 5.0 kg ไปวางไว้บนพื้นผิวโลก กล่องใบนี้จะมีน้ำหนักเท่าใด?
+A. 5.0 N
+B. 14.8 N
+C. 49.0 N
+D. 50.0 kg
+**คำตอบ:** C
+**Skill:** application
+**Difficulty:** easy
+**คำอธิบาย:** ประยุกต์ใช้กฎของน้ำหนัก $W = mg$ โดยใช้ค่าความเร่งเนื่องจากแรงโน้มถ่วงของโลก (9.80 m/s²)
+**Calculation Expression:** $W = mg = (5.0\text{ kg})(9.80\text{ m/s}^2) = 49.0\text{ N}$
+**Supporting Quote:** "the force of gravity, $W$, acting on an object of mass $m$; defined mathematically as $W = mg$, where $g$ is the magnitude and direction of the acceleration due to gravity"
+
+***
+
+**ข้อ 3**
+นักวิ่งมวล 60 kg วิ่งด้วยความเร็วคงที่ 4 m/s โมเมนตัมเชิงเส้นของนักวิ่งคนนี้มีค่าเท่าใด?
+A. 15 kg·m/s
+B. 64 kg·m/s
+C. 240 kg·m/s
+D. 240 N
+**คำตอบ:** C
+**Skill:** application
+**Difficulty:** easy
+**คำอธิบาย:** ใช้สูตรโมเมนตัม $p = mv$ กับสถานการณ์ของคนกำลังวิ่ง
+**Calculation Expression:** $p = mv = (60\text{ kg})(4\text{ m/s}) = 240\text{ kg}\cdot\text{m/s}$
+**Supporting Quote:** "Linear momentum is the product of a system’s mass and its velocity. In equation form, linear momentum $p$ is $p = mv$."
+
+***
+
+**ข้อ 4**
+คนงานออกแรงคงที่ 150 N ยกถังน้ำขึ้นในแนวดิ่งได้ระยะทาง 2.0 เมตร งานที่คนงานทำต่อถังน้ำนี้มีค่าเท่าใด?
+A. 75 J
+B. 152 J
+C. 300 J
+D. 300 N
+**คำตอบ:** C
+**Skill:** application
+**Difficulty:** easy
+**คำอธิบาย:** ประยุกต์ใช้สูตรการคำนวณงาน $W = Fd$ กับสถานการณ์การยกวัตถุ
+**Calculation Expression:** $W = Fd = (150\text{ N})(2.0\text{ m}) = 300\text{ J}$
+**Supporting Quote:** "Work is application of force, $F$, to move an object over a distance, $d$, in the direction that the force is applied. Work, $W$, is described by the equation $W = Fd$."
+
+***
+
+**ข้อ 5**
+ของเล่นเด็กชิ้นหนึ่งมีความต้านทาน 30 $\Omega$ หากเชื่อมต่อกับแบตเตอรี่ที่มีแรงดันไฟฟ้า 9 V กระแสไฟฟ้าที่ไหลผ่านของเล่นนี้คือเท่าใด?
+A. 0.3 A
+B. 3.3 A
+C. 39.0 A
+D. 270 A
+**คำตอบ:** A
+**Skill:** application
+**Difficulty:** easy
+**คำอธิบาย:** ใช้กฎของโอห์ม ($V = IR$) เพื่อหาค่ากระแสไฟฟ้าในวงจรอย่างง่าย
+**Calculation Expression:** $I = V/R = 9\text{ V} / 30\text{ }\Omega = 0.3\text{ A}$
+**Supporting Quote:** "The constant of proportionality is the resistance $R$ of the material, which leads to $V = IR$. This relationship is called Ohm’s law."
+
+---
+
+### **ชุดที่ 2: HARD APPLICATION (การประยุกต์ใช้ระดับยาก)**
+
+**ข้อ 6**
+รถบรรทุกมวล 5,000 kg เคลื่อนที่ด้วยความเร็ว 20 m/s เมื่อเหยียบเบรกจนหยุดสนิทในระยะทาง 50 m ขนาดของแรงเบรกสุทธิที่กระทำต่อรถบรรทุกเป็นเท่าใด?
+A. 2,000 N
+B. 10,000 N
+C. 20,000 N
+D. 100,000 N
+**คำตอบ:** C
+**Skill:** application
+**Difficulty:** hard
+**คำอธิบาย:** ต้องเชื่อมโยงสมการการเคลื่อนที่เพื่อหาความเร่งก่อน ($v^2 = v_0^2 + 2ad$) แล้วจึงใช้กฎข้อที่สองของนิวตัน ($F = ma$)
+**Calculation Expression:** $a = \frac{v^2 - v_0^2}{2d} = \frac{0^2 - 20^2}{2(50)} = -4\text{ m/s}^2$; $|F| = ma = (5,000\text{ kg})(4\text{ m/s}^2) = 20,000\text{ N}$
+**Supporting Quote:** "Newton’s second law of motion... defined mathematically as $F_{net} = ma$." และ "Velocity with constant acceleration... $v^2 = v_0^2 + 2a(d - d_0)$."
+
+***
+
+**ข้อ 7**
+โยนก้อนหินมวล 0.20 kg ขึ้นไปในอากาศ หากมันขึ้นไปได้สูงที่สุด 15.0 เมตร พลังงานจลน์ของก้อนหินที่ตำแหน่งเริ่มโยนบนพื้นดินมีค่าเท่าใด? (ไม่คิดแรงต้านอากาศ และ $g = 9.80$ m/s²)
+A. 1.96 J
+B. 2.94 J
+C. 29.4 J
+D. 58.8 J
+**คำตอบ:** C
+**Skill:** application
+**Difficulty:** hard
+**คำอธิบาย:** ใช้กฎการอนุรักษ์พลังงานเชื่อมโยงระหว่างพลังงานจลน์เริ่มต้นกับพลังงานศักย์โน้มถ่วงที่จุดสูงสุด ($KE_{initial} = PE_{final}$)
+**Calculation Expression:** $PE = mgh = (0.20\text{ kg})(9.80\text{ m/s}^2)(15.0\text{ m}) = 29.4\text{ J}$
+**Supporting Quote:** "Calculate the potential energy of the object before you drop it using $PE = mgh$." และ "in a closed system, total energy is conserved"
+
+***
+
+**ข้อ 8**
+นักสเกตน้ำแข็งมวล 50 kg ยืนนิ่งบนพื้นน้ำแข็งที่ลื่นมาก แล้วขว้างลูกบอลมวล 2.5 kg ออกไปข้างหน้าด้วยความเร็ว 10 m/s นักสเกตจะเคลื่อนที่ถอยหลังด้วยความเร็วเท่าใด?
+A. 0.2 m/s
+B. 0.5 m/s
+C. 2.5 m/s
+D. 5.0 m/s
+**คำตอบ:** B
+**Skill:** application
+**Difficulty:** hard
+**คำอธิบาย:** ใช้กฎการอนุรักษ์โมเมนตัมในระบบปิดที่โมเมนตัมรวมเริ่มต้นเป็นศูนย์ ($0 = m_1v'_1 + m_2v'_2$)
+**Calculation Expression:** $0 = (50\text{ kg})v' + (2.5\text{ kg})(10\text{ m/s}) \Rightarrow v' = -25/50 = -0.5\text{ m/s}$
+**Supporting Quote:** "Whenever the net external force on a system is zero, relativistic momentum is conserved, just as is the case for classical momentum."
+
+***
+
+**ข้อ 9**
+เครนไฟฟ้ามีกำลัง 1,000 W และมีประสิทธิภาพ 80% หากต้องการใช้ยกเครื่องจักรหนัก 400 kg ขึ้นไปสูง 4.0 เมตร จะต้องใช้เวลากี่วินาที? (กำหนด $g = 9.80$ m/s²)
+A. 1.6 s
+B. 15.7 s
+C. 19.6 s
+D. 20.0 s
+**คำตอบ:** C
+**Skill:** application
+**Difficulty:** hard
+**คำอธิบาย:** ต้องหาพลังงานขาออกจริงจากประสิทธิภาพ ($P_{out} = 0.8 \times 1,000$) แล้วหางาน ($W = mgh$) เพื่อคำนวณหาเวลาจาก $t = W/P$
+**Calculation Expression:** $P_{out} = 800\text{ W}$; $W = (400)(9.80)(4) = 15,680\text{ J}$; $t = 15,680\text{ J} / 800\text{ W} = 19.6\text{ s}$
+**Supporting Quote:** "Power is calculated by dividing the work done by the time it took to do the work." และ "efficiency = $W_{out}/W_{in}$"
+
+***
+
+**ข้อ 10**
+ในวงจรไฟฟ้ากระแสตรง หากคุณเปลี่ยนแหล่งจ่ายไฟจาก 12 V เป็น 24 V โดยใช้ตัวต้านทานตัวเดิม กำลังไฟฟ้าที่ตัวต้านทานนั้นสูญเสียจะเปลี่ยนแปลงอย่างไร?
+A. เท่าเดิม
+B. เพิ่มขึ้นเป็น 2 เท่า
+C. เพิ่มขึ้นเป็น 4 เท่า
+D. ลดลงเหลือครึ่งหนึ่ง
+**คำตอบ:** C
+**Skill:** application
+**Difficulty:** hard
+**คำอธิบาย:** เชื่อมโยงกฎของโอห์ม ($V=IR$) กับสูตรกำลังไฟฟ้า ($P = V^2/R$) เมื่อ $V$ เพิ่มเป็น 2 เท่า กำลังจะเพิ่มเป็น $2^2$ เท่า
+**Calculation Expression:** $P_1 = V^2/R$; $P_2 = (2V)^2/R = 4(V^2/R) = 4P_1$
+**Supporting Quote:** "the electric power dissipated for a given voltage difference $V$ across a resistor $R$, $P = V^2/R$"
+
+---
+
+### **ชุดที่ 3: CALCULATION (การคำนวณ)**
+
+**ข้อ 11**
+นักวิ่งเริ่มวิ่งจากจุดหยุดนิ่งด้วยความเร่งคงที่ 2.0 m/s² เป็นเวลา 5.0 วินาที ระยะทางที่นักวิ่งเคลื่อนที่ได้คือเท่าใด?
+A. 5.0 m
+B. 10.0 m
+C. 25.0 m
+D. 50.0 m
+**คำตอบ:** C
+**Skill:** calculation
+**Difficulty:** medium
+**คำอธิบาย:** คำนวณระยะทางโดยใช้สมการการเคลื่อนที่แนวตรงด้วยความเร่งคงที่
+**Calculation Expression:** $d = d_0 + v_0t + \frac{1}{2}at^2 = 0 + 0(5) + \frac{1}{2}(2.0)(5.0)^2 = 25.0\text{ m}$
+**Supporting Quote:** "Displacement with constant acceleration... $d = d_0 + v_0t + \frac{1}{2}at^2$."
+
+***
+
+**ข้อ 12**
+วัตถุมวล 8.0 kg ถูกแรงลัพธ์ขนาด 32.0 N กระทำในทิศทางเดียวกันกับการเคลื่อนที่ ความเร่งของวัตถุมีค่ากี่เมตรต่อวินาทียกกำลังสอง?
+A. 0.25 m/s²
+B. 4.0 m/s²
+C. 40.0 m/s²
+D. 256 m/s²
+**คำตอบ:** B
+**Skill:** calculation
+**Difficulty:** easy
+**คำอธิบาย:** คำนวณหาค่าความเร่งจากกฎข้อที่สองของนิวตันโดยตรง
+**Calculation Expression:** $a = F_{net}/m = 32.0\text{ N} / 8.0\text{ kg} = 4.0\text{ m/s}^2$
+**Supporting Quote:** "Solving Newton’s second law for the acceleration, we find that the magnitude of the acceleration, $a$, is $a = F_{net}/m$."
+
+***
+
+**ข้อ 13**
+รถยนต์ของเล่นมวล 2.0 kg เคลื่อนที่ด้วยความเร็ว 15 m/s เข้าชนกำแพงและหยุดสนิทในเวลา 0.1 วินาที การเปลี่ยนแปลงโมเมนตัม ($\Delta p$) ของรถยนต์มีค่าเท่าใด?
+A. 7.5 kg·m/s
+B. 30 kg·m/s
+C. 300 kg·m/s
+D. 0 kg·m/s
+**คำตอบ:** B
+**Skill:** calculation
+**Difficulty:** medium
+**คำอธิบาย:** คำนวณการเปลี่ยนแปลงโมเมนตัมจาก $\Delta p = m(v_f - v_i)$
+**Calculation Expression:** $\Delta p = (2.0\text{ kg})(0 - 15\text{ m/s}) = -30\text{ kg}\cdot\text{m/s}$ (ขนาดคือ 30)
+**Supporting Quote:** "The change in momentum $\Delta p$ is given by $\Delta p = m(v_f - v_i)$."
+
+***
+
+**ข้อ 14**
+ปั้นจั่นยกมวล 500 kg ขึ้นไปสูง 10 เมตร งานที่ทำต้อมวลนี้โดยแรงโน้มถ่วง (Work done against gravity) มีค่ากี่จูล? (ใช้ $g = 9.80$ m/s²)
+A. 5,000 J
+B. 9,800 J
+C. 49,000 J
+D. 50,000 J
+**คำตอบ:** C
+**Skill:** calculation
+**Difficulty:** medium
+**คำอธิบาย:** คำนวณงานที่ทำในการยกวัตถุซึ่งมีค่าเท่ากับพลังงานศักย์ที่เพิ่มขึ้น
+**Calculation Expression:** $W = mgh = (500\text{ kg})(9.80\text{ m/s}^2)(10\text{ m}) = 49,000\text{ J}$
+**Supporting Quote:** "Calculate the potential energy of the object before you drop it using $PE = mgh = (9.80)mh$."
+
+***
+
+**ข้อ 15**
+หลอดไฟดวงหนึ่งต่อกับแหล่งจ่ายไฟ 120 V มีกระแสไฟฟ้าไหลผ่าน 0.5 A ความต้านทานของหลอดไฟนี้มีค่ากี่โอห์ม?
+A. 60 $\Omega$
+B. 120 $\Omega$
+C. 240 $\Omega$
+D. 480 $\Omega$
+**คำตอบ:** C
+**Skill:** calculation
+**Difficulty:** easy
+**คำอธิบาย:** ใช้กฎของโอห์มคำนวณหาค่าความต้านทานจากแรงดันและกระแสที่ทราบค่า
+**Calculation Expression:** $R = V/I = 120\text{ V} / 0.5\text{ A} = 240\text{ }\Omega$
+**Supporting Quote:** "The constant of proportionality is the resistance $R$ of the material, which leads to $V = IR$."

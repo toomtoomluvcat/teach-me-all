@@ -1,0 +1,88 @@
+{
+  "lesson": "ตัวอย่างบทเรียนสำหรับทดสอบเครื่องมือ",
+  "budget": 4,
+  "pass_rate": 0.8,
+  "ceiling": false,
+  "questions": [
+    {
+      "kind": "mcq_single",
+      "stem": "ทางเดินอาหารของมนุษย์เริ่มต้นที่อวัยวะใด",
+      "choices": [
+        {"content": "ปาก", "is_correct": true},
+        {"content": "หลอดลม", "is_correct": false},
+        {"content": "กระเพาะอาหาร", "is_correct": false},
+        {"content": "ลำไส้เล็ก", "is_correct": false}
+      ],
+      "explanation": "ข้อความระบุว่าทางเดินอาหารเริ่มที่ปาก",
+      "source_quote": "ทางเดินอาหารของมนุษย์ประกอบด้วย ปาก หลอดอาหาร",
+      "difficulty": "easy",
+      "skill": "recall",
+      "passed": true,
+      "gates": []
+    },
+    {
+      "kind": "mcq_single",
+      "stem": "เอนไซม์อะไมเลสในน้ำลายย่อยสารอาหารชนิดใด",
+      "choices": [
+        {"content": "โปรตีน", "is_correct": false},
+        {"content": "แป้ง", "is_correct": true},
+        {"content": "ไขมัน", "is_correct": false},
+        {"content": "วิตามิน", "is_correct": false}
+      ],
+      "explanation": "อะไมเลสย่อยแป้งเป็นน้ำตาลโมเลกุลคู่",
+      "source_quote": "อะไมเลสย่อยแป้ง",
+      "difficulty": "medium",
+      "skill": "understand",
+      "passed": true,
+      "gates": []
+    },
+    {
+      "kind": "mcq_single",
+      "stem": "การดูดซึมสารอาหารส่วนใหญ่เกิดขึ้นที่อวัยวะใด",
+      "choices": [
+        {"content": "กระเพาะอาหาร", "is_correct": false},
+        {"content": "ลำไส้ใหญ่", "is_correct": false},
+        {"content": "ลำไส้เล็ก", "is_correct": true},
+        {"content": "หลอดอาหาร", "is_correct": false}
+      ],
+      "explanation": "ลำไส้เล็กมีวิลลัสจำนวนมากทำหน้าที่ดูดซึม",
+      "source_quote": "ลำไส้เล็กเป็นบริเวณที่ดูดซึมสารอาหาร",
+      "difficulty": "medium",
+      "skill": "recall",
+      "passed": true,
+      "gates": []
+    },
+    {
+      "kind": "mcq_single",
+      "stem": "น้ำดีที่สร้างจากตับทำหน้าที่ใดในการย่อยอาหาร",
+      "choices": [
+        {"content": "ย่อยโปรตีนให้เป็นกรดอะมิโน", "is_correct": false},
+        {"content": "ทำให้ไขมันแตกตัวเป็นหยดเล็ก", "is_correct": true},
+        {"content": "เปลี่ยนแป้งเป็นน้ำตาล", "is_correct": false},
+        {"content": "ดูดซึมวิตามินที่ละลายในน้ำ", "is_correct": false}
+      ],
+      "explanation": "น้ำดีทำหน้าที่อิมัลซิฟายไขมัน",
+      "source_quote": "น้ำดีทำให้ไขมันแตกตัวเป็นหยดเล็ก",
+      "difficulty": "hard",
+      "skill": "understand",
+      "passed": true,
+      "gates": []
+    },
+    {
+      "kind": "mcq_single",
+      "stem": "ข้อใดคือจุดประสงค์การเรียนรู้ข้อที่ 3 ของหน่วยนี้",
+      "choices": [
+        {"content": "ก", "is_correct": true},
+        {"content": "ข", "is_correct": false},
+        {"content": "ค", "is_correct": false},
+        {"content": "ง", "is_correct": false}
+      ],
+      "explanation": "คำถามนี้ถามจากคู่มือครู",
+      "source_quote": "จุดประสงค์การเรียนรู้",
+      "difficulty": "easy",
+      "skill": "recall",
+      "passed": false,
+      "gates": []
+    }
+  ]
+}

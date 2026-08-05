@@ -1,0 +1,232 @@
+นี่คือข้อสอบปรนัย 15 ข้อ ที่สร้างขึ้นจากแหล่งข้อมูล Physics ของ OpenStax ตามหัวข้อและเงื่อนไขที่กำหนดครับ
+
+---
+
+### **ชุดที่ 1: EASY APPLICATION (การประยุกต์ใช้ระดับง่าย)**
+
+**ข้อ 1**
+หากนักวิทยาศาสตร์ผลักรถเข็นอุปกรณ์มวล 15.0 kg ด้วยแรงสุทธิ 45.0 N ความเร่งของรถเข็นจะเป็นเท่าใด?
+A. 0.33 m/s²
+B. 3.00 m/s²
+C. 30.0 m/s²
+D. 45.0 m/s²
+**คำตอบ:** B
+**Skill:** application
+**Difficulty:** easy
+**คำอธิบาย:** ใช้กฎข้อที่สองของนิวตัน $a = F_{net}/m$ เพื่อหาความเร่งในสถานการณ์ใหม่
+**Calculation Expression:** $a = \frac{45.0\text{ N}}{15.0\text{ kg}} = 3.00\text{ m/s}^2$
+**Supporting Quote:** "Newton’s second law of motion... shows the mathematical relationship between force, mass, and acceleration. Mathematically, the second law is most often written as $F_{net} = ma$."
+
+***
+
+**ข้อ 2**
+พัสดุชิ้นหนึ่งมีมวล 4.0 kg เมื่อวางไว้บนพื้นโลก พัสดุนี้จะมีน้ำหนักประมาณเท่าใด?
+A. 4.0 N
+B. 39.2 N
+C. 40.0 N
+D. 4.0 kg
+**คำตอบ:** B
+**Skill:** application
+**Difficulty:** easy
+**คำอธิบาย:** ประยุกต์ใช้ความสัมพันธ์ระหว่างมวลและน้ำหนักบนโลก ($W = mg$)
+**Calculation Expression:** $W = mg = (4.0\text{ kg})(9.80\text{ m/s}^2) = 39.2\text{ N}$
+**Supporting Quote:** "The weight (disregarding for now the direction of the weight) of a 1.0-kg object on Earth is $W = mg = (1.0\text{ kg})(9.80\text{ m/s}^2) = 9.80\text{ N}$."
+
+***
+
+**ข้อ 3**
+ลูกเบสบอลมวล 0.15 kg ถูกขว้างด้วยความเร็ว 30.0 m/s ขนาดของโมเมนตัมเชิงเส้นของลูกบอลเป็นเท่าใด?
+A. 0.005 kg·m/s
+B. 4.5 kg·m/s
+C. 30.15 kg·m/s
+D. 200 kg·m/s
+**คำตอบ:** B
+**Skill:** application
+**Difficulty:** easy
+**คำอธิบาย:** ประยุกต์ใช้สูตรโมเมนตัมเชิงเส้น $p = mv$ กับลูกเบสบอลที่กำลังเคลื่อนที่
+**Calculation Expression:** $p = mv = (0.15\text{ kg})(30.0\text{ m/s}) = 4.5\text{ kg}\cdot\text{m/s}$
+**Supporting Quote:** "Linear momentum is the product of a system’s mass and its velocity. In equation form, linear momentum $p$ is $p = mv$."
+
+***
+
+**ข้อ 4**
+คนงานออกแรง 100 N ผลักลังสินค้าให้เคลื่อนที่ไปได้ระยะทาง 5.0 เมตรในทิศทางเดียวกับแรง งานที่ทำมีค่าเท่าใด?
+A. 20 J
+B. 95 J
+C. 105 J
+D. 500 J
+**คำตอบ:** D
+**Skill:** application
+**Difficulty:** easy
+**คำอธิบาย:** ใช้ความสัมพันธ์ของงาน ($W = Fd$) กับสถานการณ์การผลักวัตถุ
+**Calculation Expression:** $W = Fd = (100\text{ N})(5.0\text{ m}) = 500\text{ J}$
+**Supporting Quote:** "Work is application of force, $F$, to move an object over a distance, $d$, in the direction that the force is applied. Work, $W$, is described by the equation $W = Fd$."
+
+***
+
+**ข้อ 5**
+เครื่องปิ้งขนมปังมีความต้านทาน 20 $\Omega$ เชื่อมต่อกับแหล่งจ่ายไฟ 120 V กระแสไฟฟ้าที่ไหลผ่านเครื่องปิ้งขนมปังมีค่าเท่าใด?
+A. 0.16 A
+B. 6.0 A
+C. 100 A
+D. 2,400 A
+**คำตอบ:** B
+**Skill:** application
+**Difficulty:** easy
+**คำอธิบาย:** ใช้กฎของโอห์ม ($V = IR$) เพื่อหาค่ากระแสไฟฟ้าในวงจรอย่างง่าย
+**Calculation Expression:** $I = V/R = 120\text{ V} / 20\text{ }\Omega = 6.0\text{ A}$
+**Supporting Quote:** "The constant of proportionality is the resistance $R$ of the material, which leads to $V = IR$. This relationship is called Ohm’s law."
+
+---
+
+### **ชุดที่ 2: HARD APPLICATION (การประยุกต์ใช้ระดับยาก)**
+
+**ข้อ 6**
+รถยนต์มวล 2,000 kg เคลื่อนที่ด้วยความเร็ว 30 m/s เมื่อเหยียบเบรกจนหยุดสนิทในระยะทาง 75 m ขนาดของแรงเบรกสุทธิที่กระทำต่อรถยนต์เป็นเท่าใด?
+A. 1,500 N
+B. 6,000 N
+C. 12,000 N
+D. 24,000 N
+**คำตอบ:** C
+**Skill:** application
+**Difficulty:** hard
+**คำอธิบาย:** ต้องใช้สมการการเคลื่อนที่หาความเร่งก่อน แล้วจึงนำไปหาแรงสุทธิจากกฎข้อที่สองของนิวตัน
+**Calculation Expression:** $a = \frac{v^2 - v_0^2}{2d} = \frac{0 - 30^2}{2(75)} = -6\text{ m/s}^2$; $|F_{net}| = ma = (2,000\text{ kg})(6\text{ m/s}^2) = 12,000\text{ N}$
+**Supporting Quote:** "Newton’s second law of motion... defined mathematically as $F_{net} = ma$." และสมการจลนศาสตร์ "Velocity with constant acceleration... $v^2 = v_0^2 + 2a(d - d_0)$."
+
+***
+
+**ข้อ 7**
+ลูกบอลมวล 0.50 kg ถูกโยนขึ้นในแนวดิ่งจากพื้นดิน หากลูกบอลขึ้นไปได้สูงที่สุด 10.0 เมตร พลังงานจลน์เริ่มต้นของลูกบอลขณะเริ่มโยนมีค่าเท่าใด? (กำหนดให้ $g = 9.80$ m/s² และไม่มีแรงต้านอากาศ)
+A. 4.9 J
+B. 5.0 J
+C. 49.0 J
+D. 98.0 J
+**คำตอบ:** C
+**Skill:** application
+**Difficulty:** hard
+**คำอธิบาย:** ใช้กฎการอนุรักษ์พลังงานเชื่อมโยงระหว่างพลังงานจลน์ที่พื้นดินกับพลังงานศักย์ที่จุดสูงสุด
+**Calculation Expression:** $KE_{initial} = PE_{peak} = mgh = (0.50\text{ kg})(9.80\text{ m/s}^2)(10.0\text{ m}) = 49.0\text{ J}$
+**Supporting Quote:** "Calculate the potential energy of the object before you drop it using $PE = mgh = (9.80)mh$."
+
+***
+
+**ข้อ 8**
+มดสองตัวเกาะอยู่บนแผ่นเสียงที่กำลังหมุนด้วยอัตราเร็วเชิงมุมคงที่ มด A อยู่ห่างจากศูนย์กลางเป็นระยะ $r$ และมด B อยู่ห่างจากศูนย์กลางเป็นระยะ $2r$ ข้อใดกล่าวถูกต้องเกี่ยวกับอัตราเร็วเชิงเส้น (tangential speed) ของมดทั้งสอง?
+A. มดทั้งสองมีอัตราเร็วเชิงเส้นเท่ากัน
+B. มด B มีอัตราเร็วเชิงเส้นเป็นสองเท่าของมด A
+C. มด A มีอัตราเร็วเชิงเส้นเป็นสองเท่าของมด B
+D. มด B มีอัตราเร็วเชิงเส้นเป็นสี่เท่าของมด A
+**คำตอบ:** B
+**Skill:** application
+**Difficulty:** hard
+**คำอธิบาย:** เชื่อมโยงความสัมพันธ์ระหว่างระยะห่างจากศูนย์กลาง อัตราเร็วเชิงมุม และอัตราเร็วเชิงเส้น ($v = r\omega$)
+**Calculation Expression:** $v_A = r\omega$; $v_B = (2r)\omega$; ดังนั้น $v_B = 2v_A$
+**Supporting Quote:** "The equation $v = r\omega$ says that the tangential speed $v$ is proportional to the distance $r$ from the center of rotation."
+
+***
+
+**ข้อ 9**
+นักไอซ์สเกตมวล 60 kg ยืนนิ่งบนพื้นน้ำแข็งที่ไม่มีความเสียดทาน แล้วขว้างลูกบอลมวล 2.0 kg ออกไปข้างหน้าด้วยความเร็ว 12.0 m/s ความเร็วในการถอยหลัง (recoil velocity) ของนักสเกตจะเป็นเท่าใด?
+A. 0.4 m/s
+B. 1.2 m/s
+C. 2.0 m/s
+D. 6.0 m/s
+**คำตอบ:** A
+**Skill:** application
+**Difficulty:** hard
+**คำอธิบาย:** ใช้กฎการอนุรักษ์โมเมนตัมในระบบที่ผลรวมโมเมนตัมเริ่มต้นเป็นศูนย์
+**Calculation Expression:** $m_1v'_1 + m_2v'_2 = 0 \Rightarrow v'_1 = -(m_2v'_2)/m_1 = -(2.0\text{ kg} \times 12.0\text{ m/s}) / 60\text{ kg} = -0.4\text{ m/s}$ (ขนาดคือ 0.4 m/s)
+**Supporting Quote:** "This video covers an elastic collision problem in which we find the recoil velocity of an ice skater who throws a ball straight forward."
+
+***
+
+**ข้อ 10**
+รอกไฟฟ้าที่มีกำลัง 600 W และมีประสิทธิภาพ 75% ถูกนำไปใช้ยกมวล 100 kg ขึ้นในแนวดิ่ง จะต้องใช้เวลากี่วินาทีในการยกมวลนี้ขึ้นไปสูง 4.5 เมตร? (กำหนดให้ $g = 9.80$ m/s²)
+A. 0.75 s
+B. 9.8 s
+C. 13.1 s
+D. 44.1 s
+**คำตอบ:** B
+**Skill:** application
+**Difficulty:** hard
+**คำอธิบาย:** ต้องคำนวณกำลังขาออกจริงจากประสิทธิภาพก่อน แล้วจึงเชื่อมโยงกับงานที่ทำ (พลังงานศักย์) เพื่อหาเวลา
+**Calculation Expression:** $P_{out} = 600\text{ W} \times 0.75 = 450\text{ W}$; $W = mgh = (100)(9.80)(4.5) = 4,410\text{ J}$; $t = W/P_{out} = 4,410\text{ J} / 450\text{ W} = 9.8\text{ s}$
+**Supporting Quote:** "Power is calculated by dividing the work done by the time it took to do the work." และ "The ratio of output work to input work is a machine’s efficiency."
+
+---
+
+### **ชุดที่ 3: CALCULATION (การคำนวณ)**
+
+**ข้อ 11**
+คลื่นเสียงมีความถี่ 250 Hz และมีความยาวคลื่น 1.4 เมตร ความเร็วของคลื่นเสียงนี้มีค่ากี่เมตรต่อวินาที?
+A. 178 m/s
+B. 251.4 m/s
+C. 350 m/s
+D. 560 m/s
+**คำตอบ:** C
+**Skill:** calculation
+**Difficulty:** medium
+**คำอธิบาย:** คำนวณความเร็วคลื่นจากความถี่และความยาวคลื่นโดยตรง
+**Calculation Expression:** $v = f\lambda = (250\text{ Hz})(1.4\text{ m}) = 350\text{ m/s}$
+**Supporting Quote:** "Recall that $v = f\lambda$, and in a given medium under fixed temperature and humidity, $v$ is constant."
+
+***
+
+**ข้อ 12**
+ต้องใช้พลังงานความร้อนกี่จูล (J) เพื่อทำให้น้ำมวล 2.0 kg มีอุณหภูมิสูงขึ้น 5.0 °C? (กำหนดความร้อนจำเพาะของน้ำ $c = 4,186$ J/kg·°C)
+A. 8,372 J
+B. 20,930 J
+C. 41,860 J
+D. 83,720 J
+**คำตอบ:** C
+**Skill:** calculation
+**Difficulty:** medium
+**คำอธิบาย:** คำนวณปริมาณความร้อนที่ใช้ในการเปลี่ยนอุณหภูมิของสสาร
+**Calculation Expression:** $Q = mc\Delta T = (2.0\text{ kg})(4,186\text{ J/kg}\cdot^\circ\text{C})(5.0\text{ }^\circ\text{C}) = 41,860\text{ J}$
+**Supporting Quote:** "specific heat: amount of heat necessary to change the temperature of 1.00 kg of a substance by 1.00 °C" และสูตร $Q = mc\Delta T$
+
+***
+
+**ข้อ 13**
+ดาวเทียมเคลื่อนที่เป็นวงกลมรอบโลกด้วยอัตราเร็วคงที่ 7,500 m/s ในวงโคจรที่มีรัศมี $7.5 \times 10^6$ เมตร ขนาดของความเร่งสู่ศูนย์กลางของดาวเทียมมีค่าเท่าใด?
+A. 1.0 m/s²
+B. 7.5 m/s²
+C. 9.8 m/s²
+D. 10.0 m/s²
+**คำตอบ:** B
+**Skill:** calculation
+**Difficulty:** medium
+**คำอธิบาย:** คำนวณความเร่งสู่ศูนย์กลางจากการเคลื่อนที่เป็นวงกลมสม่ำเสมอ
+**Calculation Expression:** $a_c = v^2/r = (7,500\text{ m/s})^2 / (7.5 \times 10^6\text{ m}) = 56,250,000 / 7,500,000 = 7.5\text{ m/s}^2$
+**Supporting Quote:** "For an object traveling at speed $v$ in a circular path with radius $r$, the magnitude of centripetal acceleration is $a_c = v^2/r$."
+
+***
+
+**ข้อ 14**
+เลนส์นูนมีความยาวโฟกัส 0.20 เมตร กำลังของเลนส์ (Power) นี้มีค่ากี่ไดออปเตอร์ (D)?
+A. 0.2 D
+B. 2.0 D
+C. 5.0 D
+D. 10.0 D
+**คำตอบ:** C
+**Skill:** calculation
+**Difficulty:** easy
+**คำอธิบาย:** คำนวณกำลังของเลนส์จากความยาวโฟกัสในหน่วยเมตร
+**Calculation Expression:** $P = 1/f = 1 / 0.20\text{ m} = 5.0\text{ D}$
+**Supporting Quote:** "power and focal length: $P = 1/f$"
+
+***
+
+**ข้อ 15**
+รถแข่งมวล 1,200 kg เลี้ยวโค้งบนถนนราบที่มีรัศมีความโค้ง 50 m ด้วยอัตราเร็ว 20 m/s ขนาดของแรงสู่ศูนย์กลางที่กระทำต่อรถคือเท่าใด?
+A. 480 N
+B. 4,800 N
+C. 9,600 N
+D. 24,000 N
+**คำตอบ:** C
+**Skill:** calculation
+**Difficulty:** medium
+**คำอธิบาย:** คำนวณแรงสู่ศูนย์กลางที่จำเป็นสำหรับการเลี้ยวโค้งของรถยนต์
+**Calculation Expression:** $F_c = mv^2/r = (1,200\text{ kg})(20\text{ m/s})^2 / 50\text{ m} = (1,200 \times 400) / 50 = 480,000 / 50 = 9,600\text{ N}$
+**Supporting Quote:** "By using the two different forms of the equation... we get two expressions involving the magnitude of the centripetal force $F_c$... $F_c = mv^2/r$."

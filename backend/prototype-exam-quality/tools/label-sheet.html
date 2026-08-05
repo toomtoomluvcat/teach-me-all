@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Blind Question Labeller</title>
+  <style>
+    :root { color-scheme: light; --ink:#172033; --muted:#63708a; --line:#dbe2ee; --bg:#f5f7fb; --card:#fff; --blue:#2563eb; --green:#15803d; --red:#b91c1c; }
+    * { box-sizing: border-box; }
+    body { margin:0; background:var(--bg); color:var(--ink); font:16px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif; }
+    main { max-width:900px; margin:0 auto; padding:24px 16px 48px; }
+    h1 { margin:0 0 4px; font-size:clamp(24px,4vw,36px); }
+    h2 { margin:0; font-size:clamp(20px,3vw,28px); line-height:1.4; }
+    p { margin:8px 0; }
+    .muted { color:var(--muted); }
+    .banner { padding:12px 14px; border:1px solid #f0c36a; background:#fff8e7; border-radius:12px; margin:16px 0; }
+    .toolbar, .nav { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+    .toolbar { margin:14px 0; }
+    button, .file-button { border:1px solid var(--line); border-radius:9px; padding:9px 13px; background:#fff; color:var(--ink); font:inherit; cursor:pointer; }
+    button:hover, .file-button:hover { border-color:var(--blue); }
+    button.primary { background:var(--blue); border-color:var(--blue); color:#fff; }
+    button.danger { color:var(--red); }
+    input[type=file] { display:none; }
+    .status { margin-left:auto; color:var(--muted); font-size:14px; }
+    .progress { height:10px; background:#e7ebf3; border-radius:99px; overflow:hidden; margin:16px 0 20px; }
+    .progress > div { height:100%; background:var(--blue); transition:width .15s ease; }
+    .card { background:var(--card); border:1px solid var(--line); border-radius:16px; padding:22px; box-shadow:0 4px 18px #18243b0b; }
+    .counter { color:var(--muted); font-size:14px; margin-bottom:10px; }
+    .choices { display:grid; gap:10px; margin:20px 0; }
+    .choice { display:flex; gap:12px; align-items:flex-start; padding:13px 14px; border:1px solid var(--line); border-radius:11px; background:#fbfcfe; }
+    .choice b { min-width:24px; color:var(--muted); }
+    .labels { display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:10px; margin-top:22px; }
+    .label { min-height:68px; text-align:left; }
+    .label strong { display:block; }
+    .label small { color:var(--muted); display:block; line-height:1.3; margin-top:3px; }
+    .label.selected { outline:3px solid #93c5fd; border-color:var(--blue); background:#eff6ff; }
+    .label.good.selected { outline-color:#86efac; border-color:var(--green); background:#f0fdf4; }
+    .nav { justify-content:space-between; margin-top:16px; }
+    .nav .right { display:flex; gap:8px; }
+    details { margin-top:18px; color:var(--muted); }
+    kbd { border:1px solid var(--line); border-bottom-width:2px; border-radius:5px; background:#fff; padding:1px 5px; font-size:12px; }
+    @media (max-width:650px) { .labels { grid-template-columns:repeat(2, minmax(0,1fr)); } .status { width:100%; margin-left:0; } .card { padding:16px; } }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Blind Question Labeller</h1>
+  <p class="muted">กดป้ายที่ตรงกับคุณภาพของข้อสอบ ข้อมูลนี้ไม่แสดงเฉลยหรือ source</p>
+  <div class="banner"><strong>รอบนี้เป็น baseline เก่า (2026-08-03)</strong><br>เป็นชุดเดิม 45 ข้อ: ours 15 + NotebookLM-pages 15 + NotebookLM-book 15 ยังไม่ใช่ผลเจนล่าสุด</div>
+
+  <div class="toolbar">
+    <label class="file-button">โหลด CSV รอบอื่น <input id="file" type="file" accept=".csv,text/csv"></label>
+    <button id="export" class="primary">ดาวน์โหลดผล label</button>
+    <button id="reset" class="danger">ล้าง label ทั้งหมด</button>
+    <span id="status" class="status"></span>
+  </div>
+
+  <div class="progress"><div id="progressBar" style="width:0%"></div></div>
+  <section class="card">
+    <div id="counter" class="counter"></div>
+    <h2 id="stem"></h2>
+    <div id="choices" class="choices"></div>
+    <div id="labels" class="labels"></div>
+    <div class="nav">
+      <button id="prev">← ก่อนหน้า</button>
+      <div class="right"><button id="next" class="primary">ถัดไป →</button></div>
+    </div>
+  </section>
+
+  <details>
+    <summary>เกณฑ์ label และปุ่มลัด</summary>
+    <p><kbd>1</kbd> good · <kbd>2</kbd> true distractor · <kbd>3</kbd> no reading needed · <kbd>4</kbd> off topic · <kbd>5</kbd> teacher guide · <kbd>6</kbd> ambiguous</p>
+    <p><strong>good</strong>: ข้อสอบดีและต้องพึ่ง source · <strong>true distractor</strong>: มีตัวเลือกผิดที่จริงหรือยัง defensible · <strong>no reading needed</strong>: ตอบได้จากความรู้ทั่วไป · <strong>off topic</strong>: ไม่เกี่ยวกับบทเรียน · <strong>teacher guide</strong>: ถาม metadata/การสอน · <strong>ambiguous</strong>: stem หรือคำตอบตีความได้หลายทาง</p>
+    <p>หลัง label ครบ ให้กดดาวน์โหลด แล้วส่งไฟล์ CSV กลับมา หรือวางไว้ทับ <code>.scratch/labelling/sheet.csv</code> จากนั้นผมจะรัน scorer ให้</p>
+  </details>
+</main>
+<script>
+const bundledRows = [{"id":"Q01","stem":"ขณะหายใจเข้า ปริมาตรและภาวะความดันในช่องอกมีการเปลี่ยนแปลงอย่างไร","choice_a":"ปริมาตรเพิ่มขึ้น ความดันลดลง","choice_b":"ปริมาตรเพิ่มขึ้น ความดันเพิ่มขึ้น","choice_c":"ปริมาตรลดลง ความดันลดลง","choice_d":"ปริมาตรลดลง ความดันเพิ่มขึ้น","label":""},{"id":"Q02","stem":"ข้อใดอธิบายการทำงานของกล้ามเนื้อขณะหายใจเข้าได้ถูกต้อง","choice_a":"กะบังลมคลายตัว กล้ามเนื้อระหว่างกระดูกซี่โครงแถบนอกหดตัว","choice_b":"กะบังลมคลายตัว กล้ามเนื้อระหว่างกระดูกซี่โครงแถบนอกคลายตัว","choice_c":"กะบังลมหดตัว กล้ามเนื้อระหว่างกระดูกซี่โครงแถบนอกหดตัว","choice_d":"กะบังลมหดตัว กล้ามเนื้อระหว่างกระดูกซี่โครงแถบนอกคลายตัว","label":""},{"id":"Q03","stem":"ในระหว่างการหายใจเข้า กล้ามเนื้อกะบังลมมีการเปลี่ยนแปลงอย่างไร","choice_a":"หดตัวและเคลื่อนต่ำลง","choice_b":"คลายตัวและเคลื่อนต่ำลง","choice_c":"หดตัวและยกตัวสูงขึ้น","choice_d":"คลายตัวและยกตัวสูงขึ้น","label":""},{"id":"Q04","stem":"การเคลื่อนที่ของอากาศเข้าและออกจากปอดเกิดจากปัจจัยใดเป็นหลัก","choice_a":"ความแตกต่างของอุณหภูมิอากาศ","choice_b":"ความแตกต่างของความดันอากาศ","choice_c":"การทำงานของลิ้นหัวใจ","choice_d":"การขยายตัวของปอดโดยตรงด้วยกล้ามเนื้อปอด","label":""},{"id":"Q05","stem":"การดึงลูกสูบไปด้านหลังในชุดจำลองการหายใจ เปรียบได้กับสภาวะใดของการหายใจ","choice_a":"การหายใจเข้า เนื่องจากปริมาตรอากาศภายในหลอดเพิ่มขึ้น ความดันลดลง","choice_b":"การหายใจเข้า เนื่องจากปริมาตรอากาศภายในหลอดลดลง ความดันเพิ่มขึ้น","choice_c":"การหายใจออก เนื่องจากปริมาตรอากาศภายในหลอดเพิ่มขึ้น ความดันลดลง","choice_d":"การหายใจออก เนื่องจากปริมาตรอากาศภายในหลอดลดลง ความดันเพิ่มขึ้น","label":""},{"id":"Q06","stem":"การเคลื่อนที่ของอากาศเข้าออกจากปอดเกิดจากสาเหตุใด","choice_a":"ความแตกต่างของความดันอากาศภายในและภายนอกปอด","choice_b":"การเปลี่ยนแปลงของอุณหภูมิอากาศในปอด","choice_c":"การเปลี่ยนแปลงของปริมาณออกซิเจนในเลือด","choice_d":"การหดตัวของกล้ามเนื้อหัวใจ","label":""},{"id":"Q07","stem":"การกลั้นหายใจขณะดำน้ำ เป็นการควบคุมโดยสมองส่วนใดที่ทำงานเพิ่มขึ้น","choice_a":"พอนส์","choice_b":"เมดัลลาออบลองกาตา","choice_c":"ไฮโพทาลามัส","choice_d":"เซรีบรัลคอร์เทกซ์","label":""},{"id":"Q08","stem":"แบบจำลองการทำงานของกะบังลมแตกต่างจากการหายใจของมนุษย์ในเรื่องใด","choice_a":"การหายใจของมนุษย์อาศัยการทำงานร่วมกันของกล้ามเนื้อกะบังลมและกล้ามเนื้อกระดูกซี่โครง","choice_b":"การหายใจของมนุษย์อาศัยการทำงานของกล้ามเนื้อกะบังลมเพียงอย่างเดียว","choice_c":"การหายใจของมนุษย์อาศัยการทำงานของกล้ามเนื้อกระดูกซี่โครงเพียงอย่างเดียว","choice_d":"การหายใจของมนุษย์อาศัยการทำงานของปอดและหลอดลม","label":""},{"id":"Q09","stem":"เมื่อกล้ามเนื้อกะบังลมคลายตัว ปริมาตรช่องอกและความดันอากาศในปอดเปลี่ยนแปลงอย่างไร","choice_a":"ปริมาตรช่องอกลดลง ความดันอากาศในปอดเพิ่มขึ้น","choice_b":"ปริมาตรช่องอกเพิ่มขึ้น ความดันอากาศในปอดลดลง","choice_c":"ปริมาตรช่องอกลดลง ความดันอากาศในปอดลดลง","choice_d":"ปริมาตรช่องอกเพิ่มขึ้น ความดันอากาศในปอดเพิ่มขึ้น","label":""},{"id":"Q10","stem":"เหตุใดมนุษย์จึงไม่สามารถหายใจเอาอากาศออกจากปอดจนหมดได้","choice_a":"เพราะกล้ามเนื้อกะบังลมทำงานได้ไม่จำกัด","choice_b":"เพราะภายในถุงลมยังคงมีอากาศค้างอยู่และการทำงานของกล้ามเนื้อที่เกี่ยวข้องทำได้จำกัด","choice_c":"เพราะความดันภายนอกสูงกว่าความดันภายในปอดเสมอ","choice_d":"เพราะปอดมีขนาดใหญ่กว่าช่องอกมาก","label":""},{"id":"Q11","stem":"ปริมาตรอากาศที่ตกค้างในปอดหลังจากหายใจออก \"ปกติ\" มีค่าประมาณเท่าใด","choice_a":"500 mL","choice_b":"1,200 mL","choice_c":"2,400 mL","choice_d":"4,600 mL","label":""},{"id":"Q12","stem":"หากเยื่อหุ้มบริเวณปอดเป็นรูขนาดเล็ก จะส่งผลอย่างไรต่อการหายใจ","choice_a":"ปอดจะขยายตัวได้มากกว่าปกติ","choice_b":"หายใจได้ปกติแต่จะหอบเหนื่อยง่ายขึ้น","choice_c":"ปอดข้างที่เยื่อหุ้มปอดมีรูจะแฟบและทำงานไม่ได้ตามปกติ","choice_d":"ความดันในปอดจะลดลงทำให้หายใจเข้าได้เร็วขึ้น","label":""},{"id":"Q13","stem":"ในการทดลองหาปัจจัยที่มีผลต่อปริมาตรอากาศหายใจออก ถ้าต้องการเปรียบเทียบระหว่างบุคคลที่มีอายุต่างกัน ควรกำหนดตัวแปรต้นอย่างไร","choice_a":"อายุของบุคคล","choice_b":"เพศของบุคคล","choice_c":"ขนาดของร่างกาย","choice_d":"อาชีพของบุคคล","label":""},{"id":"Q14","stem":"เมื่อมีการออกกำลังกายอย่างหนัก กราฟปริมาตรอากาศในปอดที่วัดด้วยเครื่องสไปโรมิเตอร์จะเปลี่ยนแปลงอย่างไรเมื่อเทียบกับขณะพัก","choice_a":"ความถี่ลดลง ปริมาตรอากาศแต่ละครั้งลดลง","choice_b":"ความถี่เพิ่มขึ้น และปริมาตรอากาศที่เข้าและออกจากปอดสูงขึ้น","choice_c":"ความถี่คงที่ แต่ปริมาตรอากาศแต่ละครั้งสูงขึ้น","choice_d":"กราฟจะราบเรียบเนื่องจากหายใจไม่ทัน","label":""},{"id":"Q15","stem":"ขณะหายใจเข้า ปริมาตรและภาวะความดันในช่องอกมีการเปลี่ยนแปลงอย่างไร","choice_a":"ปริมาตรเพิ่มขึ้น ความดันลดลง","choice_b":"ปริมาตรลดลง ความดันเพิ่มขึ้น","choice_c":"ปริมาตรเพิ่มขึ้น ความดันเพิ่มขึ้น","choice_d":"ปริมาตรลดลง ความดันลดลง","label":""},{"id":"Q16","stem":"เมื่อปล่อยมือที่บีบขวดพลาสติก อากาศเหนือปากขวดจะเคลื่อนที่อย่างไร","choice_a":"อากาศจะถูกดูดเข้าขวด","choice_b":"อากาศจะพุ่งออกจากขวด","choice_c":"อากาศจะนิ่งไม่เคลื่อนที่","choice_d":"อากาศจะเกิดการระเหย","label":""},{"id":"Q17","stem":"เมื่อเยื่อหุ้มปอดมีรูขนาดเล็ก ปอดข้างนั้นจะมีลักษณะอย่างไร","choice_a":"ปอดแฟบและไม่สามารถทำงานได้ตามปกติ","choice_b":"ปอดขยายใหญ่ขึ้นและทำงานได้มากขึ้น","choice_c":"ปอดยังคงทำงานได้ตามปกติ","choice_d":"ปอดมีการติดเชื้อและอักเสบ","label":""},{"id":"Q18","stem":"ปริมาตรของอากาศในการหายใจเข้าและหายใจออกปกติ (Tidal volume) แต่ละครั้งมีค่าประมาณเท่าใด","choice_a":"1,200 mL","choice_b":"500 mL","choice_c":"2,400 mL","choice_d":"4,600 mL","label":""},{"id":"Q19","stem":"ปริมาตรของอากาศที่หายใจเข้าเต็มที่และหายใจออกเต็มที่แตกต่างกันอย่างไร","choice_a":"ปริมาตรอากาศหายใจเข้าเต็มที่ประมาณ 5,800 mL และหายใจออกเต็มที่ประมาณ 4,600 mL","choice_b":"ปริมาตรอากาศหายใจเข้าเต็มที่ประมาณ 4,600 mL และหายใจออกเต็มที่ประมาณ 5,800 mL","choice_c":"ปริมาตรอากาศหายใจเข้าเต็มที่และหายใจออกเต็มที่เท่ากันประมาณ 5,800 mL","choice_d":"ปริมาตรอากาศหายใจเข้าเต็มที่และหายใจออกเต็มที่เท่ากันประมาณ 4,600 mL","label":""},{"id":"Q20","stem":"ลิ้นที่กั้นระหว่างเอเทรียมขวากับเวนทริเคิลขวาเปิดเมื่อใด","choice_a":"เมื่อความดันเลือดในเอเทรียมขวาสูงกว่าเวนทริเคิลขวา","choice_b":"เมื่อความดันเลือดในเวนทริเคิลขวาสูงกว่าเอเทรียมขวา","choice_c":"เมื่อความดันเลือดในเอเทรียมซ้ายสูงกว่าเวนทริเคิลซ้าย","choice_d":"เมื่อความดันเลือดในเวนทริเคิลซ้ายสูงกว่าเอเทรียมซ้าย","label":""},{"id":"Q21","stem":"การควบคุมการหายใจเกี่ยวข้องกับระบบใดในร่างกาย","choice_a":"ระบบประสาท","choice_b":"ระบบย่อยอาหาร","choice_c":"ระบบไหลเวียนเลือด","choice_d":"ระบบต่อมไร้ท่อ","label":""},{"id":"Q22","stem":"ปัจจัยหลักที่กระตุ้นศูนย์ควบคุมการหายใจให้เพิ่มอัตราการหายใจเพื่อขับ CO2 ออกจากปอดคืออะไร","choice_a":"ปริมาณ O2 ในเลือดสูงขึ้น","choice_b":"ปริมาณ CO2 หรือไฮโดรเจนไอออนสะสมในเลือดมาก","choice_c":"ปริมาณ N2 ในบรรยากาศลดลง","choice_d":"อุณหภูมิของร่างกายลดต่ำลง","label":""},{"id":"Q23","stem":"ศูนย์ควบคุมการหายใจปกติถูกควบคุมโดยระบบประสาทใดและอยู่ที่ส่วนใดของสมอง","choice_a":"ระบบประสาทภายใต้อำนาจจิตใจ ที่สมองส่วนหน้า","choice_b":"ระบบประสาทส่วนกลาง ที่สมองส่วนเซรีเบลลัม","choice_c":"ระบบประสาทอัตโนวัติ ที่สมองส่วนพอนส์และเมดัลลาออบลองกาตา","choice_d":"ระบบประสาทรอบนอก ที่สมองส่วนไฮโพทาลามัส","label":""},{"id":"Q24","stem":"การดึงลูกสูบไปด้านหลังในชุดจำลองการหายใจ เปรียบได้กับสภาวะใดของการหายใจ","choice_a":"การหายใจเข้า เนื่องจากปริมาตรอากาศภายในหลอดเพิ่มขึ้น ความดันลดลง","choice_b":"การหายใจเข้า เนื่องจากปริมาตรอากาศภายในหลอดลดลง ความดันเพิ่มขึ้น","choice_c":"การหายใจออก เนื่องจากปริมาตรอากาศภายในหลอดเพิ่มขึ้น ความดันลดลง","choice_d":"การหายใจออก เนื่องจากปริมาตรอากาศภายในหลอดลดลง ความดันเพิ่มขึ้น","label":""},{"id":"Q25","stem":"เมื่อบีบขวดพลาสติกที่มีอากาศอยู่ภายใน อากาศเหนือปากขวดจะเคลื่อนที่อย่างไร","choice_a":"อากาศจะพุ่งออกจากขวด","choice_b":"อากาศจะถูกดูดเข้าขวด","choice_c":"อากาศจะนิ่งไม่เคลื่อนที่","choice_d":"อากาศจะควบแน่นเป็นหยดน้ำ","label":""},{"id":"Q26","stem":"หลังจากหายใจเข้าเต็มที่แล้วเป่าลมหายใจออกอย่างเต็มที่ ปริมาตรของอากาศที่ออกมามีค่าประมาณเท่าใด","choice_a":"500 mL","choice_b":"1,200 mL","choice_c":"4,600 mL","choice_d":"5,800 mL","label":""},{"id":"Q27","stem":"ข้อใดสรุปการเปลี่ยนแปลงขณะ \"หายใจออก\" ได้ถูกต้องที่สุด","choice_a":"กะบังลมหดตัว ปริมาตรช่องอกลดลง ความดันในปอดเพิ่มขึ้น","choice_b":"กะบังลมคลายตัว ปริมาตรช่องอกเพิ่มขึ้น ความดันในปอดลดลง","choice_c":"กะบังลมหดตัว ปริมาตรช่องอกเพิ่มขึ้น ความดันในปอดลดลง","choice_d":"กะบังลมคลายตัว ปริมาตรช่องอกลดลง ความดันในปอดเพิ่มขึ้น","label":""},{"id":"Q28","stem":"จากกิจกรรมจำลองการทำงานของกะบังลม ลูกโป่งและลูกสูบเปรียบได้กับอวัยวะใดตามลำดับ","choice_a":"ปอด และ หัวใจ","choice_b":"กะบังลม และ ปอด","choice_c":"หลอดลม และ ปอด","choice_d":"ถุงลม และ หัวใจ","label":""},{"id":"Q29","stem":"การยกตัวสูงขึ้นของกระดูกซี่โครงสัมพันธ์กับการเปลี่ยนแปลงความดันอากาศในปอดอย่างไร","choice_a":"ทำให้ความดันอากาศในปอดลดลง","choice_b":"ทำให้ความดันอากาศในปอดเพิ่มขึ้น","choice_c":"ทำให้ความดันอากาศในปอดคงที่","choice_d":"ไม่สัมพันธ์กับการเปลี่ยนแปลงความดัน","label":""},{"id":"Q30","stem":"ในขณะหายใจออก กระดูกซี่โครงและกะบังลมจะมีการเปลี่ยนแปลงอย่างไร","choice_a":"กระดูกซี่โครงยกสูงขึ้น กะบังลมแบนราบ","choice_b":"กระดูกซี่โครงลดต่ำลง กะบังลมโค้งมากขึ้น","choice_c":"กระดูกซี่โครงยกสูงขึ้น กะบังลมโค้งมากขึ้น","choice_d":"กระดูกซี่โครงลดต่ำลง กะบังลมแบนราบ","label":""},{"id":"Q31","stem":"ปัจจัยใดต่อไปนี้ที่เอกสารระบุว่าส่งผลต่อปริมาตรของอากาศในปอดของแต่ละบุคคล","choice_a":"เพศ อายุ และการออกกำลังกาย","choice_b":"อาหารที่รับประทานและปริมาณน้ำในร่างกาย","choice_c":"ความสูงของพื้นที่ที่อยู่อาศัย","choice_d":"กรุ๊ปเลือดและความดันโลหิต","label":""},{"id":"Q32","stem":"หน้าที่หลักของหลอดเลือดที่อยู่บริเวณผิวรอบนอกของหัวใจคืออะไร","choice_a":"นำเลือดไปเลี้ยงกล้ามเนื้อหัวใจ","choice_b":"นำเลือดไปเลี้ยงปอด","choice_c":"นำเลือดไปเลี้ยงสมอง","choice_d":"นำเลือดไปเลี้ยงไต","label":""},{"id":"Q33","stem":"Hyperventilation syndrome (ภาวะหายใจเกิน) ส่งผลต่อระดับ CO2 ในเลือดและความเป็นกรด-เบสอย่างไร","choice_a":"CO2 ในเลือดลดลง เลือดมีความเป็นเบส","choice_b":"CO2 ในเลือดเพิ่มขึ้น เลือดมีความเป็นกรด","choice_c":"O2 ในเลือดลดลง เลือดมีความเป็นกรด","choice_d":"CO2 ในเลือดลดลง เลือดมีความเป็นกรด","label":""},{"id":"Q34","stem":"เหตุใดมนุษย์จึงไม่สามารถหายใจเอาอากาศออกจากปอดจนหมดได้","choice_a":"เพราะปอดมีขนาดใหญ่กว่าช่องอกมาก","choice_b":"เพราะความดันภายนอกสูงกว่าความดันภายในปอดเสมอ","choice_c":"เพราะกล้ามเนื้อที่เกี่ยวข้องทำงานได้จำกัดและภายในถุงลมยังมีอากาศค้างอยู่","choice_d":"เพราะกล้ามเนื้อกะบังลมทำงานได้ไม่จำกัด","label":""},{"id":"Q35","stem":"ในการทดลองเปรียบเทียบปริมาตรอากาศหายใจออกของบุคคลที่มีอายุต่างกัน ตัวแปรต้นคืออะไร","choice_a":"กลุ่มคนที่มีช่วงอายุแตกต่างกัน","choice_b":"ปริมาตรของอากาศที่หายใจออก","choice_c":"สภาพร่างกายขณะพัก","choice_d":"เพศและน้ำหนักของกลุ่มตัวอย่าง","label":""},{"id":"Q36","stem":"ข้อใดอธิบายการทำงานของกล้ามเนื้อขณะหายใจเข้าได้ถูกต้อง","choice_a":"กล้ามเนื้อกะบังลมคลายตัว กล้ามเนื้อระหว่างกระดูกซี่โครงแถบนอกหดตัว","choice_b":"กล้ามเนื้อกะบังลมคลายตัว กล้ามเนื้อระหว่างกระดูกซี่โครงแถบนอกคลายตัว","choice_c":"กล้ามเนื้อกะบังลมหดตัว กล้ามเนื้อระหว่างกระดูกซี่โครงแถบนอกหดตัว","choice_d":"กล้ามเนื้อกะบังลมหดตัว กล้ามเนื้อระหว่างกระดูกซี่โครงแถบนอกคลายตัว","label":""},{"id":"Q37","stem":"หากเยื่อหุ้มบริเวณปอดเป็นรูขนาดเล็ก จะส่งผลอย่างไรต่อการหายใจ","choice_a":"หายใจได้ปกติแต่จะหอบเหนื่อยง่ายขึ้น","choice_b":"ปอดจะขยายตัวได้มากกว่าปกติ","choice_c":"ปอดข้างที่เยื่อหุ้มปอดมีรูจะแฟบและทำงานไม่ได้ตามปกติ","choice_d":"ความดันในปอดจะลดลงทำให้หายใจเข้าได้เร็วขึ้น","label":""},{"id":"Q38","stem":"หลังจากหายใจเข้าเต็มที่แล้วเป่าลมหายใจออกอย่างเต็มที่ ปริมาตรของอากาศที่ออกมามีค่าประมาณเท่าใด","choice_a":"500 mL","choice_b":"1,200 mL","choice_c":"4,600 mL","choice_d":"5,800 mL","label":""},{"id":"Q39","stem":"จากกิจกรรมจำลองการทำงานของกล้ามเนื้อกะบังลม ลูกโป่งและลูกสูบเปรียบได้กับอวัยวะใดตามลำดับ","choice_a":"ปอด และ หัวใจ","choice_b":"กะบังลม และ ปอด","choice_c":"ปอด และ กะบังลม","choice_d":"หลอดลม และ ปอด","label":""},{"id":"Q40","stem":"ศูนย์ควบคุมการหายใจในภาวะปกติอยู่ที่ส่วนใดของสมอง","choice_a":"สมองส่วนพอนส์และเมดัลลาออบลองกาตา","choice_b":"สมองส่วนซีรีบรัมและซีรีเบลลัม","choice_c":"สมองส่วนไฮโปทาลามัสและทาลามัส","choice_d":"สมองส่วนสมองส่วนกลางและสมองส่วนหน้า","label":""},{"id":"Q41","stem":"ปริมาตรของอากาศในการหายใจเข้าและหายใจออกปกติแต่ละครั้งมีค่าประมาณเท่าใด","choice_a":"1,200 mL","choice_b":"500 mL","choice_c":"2,400 mL","choice_d":"4,600 mL","label":""},{"id":"Q42","stem":"ศูนย์ควบคุมการหายใจปกติถูกควบคุมโดยระบบประสาทใดและอยู่ที่ส่วนใดของสมอง","choice_a":"ระบบประสาทส่วนกลาง ที่สมองส่วนเซรีเบลลัม","choice_b":"ระบบประสาทภายใต้อำนาจจิตใจ ที่สมองส่วนหน้า","choice_c":"ระบบประสาทอัตโนวัติ ที่สมองส่วนพอนส์และเมดัลลาออบลองกาตา","choice_d":"ระบบประสาทรอบนอก ที่สมองส่วนไฮโพทาลามัส","label":""},{"id":"Q43","stem":"ในขณะหายใจออก กระดูกซี่โครงและกะบังลมจะมีการเปลี่ยนแปลงอย่างไร","choice_a":"กระดูกซี่โครงยกสูงขึ้น กะบังลมแบนราบ","choice_b":"กระดูกซี่โครงยกสูงขึ้น กะบังลมโค้งมากขึ้น","choice_c":"กระดูกซี่โครงลดต่ำลง กะบังลมแบนราบ","choice_d":"กระดูกซี่โครงลดต่ำลง กะบังลมโค้งมากขึ้น","label":""},{"id":"Q44","stem":"การเคลื่อนที่ของอากาศเข้าและออกจากปอดเกิดจากปัจจัยใดเป็นหลัก","choice_a":"การเปลี่ยนแปลงอุณหภูมิของอากาศ","choice_b":"ความแตกต่างของความดันอากาศ","choice_c":"การทำงานของหัวใจ","choice_d":"การขยายตัวของปอดโดยตรง","label":""},{"id":"Q45","stem":"เมื่อกระดูกซี่โครงยกสูงขึ้น ความดันอากาศในปอดจะเปลี่ยนแปลงอย่างไร","choice_a":"ความดันอากาศในปอดลดลง","choice_b":"ความดันอากาศในปอดเพิ่มขึ้น","choice_c":"ความดันอากาศในปอดคงที่","choice_d":"ความดันอากาศในปอดเป็นศูนย์","label":""}];
+
+const labels = [
+  ["good", "ดี ใช้ได้จริง"],
+  ["true_distractor", "ตัวลวงจริง/ยัง defend ได้"],
+  ["no_reading_needed", "ไม่ต้องอ่าน source"],
+  ["off_topic", "นอกเรื่อง"],
+  ["teacher_guide", "metadata/การสอน"],
+  ["ambiguous", "กำกวม"]
+];
+let rows = bundledRows.map(r => ({...r}));
+let index = 0;
+let storageKey = "blind-labeler-" + rows.map(r => r.id).join("-");
+const $ = id => document.getElementById(id);
+
+function save() { localStorage.setItem(storageKey, JSON.stringify(rows.map(r => r.label || ""))); }
+function restore() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(storageKey) || "null");
+    if (Array.isArray(saved) && saved.length === rows.length) rows.forEach((r, i) => r.label = saved[i] || "");
+  } catch (_) {}
+}
+function esc(s) { return String(s).replace(/[&<>\"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+function render() {
+  if (!rows.length) return;
+  const q = rows[index];
+  $("counter").textContent = `ข้อ ${index + 1} / ${rows.length} · label แล้ว ${rows.filter(r => r.label).length} ข้อ`;
+  $("stem").textContent = q.stem;
+  $("choices").innerHTML = ["a","b","c","d"].map((letter, i) => `<div class="choice"><b>${letter.toUpperCase()}.</b><span>${esc(q["choice_" + letter] || "")}</span></div>`).join("");
+  $("labels").innerHTML = labels.map(([value, text], i) => `<button class="label ${value === "good" ? "good" : ""} ${q.label === value ? "selected" : ""}" data-label="${value}" title="กดปุ่ม ${i + 1}"><strong>${i + 1}. ${esc(value)}</strong><small>${esc(text)}</small></button>`).join("");
+  document.querySelectorAll(".label").forEach(button => button.addEventListener("click", () => { q.label = button.dataset.label; save(); render(); if (index < rows.length - 1) { index++; render(); } }));
+  $("prev").disabled = index === 0;
+  $("next").textContent = index === rows.length - 1 ? "จบ" : "ถัดไป →";
+  $("progressBar").style.width = `${rows.length ? (rows.filter(r => r.label).length / rows.length) * 100 : 0}%`;
+  $("status").textContent = `${rows.filter(r => r.label).length}/${rows.length} label แล้ว · autosave เปิดอยู่`;
+}
+function parseCsv(text) {
+  const out = [], lines = []; let row = [], cell = "", quoted = false;
+  for (let i = 0; i < text.length; i++) { const c = text[i], n = text[i + 1];
+    if (quoted && c === '"' && n === '"') { cell += '"'; i++; continue; }
+    if (c === '"') { quoted = !quoted; continue; }
+    if (!quoted && c === ',') { row.push(cell); cell = ""; continue; }
+    if (!quoted && (c === '\n' || c === '\r')) { if (c === '\r' && n === '\n') i++; row.push(cell); lines.push(row); row = []; cell = ""; continue; }
+    cell += c;
+  }
+  if (cell.length || row.length) { row.push(cell); lines.push(row); }
+  if (!lines.length) return [];
+  const head = lines.shift().map((x, i) => (i === 0 ? x.replace(/^\ufeff/, "") : x).trim().toLowerCase());
+  const pos = name => head.indexOf(name);
+  return lines.filter(r => r.length && r[pos("id")]).map(r => ({ id:r[pos("id")], stem:r[pos("stem")] || "", choice_a:r[pos("choice_a")] || "", choice_b:r[pos("choice_b")] || "", choice_c:r[pos("choice_c")] || "", choice_d:r[pos("choice_d")] || "", label:r[pos("label")] || "" }));
+}
+function csvCell(value) { const s = String(value ?? ""); return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }
+function exportCsv() {
+  const head = ["id","stem","choice_a","choice_b","choice_c","choice_d","label"];
+  const body = rows.map(r => head.map(k => csvCell(r[k])).join(","));
+  const blob = new Blob(["\ufeff" + [head.join(","), ...body].join("\r\n")], {type:"text/csv;charset=utf-8"});
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "sheet-labelled.csv"; a.click(); URL.revokeObjectURL(a.href);
+}
+$("file").addEventListener("change", event => { const file = event.target.files[0]; if (!file) return; const reader = new FileReader(); reader.onload = () => { const loaded = parseCsv(reader.result); if (!loaded.length) return alert("อ่าน CSV ไม่ได้"); rows = loaded; index = 0; storageKey = "blind-labeler-" + rows.map(r => r.id).join("-"); restore(); render(); }; reader.readAsText(file, "utf-8"); });
+$("export").addEventListener("click", exportCsv);
+$("reset").addEventListener("click", () => { if (!confirm("ล้าง label ทั้งหมดของชุดนี้หรือไม่?")) return; rows.forEach(r => r.label = ""); save(); index = 0; render(); });
+$("prev").addEventListener("click", () => { if (index > 0) { index--; render(); } });
+$("next").addEventListener("click", () => { if (index < rows.length - 1) { index++; render(); } else alert("ครบชุดแล้ว กดดาวน์โหลดผล label ได้เลย"); });
+document.addEventListener("keydown", event => { if (event.target.matches("input,textarea")) return; const n = Number(event.key); if (n >= 1 && n <= 6) document.querySelectorAll(".label")[n - 1]?.click(); if (event.key.toLowerCase() === "p") $("prev").click(); if (event.key.toLowerCase() === "n" || event.key === "Enter") $("next").click(); });
+restore(); render();
+</script>
+</body>
+</html>

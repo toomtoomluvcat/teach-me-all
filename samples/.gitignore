@@ -1,0 +1,4 @@
+# Test fixtures for backend/prototype-exam-quality. Downloaded or generated,
+# not source. See README.md in this directory for where each one came from.
+*.pdf
+!README.md
