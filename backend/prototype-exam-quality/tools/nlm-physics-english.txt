@@ -1,0 +1,224 @@
+### SET 1
+
+**Question 1**
+A scientist pushes a 10.0-kg equipment cart with a net force of 30.0 N. What is the acceleration of the cart?
+*   A. 0.33 m/s²
+*   B. 3.00 m/s²
+*   C. 30.0 m/s²
+*   D. 300.0 m/s²
+
+**Correct Answer:** B
+**Skill:** application
+**Difficulty:** easy
+**Calculation Expression:** $a = \frac{F_{net}}{m} = \frac{30.0\text{ N}}{10.0\text{ kg}} = 3.00\text{ m/s}^2$
+**Supporting Quote:** "Newton’s second law of motion... shows the mathematical relationship between force, mass, and acceleration. Mathematically, the second law is most often written as $F_{net} = ma$."
+
+***
+
+**Question 2**
+A package at a shipping center has a mass of 5.0 kg. What is the weight of this package on Earth?
+*   A. 0.51 N
+*   B. 5.0 N
+*   C. 49.0 N
+*   D. 98.0 N
+
+**Correct Answer:** C
+**Skill:** application
+**Difficulty:** easy
+**Calculation Expression:** $W = mg = (5.0\text{ kg})(9.80\text{ m/s}^2) = 49.0\text{ N}$
+**Supporting Quote:** "The weight (disregarding for now the direction of the weight) of a 1.0-kg object on Earth is $W = mg = (1.0\text{ kg})(9.80\text{ m/s}^2) = 9.80\text{ N}$."
+
+***
+
+**Question 3**
+A 0.50-kg baseball is thrown at a velocity of 20.0 m/s. What is the magnitude of the ball's linear momentum?
+*   A. 0.025 kg·m/s
+*   B. 10.0 kg·m/s
+*   C. 20.5 kg·m/s
+*   D. 40.0 kg·m/s
+
+**Correct Answer:** B
+**Skill:** application
+**Difficulty:** easy
+**Calculation Expression:** $p = mv = (0.50\text{ kg})(20.0\text{ m/s}) = 10.0\text{ kg}\cdot\text{m/s}$
+**Supporting Quote:** "Linear momentum is the product of a system’s mass and its velocity. In equation form, linear momentum $p$ is $p = mv$."
+
+***
+
+**Question 4**
+A person applies a constant force of 50 N to push a crate 4.0 meters across a level warehouse floor. How much work is done on the crate?
+*   A. 12.5 J
+*   B. 46.0 J
+*   C. 54.0 J
+*   D. 200.0 J
+
+**Correct Answer:** D
+**Skill:** application
+**Difficulty:** easy
+**Calculation Expression:** $W = Fd = (50\text{ N})(4.0\text{ m}) = 200\text{ J}$
+**Supporting Quote:** "Work is application of force, $F$, to move an object over a distance, $d$, in the direction that the force is applied. Work, $W$, is described by the equation $W = Fd$."
+
+***
+
+**Question 5**
+A 12-V battery is connected to a light bulb with a resistance of 3.0 Ω. What is the current flowing through the bulb?
+*   A. 0.25 A
+*   B. 4.0 A
+*   C. 15.0 A
+*   D. 36.0 A
+
+**Correct Answer:** B
+**Skill:** application
+**Difficulty:** easy
+**Calculation Expression:** $I = \frac{V}{R} = \frac{12\text{ V}}{3.0\text{ }\Omega} = 4.0\text{ A}$
+**Supporting Quote:** "The constant of proportionality is the resistance $R$ of the material, which leads to $V = IR$. This relationship is called Ohm’s law."
+
+### SET 2
+
+**Question 1**
+An athlete starts a sprint from rest and reaches a speed of $8.0\text{ m/s}$ in $2.0\text{ s}$. Assuming the acceleration is constant, what total distance will the athlete have covered after $5.0\text{ seconds}$?
+*   A. $16.0\text{ m}$
+*   B. $20.0\text{ m}$
+*   C. $40.0\text{ m}$
+*   D. $50.0\text{ m}$
+
+**Correct Answer:** D
+**Skill:** application
+**Difficulty:** hard
+**Calculation Expression:** $a = \frac{\Delta v}{\Delta t} = \frac{8.0\text{ m/s}}{2.0\text{ s}} = 4.0\text{ m/s}^2$; $d = d_0 + v_0t + \frac{1}{2}at^2 = 0 + 0(5.0) + \frac{1}{2}(4.0\text{ m/s}^2)(5.0\text{ s})^2 = 50.0\text{ m}$
+**Supporting Quote:** "Displacement with constant acceleration... $d = d_0 + v_0t + \frac{1}{2}at^2$."
+
+***
+
+**Question 2**
+A $2,000\text{-kg}$ car traveling at $30\text{ m/s}$ slams on its brakes and comes to a complete stop over a distance of $75\text{ m}$. What is the magnitude of the constant net braking force acting on the car?
+*   A. $1,500\text{ N}$
+*   B. $6,000\text{ N}$
+*   C. $12,000\text{ N}$
+*   D. $24,000\text{ N}$
+
+**Correct Answer:** C
+**Skill:** application
+**Difficulty:** hard
+**Calculation Expression:** $a = \frac{v^2 - v_0^2}{2d} = \frac{0 - 30^2}{2(75)} = -6.0\text{ m/s}^2$; $F_{net} = ma = (2,000\text{ kg})(6.0\text{ m/s}^2) = 12,000\text{ N}$
+**Supporting Quote:** "Newton’s second law of motion... defined mathematically as $F_{net} = ma$."
+
+***
+
+**Question 3**
+A $0.50\text{-kg}$ ball is launched vertically upward from the ground. If it reaches a maximum height of $15.0\text{ m}$, what was the initial kinetic energy of the ball at the moment of launch? (Use $g = 9.80\text{ m/s}^2$ and ignore air resistance).
+*   A. $3.68\text{ J}$
+*   B. $7.35\text{ J}$
+*   C. $73.5\text{ J}$
+*   D. $147.0\text{ J}$
+
+**Correct Answer:** C
+**Skill:** application
+**Difficulty:** hard
+**Calculation Expression:** $PE_{peak} = mgh = (0.50\text{ kg})(9.80\text{ m/s}^2)(15.0\text{ m}) = 73.5\text{ J}$; $KE_{initial} = PE_{peak} = 73.5\text{ J}$
+**Supporting Quote:** "Calculate the potential energy of the object before you drop it using $PE = mgh = (9.80)mh$."
+
+***
+
+**Question 4**
+A planetary rover on a distant moon weighs $100\text{ N}$. The moon has a mass of $1.2 \times 10^{23}\text{ kg}$ and a radius of $1.5 \times 10^6\text{ m}$. What is the mass of the rover?
+*   A. $5.6\text{ kg}$
+*   B. $28.1\text{ kg}$
+*   C. $56.0\text{ kg}$
+*   D. $100.0\text{ kg}$
+
+**Correct Answer:** B
+**Skill:** application
+**Difficulty:** hard
+**Calculation Expression:** $g = \frac{GM}{r^2} = \frac{(6.673 \times 10^{-11}\text{ N}\cdot\text{m}^2/\text{kg}^2)(1.2 \times 10^{23}\text{ kg})}{(1.5 \times 10^6\text{ m})^2} \approx 3.56\text{ m/s}^2$; $m = \frac{W}{g} = \frac{100\text{ N}}{3.56\text{ m/s}^2} \approx 28.1\text{ kg}$
+**Supporting Quote:** "acceleration due to gravity $g = \frac{GM}{r^2}$" and "weight... defined mathematically as $W = mg$."
+
+***
+
+**Question 5**
+An electric winch with a power rating of $500\text{ W}$ and an efficiency of $60\%$ is used to lift a $100\text{-kg}$ load. How much time will it take to lift the load to a height of $6.0\text{ meters}$? (Use $g = 9.80\text{ m/s}^2$).
+*   A. $1.2\text{ s}$
+*   B. $11.8\text{ s}$
+*   C. $19.6\text{ s}$
+*   D. $32.7\text{ s}$
+
+**Correct Answer:** C
+**Skill:** application
+**Difficulty:** hard
+**Calculation Expression:** $P_{out} = 500\text{ W} \times 0.60 = 300\text{ W}$; $W = mgh = (100\text{ kg})(9.80\text{ m/s}^2)(6.0\text{ m}) = 5,880\text{ J}$; $t = \frac{W}{P_{out}} = \frac{5,880\text{ J}}{300\text{ W}} = 19.6\text{ s}$
+**Supporting Quote:** "Power is calculated by dividing the work done by the time it took to do the work."
+
+### SET 3
+
+**Question 1**
+A cyclist travels a total distance of $45.0\text{ km}$ in $1.50\text{ hours}$. What is the average speed of the cyclist?
+*   A. $0.033\text{ km/h}$
+*   B. $30.0\text{ km/h}$
+*   C. $45.0\text{ km/h}$
+*   D. $67.5\text{ km/h}$
+
+**Correct Answer:** B
+**Skill:** calculation
+**Difficulty:** easy
+**Calculation Expression:** $\text{Average speed} = \frac{d}{t} = \frac{45.0\text{ km}}{1.50\text{ h}} = 30.0\text{ km/h}$
+**Supporting Quote:** "Note—Average speed is distance traveled divided by time of travel."
+
+***
+
+**Question 2**
+A child pulls a $2.0\text{-kg}$ toy wagon across a smooth floor with a net external force of $12.0\text{ N}$. What is the acceleration of the wagon?
+*   A. $0.17\text{ m/s}^2$
+*   B. $6.0\text{ m/s}^2$
+*   C. $12.0\text{ m/s}^2$
+*   D. $24.0\text{ m/s}^2$
+
+**Correct Answer:** B
+**Skill:** calculation
+**Difficulty:** easy
+**Calculation Expression:** $a = \frac{F_{net}}{m} = \frac{12.0\text{ N}}{2.0\text{ kg}} = 6.0\text{ m/s}^2$
+**Supporting Quote:** "Newton’s second law of motion... shows the mathematical relationship between force, mass, and acceleration. Mathematically, the second law is most often written as $F_{net} = ma$."
+
+***
+
+**Question 3**
+A 0.15-kg hockey puck slides across the ice at a constant velocity of $40.0\text{ m/s}$. What is the magnitude of the puck's linear momentum?
+*   A. $0.00375\text{ kg}\cdot\text{m/s}$
+*   B. $6.0\text{ kg}\cdot\text{m/s}$
+*   C. $40.15\text{ kg}\cdot\text{m/s}$
+*   D. $266.7\text{ kg}\cdot\text{m/s}$
+
+**Correct Answer:** B
+**Skill:** calculation
+**Difficulty:** easy
+**Calculation Expression:** $p = mv = (0.15\text{ kg})(40.0\text{ m/s}) = 6.0\text{ kg}\cdot\text{m/s}$
+**Supporting Quote:** "Linear momentum is the product of a system’s mass and its velocity. In equation form, linear momentum $p$ is $p = mv$."
+
+***
+
+**Question 4**
+A worker lifts a $15.0\text{-kg}$ box vertically through a distance of $2.0\text{ m}$ at a constant speed. How much work is done on the box against gravity? (Use $g = 9.80\text{ m/s}^2$).
+*   A. $7.5\text{ J}$
+*   B. $30.0\text{ J}$
+*   C. $147.0\text{ J}$
+*   D. $294.0\text{ J}$
+
+**Correct Answer:** D
+**Skill:** calculation
+**Difficulty:** medium
+**Calculation Expression:** $W = Fd = (mg)d = (15.0\text{ kg} \times 9.80\text{ m/s}^2)(2.0\text{ m}) = 294.0\text{ J}$
+**Supporting Quote:** "Work is application of force, $F$, to move an object over a distance, $d$, in the direction that the force is applied. Work, $W$, is described by the equation $W = Fd$."
+
+***
+
+**Question 5**
+An electric portable heater is connected to a $120\text{-V}$ outlet. If the internal heating element has a resistance of $20\text{ }\Omega$, what is the current flowing through the heater?
+*   A. $0.16\text{ A}$
+*   B. $6.0\text{ A}$
+*   C. $100.0\text{ A}$
+*   D. $2,400\text{ A}$
+
+**Correct Answer:** B
+**Skill:** calculation
+**Difficulty:** easy
+**Calculation Expression:** $I = \frac{V}{R} = \frac{120\text{ V}}{20\text{ }\Omega} = 6.0\text{ A}$
+**Supporting Quote:** "The constant of proportionality is the resistance $R$ of the material, which leads to $V = IR$. This relationship is called Ohm’s law."
