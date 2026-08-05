@@ -39,7 +39,7 @@ var calcTool = Tool{
 			"properties": map[string]any{
 				"expression": map[string]any{
 					"type":        "string",
-					"description": "plain arithmetic using only numbers, + - * / ( ) ^ and decimal points. No units, no variables, no words. Example: (1200*0.07)/12",
+					"description": "plain arithmetic using numbers, + - * / ^, parentheses, pi, and only sin, cos, tan, sqrt, abs, exp, ln. No variables, units, or words. Trigonometric arguments are radians. Example: (20*sin(30*pi/180))/9.8",
 				},
 			},
 			"required":             []string{"expression"},
@@ -53,9 +53,10 @@ const factsSystem = `You are preparing the arithmetic for exam questions about a
 You do not write questions here. You only work out numbers.
 
 Call the calc tool once for each quantity an exam question about this passage
-could reasonably ask for. Use only numbers that appear in the passage. Do not
-invent inputs and do not do any arithmetic yourself — every number you report
-must come back from the tool.
+could reasonably ask for. Use only numbers that appear in the passage. You may
+use sin, cos, tan, sqrt, abs, exp, ln, and pi when the source gives a matching
+formula; trig arguments must be radians. Do not invent inputs and do not do
+any arithmetic yourself — every number you report must come back from the tool.
 
 When you have computed everything useful, reply with the single word DONE.
 If the passage contains no numbers worth computing with, reply DONE immediately.`
@@ -107,7 +108,7 @@ func (g *Generator) ComputeFacts(ctx context.Context, c examgen.Chunk, forceCalc
 			default:
 				v, err := arith.Eval(expr)
 				if err != nil {
-					result = "error: " + err.Error() + ". Use only numbers and + - * / ( ) ^"
+					result = "error: " + err.Error() + ". Use only numbers, + - * / ^, parentheses, pi, and the allowed math functions"
 					break
 				}
 				seen[expr] = true

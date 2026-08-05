@@ -51,3 +51,16 @@ func TestChoiceMentionsNumberWords(t *testing.T) {
 		t.Fatal("wrong number word should not match")
 	}
 }
+
+func TestChoiceMentionsNumberUsesNumericBoundaries(t *testing.T) {
+	for _, choice := range []string{"14 N", "40 m/s", "0.4 kg"} {
+		if choiceMentionsNumber(choice, 4) {
+			t.Fatalf("%q should not match the standalone number 4", choice)
+		}
+	}
+	for _, choice := range []string{"4 N", "4.0 kg", "approximately 4"} {
+		if !choiceMentionsNumber(choice, 4) {
+			t.Fatalf("%q should match the standalone number 4", choice)
+		}
+	}
+}

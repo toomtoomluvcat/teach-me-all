@@ -51,7 +51,7 @@ func TestQuestionSystemIsDomainAgnostic(t *testing.T) {
 	for _, want := range []string{
 		"domain-agnostic",
 		"science, mathematics, medicine",
-		"Never apply a biology-only",
+		"subject-specific template",
 		"genuinely new situation",
 		"name,",
 		"at least two linked inferences",
@@ -59,6 +59,11 @@ func TestQuestionSystemIsDomainAgnostic(t *testing.T) {
 	} {
 		if !strings.Contains(system, want) {
 			t.Fatalf("domain-agnostic contract omitted %q:\n%s", want, system)
+		}
+	}
+	for _, unwanted := range []string{"physics", "newton", "m/s^2", "physical unit"} {
+		if strings.Contains(strings.ToLower(system), unwanted) {
+			t.Fatalf("question system contains subject-specific prompt bias %q:\n%s", unwanted, system)
 		}
 	}
 }
@@ -165,6 +170,22 @@ func TestQuestionSetSchemaForContractRestrictsProvenanceIDs(t *testing.T) {
 				}
 			}
 		})
+	}
+	if _, ok := properties["operation"]; !ok {
+		t.Fatal("set schema omitted the contract operation field")
+	}
+	operation := properties["operation"].(map[string]any)
+	gotOperations, ok := operation["enum"].([]any)
+	if ok && len(gotOperations) != 0 {
+		t.Fatalf("operation schema should stay open only when contract has no operations: %#v", operation)
+	}
+	withOperation := CoverageContract{Slots: []CoverageSlot{{ID: "S01", AtomID: "A001", Operation: "causal"}, {ID: "S02", AtomID: "A002", Operation: "comparison"}}}
+	withOperationRoot := QuestionSetSchemaForContract(false, withOperation)["properties"].(map[string]any)
+	withOperationItem := withOperationRoot["questions"].(map[string]any)["items"].(map[string]any)
+	withOperationSchema := withOperationItem["properties"].(map[string]any)["operation"].(map[string]any)
+	values, ok := withOperationSchema["enum"].([]any)
+	if !ok || len(values) != 2 || values[0] != "causal" || values[1] != "comparison" {
+		t.Fatalf("operation enum = %#v, want causal/comparison", withOperationSchema)
 	}
 	prompt := QuestionSetPrompt(Lesson{Title: "Lesson"}, nil, nil, contract, nil, false)
 	for _, want := range []string{"Slot execution protocol", "never invent or mix IDs", "source_quote is verbatim"} {

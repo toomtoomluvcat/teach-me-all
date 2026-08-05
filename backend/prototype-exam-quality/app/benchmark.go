@@ -21,7 +21,10 @@ type benchmarkCase struct {
 	TargetDifficulty string
 }
 
-func benchmarkCases(selection string) ([]benchmarkCase, error) {
+func benchmarkCases(selection string, lessonHint string, scopeHint string) ([]benchmarkCase, error) {
+	if strings.TrimSpace(lessonHint) != "" {
+		return genericBenchmarkCases(selection, lessonHint, scopeHint)
+	}
 	applicationEasy := benchmarkCase{
 		Name:             "application-easy",
 		LessonContains:   "projectile",
@@ -38,22 +41,86 @@ func benchmarkCases(selection string) ([]benchmarkCase, error) {
 		TargetSkill:      "application",
 		TargetDifficulty: "hard",
 	}
+	applicationMedium := benchmarkCase{
+		Name:             "application-medium",
+		LessonContains:   "projectile",
+		Scope:            "projectile motion relationship applied comparison changed condition",
+		Directive:        "Generate application questions at medium level. Each question must apply one stated physics relationship to a new scenario with one meaningful changed condition and require a comparison, prediction, or outcome decision. Do not ask for a definition, direct fact, or unchanged example. Set difficulty to medium and skill to application.",
+		TargetSkill:      "application",
+		TargetDifficulty: "medium",
+	}
 	calculation := benchmarkCase{
 		Name:           "calculation",
 		LessonContains: "newton",
 		Scope:          "net force mass acceleration weight worked calculation",
-		Directive:      "Generate calculation questions only. Use numerical values that appear in the passage or stem, show a solvable expression in calculation.expression, and set skill to calculation. Prefer applied physics scenarios over definition questions.",
+		Directive:      "Generate calculation questions only. Use explicit numerical values that appear in the passage or stem and show a solvable expression in calculation.expression. The correct choice must be a decimal/integer numeric answer, never a radical, variable, or symbolic identity. Set skill to calculation. Prefer applied physics scenarios over definition questions.",
 		ForceCalc:      true,
 		TargetSkill:    "calculation",
 	}
 
 	switch strings.ToLower(strings.TrimSpace(selection)) {
 	case "all":
-		return []benchmarkCase{applicationEasy, applicationHard, calculation}, nil
+		return []benchmarkCase{applicationEasy, applicationMedium, applicationHard, calculation}, nil
 	case "application-easy", "application_easy":
 		return []benchmarkCase{applicationEasy}, nil
 	case "application-hard", "application_hard":
 		return []benchmarkCase{applicationHard}, nil
+	case "application-medium", "application_medium", "medium":
+		return []benchmarkCase{applicationMedium}, nil
+	case "calculation", "calc":
+		return []benchmarkCase{calculation}, nil
+	default:
+		return nil, fmt.Errorf("--benchmark must be all, application-easy, application-hard, or calculation; got %q", selection)
+	}
+}
+
+func genericBenchmarkCases(selection, lessonHint, scopeHint string) ([]benchmarkCase, error) {
+	focus := strings.TrimSpace(scopeHint)
+	if focus == "" {
+		focus = strings.TrimSpace(lessonHint)
+	}
+	applicationEasy := benchmarkCase{
+		Name:             "application-easy",
+		LessonContains:   lessonHint,
+		Scope:            focus + " source relationships examples simple new scenario",
+		Directive:        "Generate application questions at easy level. Each question must apply one source-stated relationship, rule, mechanism, sequence, or condition to a genuinely new scenario with a changed value, entity, or condition and require a prediction, comparison, explanation, or outcome decision. Vary the target across questions. Do not ask for a name, definition, direct fact, unchanged property, or copied sentence. Set difficulty to easy and skill to application.",
+		TargetSkill:      "application",
+		TargetDifficulty: "easy",
+	}
+	applicationHard := benchmarkCase{
+		Name:             "application-hard",
+		LessonContains:   lessonHint,
+		Scope:            focus + " source relationships multi-step nontrivial scenario",
+		Directive:        "Generate application questions at hard level. Each question must use at least two given source-supported inputs, conditions, entities, or constraints and require at least two linked inferences, transformations, or decisions before the answer. A one-step fact, definition, label, or unchanged example is invalid. Vary the relationship and target across questions. Set difficulty to hard and skill to application.",
+		TargetSkill:      "application",
+		TargetDifficulty: "hard",
+	}
+	applicationMedium := benchmarkCase{
+		Name:             "application-medium",
+		LessonContains:   lessonHint,
+		Scope:            focus + " source relationships applied comparison meaningful changed condition",
+		Directive:        "Generate application questions at medium level. Each question must apply one source-stated relationship, rule, mechanism, sequence, or condition to a new scenario with one meaningful changed condition and require a comparison, prediction, explanation, or outcome decision. A one-step direct fact or unchanged example is invalid. Set difficulty to medium and skill to application.",
+		TargetSkill:      "application",
+		TargetDifficulty: "medium",
+	}
+	calculation := benchmarkCase{
+		Name:           "calculation",
+		LessonContains: lessonHint,
+		Scope:          focus + " numerical rule equation worked example",
+		Directive:      "Generate calculation questions only. Use explicit numerical values that appear in the passage or stem and show a solvable expression in calculation.expression. The correct choice must be a decimal/integer numeric answer, never a radical, variable, or symbolic identity. Set skill to calculation. Prefer an applied scenario over a definition question.",
+		ForceCalc:      true,
+		TargetSkill:    "calculation",
+	}
+
+	switch strings.ToLower(strings.TrimSpace(selection)) {
+	case "all":
+		return []benchmarkCase{applicationEasy, applicationMedium, applicationHard, calculation}, nil
+	case "application-easy", "application_easy":
+		return []benchmarkCase{applicationEasy}, nil
+	case "application-hard", "application_hard":
+		return []benchmarkCase{applicationHard}, nil
+	case "application-medium", "application_medium", "medium":
+		return []benchmarkCase{applicationMedium}, nil
 	case "calculation", "calc":
 		return []benchmarkCase{calculation}, nil
 	default:
@@ -80,6 +147,8 @@ type benchmarkQuestion struct {
 type benchmarkCaseResult struct {
 	Name                string                 `json:"name"`
 	Lesson              string                 `json:"lesson"`
+	Skipped             bool                   `json:"skipped,omitempty"`
+	SkipReason          string                 `json:"skip_reason,omitempty"`
 	Budget              int                    `json:"budget"`
 	Drafts              int                    `json:"drafts"`
 	Accepted            int                    `json:"accepted"`
@@ -88,6 +157,10 @@ type benchmarkCaseResult struct {
 	TargetAccepted      int                    `json:"target_accepted"`
 	CalculationDrafts   int                    `json:"calculation_drafts"`
 	CalculationAccepted int                    `json:"calculation_accepted"`
+	DemandPassed        int                    `json:"demand_passed"`
+	ChangedCondition    int                    `json:"changed_condition_passed"`
+	NumericVerified     int                    `json:"numeric_verified"`
+	WellFormedPassed    int                    `json:"well_formed_passed"`
 	ContractRetries     int                    `json:"contract_retries"`
 	Quality             *examgen.QualityReport `json:"quality,omitempty"`
 	Questions           []benchmarkQuestion    `json:"questions"`
@@ -101,7 +174,7 @@ type benchmarkReport struct {
 }
 
 func runBenchmark(ctx context.Context, cfg config, outline *examgen.Outline, chunks []examgen.Chunk, deps examgen.Deps) error {
-	cases, err := benchmarkCases(cfg.benchmark)
+	cases, err := benchmarkCases(cfg.benchmark, cfg.benchmarkLesson, cfg.benchmarkScope)
 	if err != nil {
 		return err
 	}
@@ -131,14 +204,27 @@ func runBenchmark(ctx context.Context, cfg config, outline *examgen.Outline, chu
 		fmt.Printf("\n%sBENCHMARK %s — %s%s\n", bold, benchmark.Name, lesson.Title, reset)
 		res, err := examgen.GenerateExam(ctx, outline, lesson, chunks, deps, opt)
 		if err != nil {
+			if benchmark.ForceCalc && strings.Contains(err.Error(), "no coverage slots") {
+				caseResult := benchmarkCaseResult{
+					Name:       benchmark.Name,
+					Lesson:     lesson.Title,
+					Budget:     budget,
+					Skipped:    true,
+					SkipReason: "source has no graph evidence that supports a calculation slot",
+				}
+				report.Cases = append(report.Cases, caseResult)
+				fmt.Printf("%s%s: skipped — %s%s\n", yellow, benchmark.Name, caseResult.SkipReason, reset)
+				continue
+			}
 			return fmt.Errorf("benchmark %s: %w", benchmark.Name, err)
 		}
 		caseResult := makeBenchmarkCaseResult(benchmark, res)
 		report.Cases = append(report.Cases, caseResult)
-		fmt.Printf("%s%s: %d/%d accepted (%.1f%%), target %d/%d, calculations %d/%d, retries %d%s\n",
+		fmt.Printf("%s%s: %d/%d accepted (%.1f%%), target %d/%d, calc %d/%d, demand %d, changed %d, numeric %d, retries %d%s\n",
 			dim, benchmark.Name, caseResult.Accepted, caseResult.Drafts, caseResult.PassRate*100,
 			caseResult.TargetAccepted, caseResult.TargetDrafts,
-			caseResult.CalculationAccepted, caseResult.CalculationDrafts, caseResult.ContractRetries, reset)
+			caseResult.CalculationAccepted, caseResult.CalculationDrafts,
+			caseResult.DemandPassed, caseResult.ChangedCondition, caseResult.NumericVerified, caseResult.ContractRetries, reset)
 	}
 
 	dir := scratchDir(cfg)
@@ -177,6 +263,19 @@ func makeBenchmarkCaseResult(benchmark benchmarkCase, res *examgen.ExamResult) b
 				out.CalculationAccepted++
 			}
 		}
+		isDemandTarget := strings.EqualFold(strings.TrimSpace(q.Skill), "application") && (strings.EqualFold(strings.TrimSpace(q.Difficulty), "medium") || strings.EqualFold(strings.TrimSpace(q.Difficulty), "hard"))
+		if isDemandTarget && gatePassed(q.Report, examgen.GateDemand) {
+			out.DemandPassed++
+		}
+		if isDemandTarget && strings.TrimSpace(q.ChangedCondition) != "" {
+			out.ChangedCondition++
+		}
+		if gatePassed(q.Report, examgen.GateArithmetic) && q.Calculation != nil {
+			out.NumericVerified++
+		}
+		if gatePassed(q.Report, examgen.GateWellFormed) {
+			out.WellFormedPassed++
+		}
 		target := strings.EqualFold(strings.TrimSpace(q.Skill), benchmark.TargetSkill)
 		if benchmark.TargetDifficulty != "" {
 			target = target && strings.EqualFold(strings.TrimSpace(q.Difficulty), benchmark.TargetDifficulty)
@@ -197,4 +296,16 @@ func makeBenchmarkCaseResult(benchmark benchmarkCase, res *examgen.ExamResult) b
 		out.PassRate = float64(out.Accepted) / float64(out.Drafts)
 	}
 	return out
+}
+
+func gatePassed(report *examgen.GateReport, wanted examgen.GateName) bool {
+	if report == nil {
+		return false
+	}
+	for _, result := range report.Results {
+		if result.Gate == wanted {
+			return result.Pass
+		}
+	}
+	return false
 }

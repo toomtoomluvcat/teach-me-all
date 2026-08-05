@@ -60,6 +60,16 @@ type graphTestGenerator struct {
 	graph EvidenceGraph
 }
 
+type compileRecordingGenerator struct {
+	graphTestGenerator
+	compiled []Chunk
+}
+
+func (g *compileRecordingGenerator) CompileEvidence(_ context.Context, graph EvidenceGraph, chunks []Chunk) (EvidenceGraph, error) {
+	g.compiled = append([]Chunk(nil), chunks...)
+	return graph, nil
+}
+
 func (g *graphTestGenerator) Topics(context.Context, Chunk) (ChunkTopics, error) {
 	return ChunkTopics{}, nil
 }
@@ -145,6 +155,25 @@ func TestBuildOutlineCompilesEvidenceGraphWithoutLosingChunkProvenance(t *testin
 	}
 	if assigned[0].LessonID != "L01" || assigned[1].LessonID != "L01" || assigned[2].LessonID != "" {
 		t.Fatalf("lesson assignments = %#v, want content assigned and page furniture skipped", assigned)
+	}
+}
+
+func TestBuildOutlineCompilesOnlyContentChunks(t *testing.T) {
+	chunks := []Chunk{{ID: "c1", Page: 1, Text: "subject"}, {ID: "c2", Page: 2, Text: "answer key"}}
+	gen := &compileRecordingGenerator{}
+	_, _, err := BuildOutline(context.Background(), chunks, Deps{
+		Gen:          gen,
+		CompileGraph: true,
+		TopicBatcher: graphTopicBatcher{topics: []ChunkTopics{
+			content("Subject"),
+			{Kind: TopicApparatus, Topics: []string{"answer key"}},
+		}},
+	})
+	if err != nil {
+		t.Fatalf("BuildOutline() error = %v", err)
+	}
+	if len(gen.compiled) != 1 || gen.compiled[0].ID != "c1" {
+		t.Fatalf("compiler received %#v, want only content chunk c1", gen.compiled)
 	}
 }
 

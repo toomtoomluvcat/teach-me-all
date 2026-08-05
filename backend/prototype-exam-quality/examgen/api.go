@@ -81,6 +81,7 @@ const (
 	GateUnit           = model.GateUnit
 	GateDistinct       = model.GateDistinct
 	GateCoverage       = model.GateCoverage
+	GateDemand         = model.GateDemand
 
 	ChoiceSupported   = model.ChoiceSupported
 	ChoiceUnsupported = model.ChoiceUnsupported
@@ -120,6 +121,13 @@ func NormalizeEvidenceGraph(graph EvidenceGraph, chunks []Chunk, atoms []Evidenc
 }
 func LessonContext(lesson Lesson, graph *EvidenceGraph, chunks []Chunk) []Chunk {
 	return evidence.LessonContext(lesson, graph, chunks)
+}
+func RankContextChunks(chunks []Chunk, contract CoverageContract) []Chunk {
+	return evidence.RankContextChunks(chunks, contract)
+}
+
+func SlotLocalContextChunks(chunks []Chunk, graph *EvidenceGraph, contract CoverageContract) []Chunk {
+	return evidence.SlotLocalContextChunks(chunks, graph, contract)
 }
 func BuildCoverageContract(lesson Lesson, graph *EvidenceGraph, chunks []Chunk, budget int) CoverageContract {
 	return evidence.BuildCoverageContract(lesson, graph, chunks, budget)

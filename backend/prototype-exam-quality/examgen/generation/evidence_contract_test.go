@@ -6,13 +6,19 @@ import (
 )
 
 func TestQuestionSetPromptCarriesContractAndCrossContext(t *testing.T) {
-	graph := &EvidenceGraph{Atoms: []EvidenceAtom{{ID: "A001", ChunkID: "c1", Relation: "equation", Claim: "a equals v squared over r"}}}
+	graph := &EvidenceGraph{Atoms: []EvidenceAtom{
+		{ID: "A001", ChunkID: "c1", Relation: "equation", Claim: "a equals v squared over r"},
+		{ID: "A999", ChunkID: "c2", Relation: "definition", Claim: "unassigned unrelated claim"},
+	}}
 	contract := CoverageContract{Budget: 1, ContextChunkIDs: []string{"c1", "c2"}, Slots: []CoverageSlot{{ID: "S01", AtomID: "A001", SourceChunkIDs: []string{"c1"}, Skill: "calculation", Difficulty: "medium", Operation: "equation", Target: "a equals v squared over r"}}}
 	prompt := QuestionSetPrompt(Lesson{Title: "Circular motion"}, graph, []Chunk{{ID: "c1", Page: 1, Text: "first source"}, {ID: "c2", Page: 2, Text: "related source"}}, contract, nil, false)
 	for _, want := range []string{"S01", "A001", "c1", "c2", "first source", "related source"} {
 		if !strings.Contains(prompt, want) {
 			t.Fatalf("set prompt omitted %q:\n%s", want, prompt)
 		}
+	}
+	if strings.Contains(prompt, "unassigned unrelated claim") {
+		t.Fatalf("set prompt included an atom outside the assigned slots:\n%s", prompt)
 	}
 	if _, ok := QuestionSetSchema(false)["properties"]; !ok {
 		t.Fatal("set schema has no properties")
@@ -24,6 +30,16 @@ func TestQuestionSetPromptCarriesRunDirective(t *testing.T) {
 	prompt := QuestionSetPrompt(Lesson{Title: "Physics"}, nil, nil, contract, nil, false)
 	if !strings.Contains(prompt, "genuinely new condition") {
 		t.Fatalf("set prompt omitted run directive: %s", prompt)
+	}
+}
+
+func TestRankContextChunksPutsContractChunksFirst(t *testing.T) {
+	chunks := []Chunk{{ID: "c1"}, {ID: "c2"}, {ID: "c3"}}
+	contract := CoverageContract{Slots: []CoverageSlot{{SourceChunkIDs: []string{"c3"}}, {SourceChunkIDs: []string{"c1"}}}}
+	got := RankContextChunks(chunks, contract)
+	ids := []string{got[0].ID, got[1].ID, got[2].ID}
+	if strings.Join(ids, ",") != "c3,c1,c2" {
+		t.Fatalf("ranked context = %v, want [c3 c1 c2]", ids)
 	}
 }
 
@@ -39,6 +55,30 @@ func TestCoverageDirectiveSelectsAtomsThatSupportTargetSkill(t *testing.T) {
 	}
 }
 
+func TestHardApplicationContractAttachesDistinctSupportAtom(t *testing.T) {
+	graph := &EvidenceGraph{Atoms: []EvidenceAtom{
+		{ID: "A001", ChunkID: "c1", ConceptIDs: []string{"C1"}, Claim: "condition changes outcome", Quote: "condition changes outcome", Relation: "causal", QuestionForms: []string{"application"}},
+		{ID: "A002", ChunkID: "c2", ConceptIDs: []string{"C1"}, Claim: "outcome has a constraint", Quote: "outcome has a constraint", Relation: "condition", QuestionForms: []string{"understanding", "application"}},
+	}}
+	contract := BuildCoverageContractForRun(Lesson{ChunkIDs: []string{"c1", "c2"}}, graph, []Chunk{{ID: "c1"}, {ID: "c2"}}, 1, "Generate application questions at hard level. Set difficulty to hard and skill to application.", false)
+	if len(contract.Slots) != 1 || len(contract.Slots[0].SupportAtomIDs) != 1 {
+		t.Fatalf("hard contract = %#v, want one primary and one support atom", contract)
+	}
+	if contract.Slots[0].SupportAtomIDs[0] == contract.Slots[0].AtomID {
+		t.Fatalf("hard contract reused primary atom: %#v", contract.Slots[0])
+	}
+}
+
+func TestCoverageDirectiveInfersApplicationFromMechanismRelation(t *testing.T) {
+	graph := &EvidenceGraph{Atoms: []EvidenceAtom{
+		{ID: "A001", ChunkID: "c1", Claim: "condition changes the outcome", Quote: "condition changes the outcome", Relation: "causal", QuestionForms: []string{"recall"}},
+	}}
+	got := BuildCoverageContractForRun(Lesson{ChunkIDs: []string{"c1"}}, graph, []Chunk{{ID: "c1"}}, 1, "Generate application questions at easy level. Set skill to application.", false)
+	if len(got.Slots) != 1 || got.Slots[0].AtomID != "A001" || got.Slots[0].Skill != "application" {
+		t.Fatalf("contract = %#v, want causal atom inferred as application-capable", got)
+	}
+}
+
 func TestSetCoverageEnforcesDifficulty(t *testing.T) {
 	contract := CoverageContract{Slots: []CoverageSlot{{ID: "S01", AtomID: "A001", SourceChunkIDs: []string{"c1"}, Skill: "application", Difficulty: "hard", EvidenceQuote: "source claim"}}}
 	q := Question{CoverageSlotID: "S01", EvidenceAtomID: "A001", EvidenceChunkID: "c1", Skill: "application", Difficulty: "easy", SourceQuote: "source claim"}
@@ -48,8 +88,38 @@ func TestSetCoverageEnforcesDifficulty(t *testing.T) {
 	}
 }
 
+func TestSetCoverageEnforcesOperation(t *testing.T) {
+	contract := CoverageContract{Slots: []CoverageSlot{{ID: "S01", AtomID: "A001", SourceChunkIDs: []string{"c1"}, Skill: "understanding", Operation: "sequence", EvidenceQuote: "source claim"}}}
+	q := Question{CoverageSlotID: "S01", EvidenceAtomID: "A001", EvidenceChunkID: "c1", Skill: "understanding", SourceQuote: "source claim", Operation: "comparison"}
+	got := gateSetCoverage(q, contract, map[string]Chunk{"c1": {ID: "c1", Text: "source claim"}}, map[string]bool{}, map[string]bool{})
+	if got.Pass || !strings.Contains(got.Reason, "operation sequence") {
+		t.Fatalf("coverage result = %#v, want operation rejection", got)
+	}
+	q.Operation = "sequence"
+	got = gateSetCoverage(q, contract, map[string]Chunk{"c1": {ID: "c1", Text: "source claim"}}, map[string]bool{}, map[string]bool{})
+	if !got.Pass {
+		t.Fatalf("matching operation was rejected: %#v", got)
+	}
+}
+
+func TestHardApplicationRequiresDemandContract(t *testing.T) {
+	contract := CoverageContract{Slots: []CoverageSlot{{ID: "S01", AtomID: "A001", SupportAtomIDs: []string{"A002"}, SourceChunkIDs: []string{"c1", "c2"}, Skill: "application", Difficulty: "hard", Operation: "causal", EvidenceQuote: "source claim"}}}
+	base := Question{CoverageSlotID: "S01", EvidenceAtomID: "A001", EvidenceChunkID: "c1", Skill: "application", Difficulty: "hard", Operation: "causal", SourceQuote: "source claim"}
+	got := gateSetCoverage(base, contract, map[string]Chunk{"c1": {ID: "c1", Text: "source claim"}}, map[string]bool{}, map[string]bool{})
+	if got.Pass || !strings.Contains(got.Reason, "changed condition") {
+		t.Fatalf("hard application without changed condition passed: %#v", got)
+	}
+	base.ChangedCondition = "the input value changes from the source case"
+	base.SupportingAtomIDs = []string{"A002"}
+	base.ReasoningSteps = []string{"apply the source condition to the changed value", "compare the resulting outcome with the constraint"}
+	got = gateSetCoverage(base, contract, map[string]Chunk{"c1": {ID: "c1", Text: "source claim"}}, map[string]bool{}, map[string]bool{})
+	if !got.Pass {
+		t.Fatalf("linked hard application was rejected: %#v", got)
+	}
+}
+
 func TestCalculationTargetLeavesDifficultyOpenWhenUnspecified(t *testing.T) {
-	graph := &EvidenceGraph{Atoms: []EvidenceAtom{{ID: "A001", ChunkID: "c1", Claim: "force equals mass times acceleration", Quote: "force equals mass times acceleration", Relation: "equation", QuestionForms: []string{"calculation"}}}}
+	graph := &EvidenceGraph{Atoms: []EvidenceAtom{{ID: "A001", ChunkID: "c1", Claim: "force equals mass times acceleration: 10 = 2 * 5", Quote: "force equals mass times acceleration: 10 = 2 * 5", Relation: "equation", QuestionForms: []string{"calculation"}}}}
 	got := BuildCoverageContractForRun(Lesson{ChunkIDs: []string{"c1"}}, graph, []Chunk{{ID: "c1"}}, 1, "Generate calculation questions only. Set skill to calculation.", true)
 	if len(got.Slots) != 1 || got.Slots[0].Skill != "calculation" || got.Slots[0].Difficulty != "" {
 		t.Fatalf("contract = %#v, want calculation with open difficulty", got)
@@ -58,10 +128,10 @@ func TestCalculationTargetLeavesDifficultyOpenWhenUnspecified(t *testing.T) {
 
 func TestRepairQuestionProvenanceRecoversUniqueQuoteMatch(t *testing.T) {
 	graph := &EvidenceGraph{Atoms: []EvidenceAtom{{ID: "A001", ChunkID: "c1", Claim: "force equals mass times acceleration", Quote: "Force equals mass times acceleration.", Relation: "equation", QuestionForms: []string{"calculation"}}}}
-	contract := CoverageContract{Slots: []CoverageSlot{{ID: "S01", AtomID: "A001", SourceChunkIDs: []string{"c1"}, Skill: "calculation", EvidenceQuote: "Force equals mass times acceleration."}}}
+	contract := CoverageContract{Slots: []CoverageSlot{{ID: "S01", AtomID: "A001", SourceChunkIDs: []string{"c1"}, Skill: "calculation", Operation: "equation", EvidenceQuote: "Force equals mass times acceleration."}}}
 	q := Question{Stem: "Calculate force", Skill: "calculation", SourceQuote: "Force equals mass times acceleration."}
 	got := RepairQuestionProvenance(q, contract, graph, []Chunk{{ID: "c1", Text: "Force equals mass times acceleration."}})
-	if got.CoverageSlotID != "S01" || got.EvidenceAtomID != "A001" || got.EvidenceChunkID != "c1" {
+	if got.CoverageSlotID != "S01" || got.EvidenceAtomID != "A001" || got.EvidenceChunkID != "c1" || got.Operation != "equation" {
 		t.Fatalf("repaired question = %#v", got)
 	}
 }

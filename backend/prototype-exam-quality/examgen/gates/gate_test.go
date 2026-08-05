@@ -186,15 +186,66 @@ func TestGateUnitCheckMatchesPhysicalAnswerUnit(t *testing.T) {
 	}
 }
 
-func TestGateArithmeticAcceptsVerifiedNumericSubstepForSymbolicAnswer(t *testing.T) {
+func TestGateUnitCheckAcceptsNonPhysicsUnits(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		unit string
+		text string
+	}{
+		{name: "chemistry", unit: "mol/L", text: "0.25 mol/L"},
+		{name: "biology", unit: "%", text: "12.5%"},
+		{name: "economics", unit: "USD", text: "125 USD"},
+		{name: "temperature", unit: "°C", text: "37 °C"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			q := Question{
+				Calculation: &Calculation{Expression: "5/2", Expected: 2.5, Unit: tc.unit},
+				Choices:     []Choice{{Content: tc.text, IsCorrect: true}, {Content: "0"}},
+			}
+			got := gateUnitCheck(q)
+			if !got.Pass {
+				t.Fatalf("unit %q failed: %#v", tc.unit, got)
+			}
+		})
+	}
+}
+
+func TestGateArithmeticRejectsSymbolicOnlyAnswerForNumericCalculation(t *testing.T) {
 	q := Question{
 		Skill:       "calculation",
 		Calculation: &Calculation{Expression: "2-8", Expected: -6},
 		Choices:     []Choice{{Content: "1/b^6", IsCorrect: true}, {Content: "b^6"}},
 	}
 	got := gateArithmetic(q, Arith{})
-	if !got.Pass {
-		t.Fatalf("symbolic answer failed after numeric substep was verified: %#v", got)
+	if got.Pass {
+		t.Fatalf("symbolic answer passed numeric calculation gate: %#v", got)
+	}
+}
+
+func TestGateArithmeticAllowsNormalThreeDecimalRounding(t *testing.T) {
+	q := Question{
+		Skill: "calculation", Calculation: &Calculation{Expression: "(20^2*0.866025)/9.8", Expected: 35.348},
+		Choices: []Choice{{Content: "35.348", IsCorrect: true}, {Content: "35.346"}},
+	}
+	if got := gateArithmetic(q, Arith{}); !got.Pass {
+		t.Fatalf("normal rounded numeric answer was rejected: %#v", got)
+	}
+	q.Calculation.Expected = 35.346
+	if got := gateArithmetic(q, Arith{}); got.Pass {
+		t.Fatalf("wrong rounded numeric answer passed: %#v", got)
+	}
+}
+
+func TestGateDemandContractRejectsOverclaimedHardApplication(t *testing.T) {
+	q := Question{
+		Skill: "application", Difficulty: "hard", Choices: []Choice{
+			{Content: "correct", IsCorrect: true}, {Content: "wrong one"}, {Content: "wrong two"}, {Content: "wrong three"},
+		},
+		Explanation: "Because the rule applies, therefore the answer follows.",
+	}
+	got := gateDemandContract(q)
+	if got.Pass || !strings.Contains(got.Reason, "changed condition") {
+		t.Fatalf("overclaimed hard application passed: %#v", got)
 	}
 }
 

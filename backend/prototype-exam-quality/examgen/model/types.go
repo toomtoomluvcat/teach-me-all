@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"sort"
 	"strconv"
 	"strings"
 )
@@ -247,6 +248,12 @@ type Question struct {
 	Difficulty  string       `json:"difficulty"`
 	Skill       string       `json:"skill"`
 	Calculation *Calculation `json:"calculation,omitempty"`
+	// Demand metadata is deliberately compact. It gives deterministic QC a
+	// handle on the claimed reasoning load instead of trusting a long prose
+	// explanation to look multi-step.
+	ReasoningSteps    []string `json:"reasoning_steps,omitempty"`
+	ChangedCondition  string   `json:"changed_condition,omitempty"`
+	DistractorReasons []string `json:"distractor_reasons,omitempty"`
 
 	// Set-generation provenance. The per-chunk path leaves these empty; the
 	// set path requires them so a question can be traced to one graph atom and
@@ -254,10 +261,72 @@ type Question struct {
 	CoverageSlotID  string `json:"coverage_slot_id,omitempty"`
 	EvidenceAtomID  string `json:"evidence_atom_id,omitempty"`
 	EvidenceChunkID string `json:"evidence_chunk_id,omitempty"`
+	// Operation is the exact generic reasoning label assigned by the coverage
+	// contract. Set-generated questions must return it so the writer cannot
+	// silently replace an application/equation/sequence target with recall.
+	Operation string `json:"operation,omitempty"`
+	// SupportingAtomIDs are the additional source claims used by a hard item.
+	// EvidenceAtomID remains the primary claim for backward-compatible reports.
+	SupportingAtomIDs []string `json:"supporting_atom_ids,omitempty"`
 
 	// Filled in by us, not by the model.
 	ChunkID string      `json:"-"`
 	Report  *GateReport `json:"-"`
+}
+
+// UnmarshalJSON tolerates one common provider shape error without weakening
+// the demand gate: some JSON-mode models return keyed objects for the compact
+// lists even though the schema says array. We normalize those values to a
+// stable list and let deterministic QC decide whether the list is complete.
+func (q *Question) UnmarshalJSON(data []byte) error {
+	type alias Question
+	wire := struct {
+		*alias
+		ReasoningSteps    json.RawMessage `json:"reasoning_steps"`
+		DistractorReasons json.RawMessage `json:"distractor_reasons"`
+	}{alias: (*alias)(q)}
+	if err := json.Unmarshal(data, &wire); err != nil {
+		return err
+	}
+	var err error
+	if len(wire.ReasoningSteps) > 0 && string(wire.ReasoningSteps) != "null" {
+		q.ReasoningSteps, err = decodeDemandStringList(wire.ReasoningSteps)
+		if err != nil {
+			return fmt.Errorf("reasoning_steps: %w", err)
+		}
+	}
+	if len(wire.DistractorReasons) > 0 && string(wire.DistractorReasons) != "null" {
+		q.DistractorReasons, err = decodeDemandStringList(wire.DistractorReasons)
+		if err != nil {
+			return fmt.Errorf("distractor_reasons: %w", err)
+		}
+	}
+	return nil
+}
+
+func decodeDemandStringList(raw json.RawMessage) ([]string, error) {
+	var list []string
+	if err := json.Unmarshal(raw, &list); err == nil {
+		return list, nil
+	}
+	var keyed map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &keyed); err != nil {
+		return nil, fmt.Errorf("expected array or keyed object: %w", err)
+	}
+	keys := make([]string, 0, len(keyed))
+	for key := range keyed {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	list = make([]string, 0, len(keys))
+	for _, key := range keys {
+		var value string
+		if err := json.Unmarshal(keyed[key], &value); err != nil {
+			return nil, fmt.Errorf("value %q is not a string", key)
+		}
+		list = append(list, value)
+	}
+	return list, nil
 }
 
 // CorrectIndex returns the index of the single correct choice, or -1 if the
@@ -290,6 +359,7 @@ const (
 	GateUnit           GateName = "unit_check"
 	GateDistinct       GateName = "not_a_duplicate"
 	GateCoverage       GateName = "coverage_contract"
+	GateDemand         GateName = "demand_contract"
 )
 
 // GateResult is the outcome of one check.

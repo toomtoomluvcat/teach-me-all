@@ -319,6 +319,12 @@ func generateExamSet(ctx context.Context, outline *Outline, lesson Lesson, chunk
 		contract = PreflightCoverageContract(contract, outline.EvidenceGraph, contextChunks)
 		d.Log.report("set-preflight", len(contract.PreflightChanges)-before, len(contract.Slots), "deterministic contract normalization")
 	}
+	localContext := SlotLocalContextChunks(contextChunks, outline.EvidenceGraph, contract)
+	if len(localContext) < len(contextChunks) {
+		d.Log.report("set-context", len(localContext), len(contextChunks), "slot-local evidence packet with typed neighbors")
+	}
+	contextChunks = localContext
+	contextChunks = RankContextChunks(contextChunks, contract)
 	if len(contract.Slots) == 0 {
 		return nil, fmt.Errorf("set generation produced no coverage slots for lesson %q", lesson.Title)
 	}

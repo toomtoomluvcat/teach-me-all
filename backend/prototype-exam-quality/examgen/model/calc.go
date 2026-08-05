@@ -14,7 +14,9 @@ func choiceMentionsNumber(choice string, v float64) bool {
 	candidates := []string{
 		trimZeros(fmt.Sprintf("%.6f", v)), trimZeros(fmt.Sprintf("%.4f", v)),
 		trimZeros(fmt.Sprintf("%.3f", v)), trimZeros(fmt.Sprintf("%.2f", v)),
-		trimZeros(fmt.Sprintf("%.1f", v)), fmt.Sprintf("%.0f", v), fmt.Sprintf("%g", v),
+		trimZeros(fmt.Sprintf("%.1f", v)), fmt.Sprintf("%.1f", v), fmt.Sprintf("%.2f", v),
+		fmt.Sprintf("%.3f", v), fmt.Sprintf("%.4f", v), fmt.Sprintf("%.6f", v),
+		fmt.Sprintf("%.0f", v), fmt.Sprintf("%g", v),
 	}
 	normalized := normalizeScientificNotation(choice)
 	for _, format := range []string{"%.0e", "%.1e", "%.2e", "%.3e", "%.4e"} {
@@ -22,23 +24,75 @@ func choiceMentionsNumber(choice string, v float64) bool {
 	}
 	haystack := strings.ReplaceAll(choice, ",", "")
 	for _, candidate := range candidates {
-		if candidate != "" && strings.Contains(haystack, candidate) {
+		if candidate != "" && containsNumericToken(haystack, candidate) {
 			return true
 		}
 	}
 	if v >= 0 && v <= 20 && math.Abs(v-math.Round(v)) < 1e-9 {
 		words := []string{"zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen", "nineteen", "twenty"}
-		if strings.Contains(strings.ToLower(choice), words[int(math.Round(v))]) {
+		if containsWordToken(strings.ToLower(choice), words[int(math.Round(v))]) {
 			return true
 		}
 	}
 	for _, format := range []string{"%.0e", "%.1e", "%.2e", "%.3e", "%.4e"} {
 		candidate := normalizeScientificLiteral(fmt.Sprintf(format, v))
-		if candidate != "" && strings.Contains(normalized, candidate) {
+		if candidate != "" && containsNumericToken(normalized, candidate) {
 			return true
 		}
 	}
 	return false
+}
+
+func containsNumericToken(text, candidate string) bool {
+	if candidate == "" {
+		return false
+	}
+	start := 0
+	for start < len(text) {
+		rel := strings.Index(text[start:], candidate)
+		if rel < 0 {
+			return false
+		}
+		i := start + rel
+		beforeOK := i == 0 || !isNumericAdjacent(text[i-1])
+		end := i + len(candidate)
+		afterOK := end >= len(text) || !isNumericAdjacent(text[end])
+		if beforeOK && afterOK {
+			return true
+		}
+		start = i + 1
+	}
+	return false
+}
+
+func isNumericAdjacent(b byte) bool {
+	return (b >= '0' && b <= '9') || b == '.'
+}
+
+func containsWordToken(text, word string) bool {
+	if word == "" {
+		return false
+	}
+	start := 0
+	for start < len(text) {
+		rel := strings.Index(text[start:], word)
+		if rel < 0 {
+			return false
+		}
+		i := start + rel
+		beforeOK := i == 0 || !isASCIIWord(text[i-1])
+		end := i + len(word)
+		afterOK := end >= len(text) || !isASCIIWord(text[end])
+		if beforeOK && afterOK {
+			return true
+		}
+		start = i + 1
+	}
+	return false
+}
+
+func isASCIIWord(b byte) bool {
+	return (b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z') || (b >= '0' && b <= '9') || b == '_'
 }
 
 // ChoiceMentionsNumber exposes the answer-choice number matcher to the gate

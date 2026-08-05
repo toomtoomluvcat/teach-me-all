@@ -57,6 +57,23 @@ func TestBuildCoverageContractPrefersDistinctAtomsAndForms(t *testing.T) {
 	}
 }
 
+func TestSlotLocalContextKeepsExactAndDropsUnrelatedChunks(t *testing.T) {
+	graph := &EvidenceGraph{
+		Concepts: []ConceptNode{
+			{ID: "C1", ChunkIDs: []string{"c1"}},
+			{ID: "C2", ChunkIDs: []string{"c2"}},
+			{ID: "C9", ChunkIDs: []string{"c9"}},
+		},
+		Edges: []ConceptEdge{{From: "C1", To: "C2", Kind: EdgeFollows}},
+		Atoms: []EvidenceAtom{{ID: "A1", ChunkID: "c1", ConceptIDs: []string{"C1"}}},
+	}
+	contract := CoverageContract{Slots: []CoverageSlot{{AtomID: "A1", SourceChunkIDs: []string{"c1"}}}}
+	got := SlotLocalContextChunks([]Chunk{{ID: "c9"}, {ID: "c1"}, {ID: "c2"}}, graph, contract)
+	if len(got) != 2 || got[0].ID != "c1" || got[1].ID != "c2" {
+		t.Fatalf("slot-local context = %#v, want c1,c2", got)
+	}
+}
+
 func TestPreflightCoverageContractDowngradesUnsupportedDefinitionCalculation(t *testing.T) {
 	graph := &EvidenceGraph{Atoms: []EvidenceAtom{{
 		ID: "A008", ChunkID: "c1", Relation: "definition", Claim: "The quotient rule is a^(m-n).",

@@ -157,50 +157,82 @@ func (g *Generator) CompileEvidence(ctx context.Context, graph examgen.EvidenceG
 	ctx = WithLabel(ctx, "outline/compile")
 	var rawAtoms []examgen.EvidenceAtom
 	for _, batch := range evidenceBatches(chunks) {
-		var out struct {
-			Atoms []struct {
-				SourceChunkID string        `json:"source_chunk_id"`
-				ChunkID       string        `json:"chunk_id"`
-				EvidenceChunk string        `json:"evidence_chunk_id"`
-				ConceptIDs    []string      `json:"concept_ids"`
-				Claim         string        `json:"claim"`
-				EvidenceQuote string        `json:"evidence_quote"`
-				Relation      string        `json:"relation"`
-				Conditions    stringListish `json:"conditions"`
-				Variables     stringListish `json:"variables"`
-				QuestionForms stringListish `json:"question_forms"`
-			} `json:"atoms"`
-		}
-		msgs := []Message{
-			{Role: "system", Content: examgen.EvidenceCompileSystem()},
-			{Role: "user", Content: examgen.EvidenceCompilePrompt(graph, batch)},
-		}
-		opt := genOptions(evidenceCompileNumCtx, 0)
-		opt.NumPredict = evidenceCompileMaxOutputTokens
-		if err := g.c.ChatJSON(ctx, g.model, msgs, examgen.EvidenceCompileSchema(), opt, &out); err != nil {
+		atoms, err := g.compileEvidenceBatch(ctx, graph, batch)
+		if err != nil {
 			return examgen.EvidenceGraph{}, err
 		}
-		for _, atom := range out.Atoms {
-			chunkID := atom.SourceChunkID
-			if chunkID == "" {
-				chunkID = atom.ChunkID
-			}
-			if chunkID == "" {
-				chunkID = atom.EvidenceChunk
-			}
-			rawAtoms = append(rawAtoms, examgen.EvidenceAtom{
-				ChunkID:       chunkID,
-				ConceptIDs:    atom.ConceptIDs,
-				Claim:         atom.Claim,
-				Quote:         atom.EvidenceQuote,
-				Relation:      atom.Relation,
-				Conditions:    []string(atom.Conditions),
-				Variables:     []string(atom.Variables),
-				QuestionForms: []string(atom.QuestionForms),
-			})
-		}
+		rawAtoms = append(rawAtoms, atoms...)
 	}
 	return examgen.NormalizeEvidenceGraph(graph, chunks, rawAtoms)
+}
+
+type rawEvidenceAtom struct {
+	SourceChunkID string        `json:"source_chunk_id"`
+	ChunkID       string        `json:"chunk_id"`
+	EvidenceChunk string        `json:"evidence_chunk_id"`
+	ConceptIDs    []string      `json:"concept_ids"`
+	Claim         string        `json:"claim"`
+	EvidenceQuote string        `json:"evidence_quote"`
+	Relation      string        `json:"relation"`
+	Conditions    stringListish `json:"conditions"`
+	Variables     stringListish `json:"variables"`
+	QuestionForms stringListish `json:"question_forms"`
+}
+
+type rawEvidenceResponse struct {
+	Atoms []rawEvidenceAtom `json:"atoms"`
+}
+
+// compileEvidenceBatch retries a malformed/truncated structured response with
+// smaller source packets. Most batches stay at the measured 4-chunk/8k shape;
+// dense textbook pages that produce too many atoms are split only on failure.
+// This keeps the normal token cost unchanged while preventing one oversized
+// response from aborting the entire graph compile.
+func (g *Generator) compileEvidenceBatch(ctx context.Context, graph examgen.EvidenceGraph, batch []examgen.Chunk) ([]examgen.EvidenceAtom, error) {
+	var out rawEvidenceResponse
+	msgs := []Message{
+		{Role: "system", Content: examgen.EvidenceCompileSystem()},
+		{Role: "user", Content: examgen.EvidenceCompilePrompt(graph, batch)},
+	}
+	opt := genOptions(evidenceCompileNumCtx, 0)
+	opt.NumPredict = evidenceCompileMaxOutputTokens
+	if err := g.c.ChatJSON(ctx, g.model, msgs, examgen.EvidenceCompileSchema(), opt, &out); err != nil {
+		if len(batch) <= 1 {
+			return nil, err
+		}
+		mid := len(batch) / 2
+		left, leftErr := g.compileEvidenceBatch(ctx, graph, batch[:mid])
+		if leftErr != nil {
+			return nil, leftErr
+		}
+		right, rightErr := g.compileEvidenceBatch(ctx, graph, batch[mid:])
+		if rightErr != nil {
+			return nil, rightErr
+		}
+		return append(left, right...), nil
+	}
+
+	atoms := make([]examgen.EvidenceAtom, 0, len(out.Atoms))
+	for _, atom := range out.Atoms {
+		chunkID := atom.SourceChunkID
+		if chunkID == "" {
+			chunkID = atom.ChunkID
+		}
+		if chunkID == "" {
+			chunkID = atom.EvidenceChunk
+		}
+		atoms = append(atoms, examgen.EvidenceAtom{
+			ChunkID:       chunkID,
+			ConceptIDs:    atom.ConceptIDs,
+			Claim:         atom.Claim,
+			Quote:         atom.EvidenceQuote,
+			Relation:      atom.Relation,
+			Conditions:    []string(atom.Conditions),
+			Variables:     []string(atom.Variables),
+			QuestionForms: []string(atom.QuestionForms),
+		})
+	}
+	return atoms, nil
 }
 
 const (

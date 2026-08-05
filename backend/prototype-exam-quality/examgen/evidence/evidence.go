@@ -20,6 +20,7 @@ type EvidenceCompiler interface {
 type CoverageSlot struct {
 	ID             string   `json:"id"`
 	AtomID         string   `json:"atom_id"`
+	SupportAtomIDs []string `json:"support_atom_ids,omitempty"`
 	SourceChunkIDs []string `json:"source_chunk_ids"`
 	ConceptIDs     []string `json:"concept_ids"`
 	Skill          string   `json:"skill"`
@@ -87,6 +88,29 @@ func PreflightCoverageContract(contract CoverageContract, graph *EvidenceGraph, 
 		}
 		seenAtoms[atom.ID] = true
 		slot.SourceChunkIDs = []string{atom.ChunkID}
+		validSupport := make([]string, 0, len(slot.SupportAtomIDs))
+		for _, supportID := range slot.SupportAtomIDs {
+			support, supportOK := atomByID[supportID]
+			if !supportOK || support.ID == atom.ID {
+				contract.PreflightChanges = append(contract.PreflightChanges, fmt.Sprintf("drop support %s from %s: unknown or primary atom", supportID, slot.ID))
+				continue
+			}
+			supportChunk, chunkOK := chunkByID[support.ChunkID]
+			if !chunkOK || !contextIDs[support.ChunkID] {
+				contract.PreflightChanges = append(contract.PreflightChanges, fmt.Sprintf("drop support %s from %s: atom is outside set context", supportID, slot.ID))
+				continue
+			}
+			validSupport = append(validSupport, support.ID)
+			if !containsString(slot.SourceChunkIDs, supportChunk.ID) {
+				slot.SourceChunkIDs = append(slot.SourceChunkIDs, supportChunk.ID)
+			}
+			seenAtoms[support.ID] = true
+		}
+		slot.SupportAtomIDs = validSupport
+		if strings.EqualFold(slot.Skill, "application") && strings.EqualFold(slot.Difficulty, "hard") && len(slot.SupportAtomIDs) == 0 {
+			contract.PreflightChanges = append(contract.PreflightChanges, fmt.Sprintf("drop %s: hard application slot has no supporting atom", slot.ID))
+			continue
+		}
 		if strings.TrimSpace(slot.EvidenceQuote) == "" || !strings.Contains(squeeze(chunk.Text), squeeze(slot.EvidenceQuote)) {
 			slot.EvidenceQuote = atom.Quote
 			contract.PreflightChanges = append(contract.PreflightChanges, fmt.Sprintf("repair %s: use atom %s exact quote", slot.ID, atom.ID))
@@ -113,9 +137,6 @@ func PreflightCoverageContract(contract CoverageContract, graph *EvidenceGraph, 
 }
 
 func shouldDowngradeCalculation(atom EvidenceAtom) bool {
-	if !strings.EqualFold(strings.TrimSpace(atom.Relation), "definition") {
-		return false
-	}
 	return !containsConcreteNumber(atom.Claim) && !containsConcreteNumber(atom.Quote)
 }
 
@@ -257,6 +278,115 @@ func LessonContext(lesson Lesson, graph *EvidenceGraph, chunks []Chunk) []Chunk 
 	return limited
 }
 
+// RankContextChunks places the exact chunks selected by the coverage contract
+// before incidental graph context. The set still receives the same bounded
+// evidence pool, but the rune cap now spends its budget on the claims the
+// writer is actually required to answer.
+func RankContextChunks(chunks []Chunk, contract CoverageContract) []Chunk {
+	if len(chunks) < 2 || len(contract.Slots) == 0 {
+		return chunks
+	}
+	priority := map[string]int{}
+	next := 0
+	for _, slot := range contract.Slots {
+		for _, id := range slot.SourceChunkIDs {
+			if _, ok := priority[id]; !ok {
+				priority[id] = next
+				next++
+			}
+		}
+	}
+	ordered := append([]Chunk(nil), chunks...)
+	sort.SliceStable(ordered, func(i, j int) bool {
+		pi, iok := priority[ordered[i].ID]
+		pj, jok := priority[ordered[j].ID]
+		if iok != jok {
+			return iok
+		}
+		if iok && pi != pj {
+			return pi < pj
+		}
+		return false
+	})
+	return ordered
+}
+
+// SlotLocalContextChunks narrows a broad lesson context to the exact chunks
+// cited by the contract plus a small typed-neighbor fringe. The packet keeps
+// the raw chunk for quote verification, while the compiled atoms carry the
+// claim vocabulary. Unrelated lesson chunks are not useful generation
+// context; they mainly create lost-in-the-middle competition.
+func SlotLocalContextChunks(chunks []Chunk, graph *EvidenceGraph, contract CoverageContract) []Chunk {
+	if graph == nil || len(contract.Slots) == 0 || len(chunks) < 2 {
+		return chunks
+	}
+	exact := map[string]bool{}
+	selectedConcepts := map[string]bool{}
+	for _, slot := range contract.Slots {
+		for _, chunkID := range slot.SourceChunkIDs {
+			exact[chunkID] = true
+		}
+		for _, atomID := range append([]string{slot.AtomID}, slot.SupportAtomIDs...) {
+			for _, atom := range graph.Atoms {
+				if atom.ID != atomID {
+					continue
+				}
+				for _, conceptID := range atom.ConceptIDs {
+					selectedConcepts[conceptID] = true
+				}
+			}
+		}
+	}
+	neighborConcepts := map[string]bool{}
+	for _, edge := range graph.Edges {
+		if selectedConcepts[edge.From] {
+			neighborConcepts[edge.To] = true
+		}
+		if selectedConcepts[edge.To] {
+			neighborConcepts[edge.From] = true
+		}
+	}
+	for conceptID := range selectedConcepts {
+		neighborConcepts[conceptID] = true
+	}
+	neighborChunks := map[string]bool{}
+	for _, concept := range graph.Concepts {
+		if !neighborConcepts[concept.ID] {
+			continue
+		}
+		for _, chunkID := range concept.ChunkIDs {
+			neighborChunks[chunkID] = true
+		}
+	}
+	const maxChunks = 10
+	const maxRunes = 18_000
+	ordered := make([]Chunk, 0, len(chunks))
+	for _, chunk := range chunks {
+		if exact[chunk.ID] {
+			ordered = append(ordered, chunk)
+		}
+	}
+	for _, chunk := range chunks {
+		if exact[chunk.ID] || !neighborChunks[chunk.ID] {
+			continue
+		}
+		if len(ordered) >= maxChunks {
+			break
+		}
+		ordered = append(ordered, chunk)
+	}
+	used := 0
+	limited := ordered[:0]
+	for _, chunk := range ordered {
+		if len(limited) > 0 && used+RuneLen(chunk.Text) > maxRunes && !exact[chunk.ID] {
+			continue
+		}
+		limited = append(limited, chunk)
+		used += RuneLen(chunk.Text)
+	}
+	return limited
+}
+
 // BuildCoverageContract converts compiled atoms into a small, varied set
 // contract without asking a second planner to invent free-text targets. It
 // prefers distinct claims/relations and cycles through available reasoning
@@ -296,6 +426,15 @@ func buildCoverageContract(lesson Lesson, graph *EvidenceGraph, contextChunks []
 			continue
 		}
 		atoms = append(atoms, atom)
+	}
+	if requiredSkill == "application" && requiredDifficulty == "hard" {
+		withSupport := make([]EvidenceAtom, 0, len(atoms))
+		for _, atom := range atoms {
+			if supportingAtomIndex(atom, atoms, nil) >= 0 {
+				withSupport = append(withSupport, atom)
+			}
+		}
+		atoms = withSupport
 	}
 
 	sort.SliceStable(atoms, func(i, j int) bool {
@@ -348,10 +487,29 @@ func buildCoverageContract(lesson Lesson, graph *EvidenceGraph, contextChunks []
 				}
 			}
 		}
+		supportIDs := []string(nil)
+		if requiredSkill == "application" && requiredDifficulty == "hard" {
+			supportIDs = supportingAtomIDs(atom, atoms, usedAtoms)
+		}
+		if requiredSkill == "application" && requiredDifficulty == "hard" && len(supportIDs) == 0 {
+			continue
+		}
+		for _, supportID := range supportIDs {
+			usedAtoms[supportID] = true
+		}
+		sourceChunkIDs := []string{atom.ChunkID}
+		for _, supportID := range supportIDs {
+			for _, candidate := range atoms {
+				if candidate.ID == supportID && !containsString(sourceChunkIDs, candidate.ChunkID) {
+					sourceChunkIDs = append(sourceChunkIDs, candidate.ChunkID)
+				}
+			}
+		}
 		contract.Slots = append(contract.Slots, CoverageSlot{
 			ID:             fmt.Sprintf("S%02d", len(contract.Slots)+1),
 			AtomID:         atom.ID,
-			SourceChunkIDs: []string{atom.ChunkID},
+			SupportAtomIDs: supportIDs,
+			SourceChunkIDs: sourceChunkIDs,
 			ConceptIDs:     append([]string(nil), atom.ConceptIDs...),
 			Skill:          skill,
 			Difficulty:     difficulty,
@@ -361,6 +519,84 @@ func buildCoverageContract(lesson Lesson, graph *EvidenceGraph, contextChunks []
 		})
 	}
 	return contract
+}
+
+func supportingAtomIDs(primary EvidenceAtom, atoms []EvidenceAtom, used map[string]bool) []string {
+	type candidate struct {
+		id    string
+		score int
+	}
+	candidates := make([]candidate, 0, len(atoms))
+	for i, atom := range atoms {
+		if atom.ID == primary.ID || (used != nil && used[atom.ID]) {
+			continue
+		}
+		score := 0
+		if atom.ChunkID == primary.ChunkID {
+			score += 40
+		}
+		if sharesConcept(primary.ConceptIDs, atom.ConceptIDs) {
+			score += 60
+		}
+		if strings.EqualFold(atom.Relation, primary.Relation) {
+			score -= 20
+		}
+		if supportsForm(atom, "application") || supportsForm(atom, "understanding") {
+			score += 10
+		}
+		candidates = append(candidates, candidate{id: atom.ID, score: score + (len(atoms) - i)})
+	}
+	sort.SliceStable(candidates, func(i, j int) bool { return candidates[i].score > candidates[j].score })
+	limit := 2
+	if len(candidates) < limit {
+		limit = len(candidates)
+	}
+	ids := make([]string, 0, limit)
+	for _, candidate := range candidates[:limit] {
+		ids = append(ids, candidate.id)
+	}
+	return ids
+}
+
+func supportingAtomIndex(primary EvidenceAtom, atoms []EvidenceAtom, used map[string]bool) int {
+	best := -1
+	bestScore := -1
+	for i, candidate := range atoms {
+		if candidate.ID == primary.ID || (used != nil && used[candidate.ID]) {
+			continue
+		}
+		score := 0
+		if candidate.ChunkID == primary.ChunkID {
+			score += 40
+		}
+		if sharesConcept(primary.ConceptIDs, candidate.ConceptIDs) {
+			score += 60
+		}
+		if strings.EqualFold(candidate.Relation, primary.Relation) {
+			score -= 20
+		}
+		if supportsForm(candidate, "application") || supportsForm(candidate, "understanding") {
+			score += 10
+		}
+		if score > bestScore {
+			best = i
+			bestScore = score
+		}
+	}
+	return best
+}
+
+func sharesConcept(left, right []string) bool {
+	seen := make(map[string]bool, len(left))
+	for _, id := range left {
+		seen[id] = true
+	}
+	for _, id := range right {
+		if seen[id] {
+			return true
+		}
+	}
+	return false
 }
 
 func coverageDirectiveTargets(directive string, forceCalc bool) (skill, difficulty string) {
@@ -431,6 +667,9 @@ func RepairQuestionProvenance(q Question, contract CoverageContract, graph *Evid
 	q.EvidenceAtomID = matched.ID
 	q.EvidenceChunkID = matched.ChunkID
 	q.ChunkID = matched.ChunkID
+	if strings.TrimSpace(q.Operation) == "" {
+		q.Operation = slot.Operation
+	}
 	return q
 }
 
@@ -519,6 +758,20 @@ func relationPriority(relation string) int {
 func supportsForm(atom EvidenceAtom, form string) bool {
 	for _, candidate := range atom.QuestionForms {
 		if strings.EqualFold(strings.TrimSpace(candidate), form) {
+			if strings.EqualFold(strings.TrimSpace(form), "calculation") && shouldDowngradeCalculation(atom) {
+				continue
+			}
+			return true
+		}
+	}
+	// Hosted models often under-label the usable reasoning forms while still
+	// identifying the relation correctly. A causal/conditional/sequence claim
+	// can support a new-scenario application question even when the optional
+	// question_forms array says only recall or understanding. Keep the fallback
+	// narrow; calculation still requires an explicit equation/numeric signal.
+	if strings.EqualFold(strings.TrimSpace(form), "application") {
+		switch strings.ToLower(strings.TrimSpace(atom.Relation)) {
+		case "causal", "sequence", "condition", "comparison", "direction", "example":
 			return true
 		}
 	}
@@ -582,6 +835,26 @@ func gateSetCoverage(q Question, contract CoverageContract, byChunk map[string]C
 		res.Reason = fmt.Sprintf("slot %s requires skill %s, got %s", slot.ID, slot.Skill, q.Skill)
 		return res
 	}
+	if slot.Operation != "" && !strings.EqualFold(strings.TrimSpace(q.Operation), strings.TrimSpace(slot.Operation)) {
+		res.Reason = fmt.Sprintf("slot %s requires operation %s, got %s", slot.ID, slot.Operation, q.Operation)
+		return res
+	}
+	if strings.EqualFold(slot.Skill, "application") && (strings.EqualFold(slot.Difficulty, "medium") || strings.EqualFold(slot.Difficulty, "hard")) {
+		if strings.TrimSpace(q.ChangedCondition) == "" {
+			res.Reason = fmt.Sprintf("%s application slot %s must state the changed condition", slot.Difficulty, slot.ID)
+			return res
+		}
+	}
+	if strings.EqualFold(slot.Skill, "application") && strings.EqualFold(slot.Difficulty, "hard") {
+		if !sameIDs(q.SupportingAtomIDs, slot.SupportAtomIDs) {
+			res.Reason = fmt.Sprintf("hard application slot %s requires supporting atoms %v, got %v", slot.ID, slot.SupportAtomIDs, q.SupportingAtomIDs)
+			return res
+		}
+		if !validReasoningSteps(q.ReasoningSteps) {
+			res.Reason = fmt.Sprintf("hard application slot %s needs two distinct reasoning steps", slot.ID)
+			return res
+		}
+	}
 	if slot.EvidenceQuote != "" {
 		quote := squeeze(q.SourceQuote)
 		atomQuote := squeeze(slot.EvidenceQuote)
@@ -593,6 +866,37 @@ func gateSetCoverage(q Question, contract CoverageContract, byChunk map[string]C
 	res.Pass = true
 	res.Reason = fmt.Sprintf("slot %s uses atom %s from chunk %s", slot.ID, q.EvidenceAtomID, q.EvidenceChunkID)
 	return res
+}
+
+func sameIDs(left, right []string) bool {
+	if len(left) != len(right) {
+		return false
+	}
+	seen := make(map[string]bool, len(left))
+	for _, id := range left {
+		seen[id] = true
+	}
+	for _, id := range right {
+		if !seen[id] {
+			return false
+		}
+	}
+	return true
+}
+
+func validReasoningSteps(steps []string) bool {
+	if len(steps) < 2 {
+		return false
+	}
+	seen := map[string]bool{}
+	for _, step := range steps {
+		key := strings.ToLower(squeeze(step))
+		if len([]rune(key)) < 8 || seen[key] {
+			return false
+		}
+		seen[key] = true
+	}
+	return true
 }
 
 // GateSetCoverage is the set-level coverage check consumed by the generation

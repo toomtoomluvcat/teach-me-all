@@ -69,3 +69,14 @@ func TestCalculationUnmarshalRejectsNumberWithUnits(t *testing.T) {
 		t.Fatal("unmarshal calculation succeeded for a number with units")
 	}
 }
+
+func TestQuestionUnmarshalNormalizesKeyedDemandLists(t *testing.T) {
+	var q Question
+	err := json.Unmarshal([]byte(`{"stem":"Which result?","reasoning_steps":{"1":"apply the rule","2":"compare the outcome"},"distractor_reasons":{"A":"wrong assumption","B":"missed condition","C":"wrong operation"}}`), &q)
+	if err != nil {
+		t.Fatalf("unmarshal keyed demand lists: %v", err)
+	}
+	if len(q.ReasoningSteps) != 2 || len(q.DistractorReasons) != 3 {
+		t.Fatalf("normalized demand lists = %#v", q)
+	}
+}

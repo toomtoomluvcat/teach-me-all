@@ -95,7 +95,11 @@ func BuildOutline(ctx context.Context, chunks []Chunk, d Deps) (*Outline, []Chun
 			return nil, nil, fmt.Errorf("graph compilation requested but generator has no evidence compiler")
 		}
 		d.Log.report("outline/compile", 0, 1, "splitting source into atomic evidence")
-		compiled, err := compiler.CompileEvidence(ctx, graph, chunks)
+		compileChunks := chunks
+		if !d.KeepAllTopics {
+			compileChunks = contentChunks(chunks, perChunk)
+		}
+		compiled, err := compiler.CompileEvidence(ctx, graph, compileChunks)
 		if err != nil {
 			return nil, nil, fmt.Errorf("compile evidence graph: %w", err)
 		}
@@ -175,6 +179,19 @@ func BuildOutline(ctx context.Context, chunks []Chunk, d Deps) (*Outline, []Chun
 	}
 
 	return outline, out, nil
+}
+
+func contentChunks(chunks []Chunk, topics []ChunkTopics) []Chunk {
+	if len(chunks) == 0 || len(topics) == 0 {
+		return nil
+	}
+	out := make([]Chunk, 0, len(chunks))
+	for i, chunk := range chunks {
+		if i < len(topics) && topics[i].Teaches() {
+			out = append(out, chunk)
+		}
+	}
+	return out
 }
 
 func attachConceptToLesson(conceptID, lessonID string, assigned map[string]string, lessons map[string]*Lesson) {

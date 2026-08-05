@@ -1,6 +1,6 @@
 # Handoff — exam-quality prototype
 
-อัปเดต 2026-08-06 บน branch `prototype/exam-quality` ที่ `48667e4`.
+อัปเดต 2026-08-06 บน branch `prototype/exam-quality`.
 เอกสารนี้เป็นสถานะปัจจุบันและแผนทดลองถัดไป; ผลวัดเก่าให้อ่านจาก
 `backend/prototype-exam-quality/VERDICT.md` โดยระวังว่าแถว judge เก่าบางส่วนไม่ใช่
 runtime path ปัจจุบันแล้ว
@@ -24,6 +24,94 @@ PDF → Docling extraction → chunks
   สำหรับการทดลองเฉพาะกิจ
 - cleanup/runtime refactor ผ่าน `go test`, `go vet`, `go build`, Python self-test,
   Ruff และ Pyright แล้ว
+
+## สถานะหลังรอบ research + cross-subject benchmark
+
+รอบนี้ลงมือแก้ P0 ที่คุ้ม token สูงสุดแล้ว โดยไม่เพิ่ม planner หรือ per-question
+judge call ใหม่:
+
+- graph compiler ส่งเฉพาะ content chunks เมื่ออยู่ในโหมดปกติ และมี fallback
+  แบ่ง batch เฉพาะเมื่อ response แตก/ถูกตัด
+- set generation ใช้ **slot-local evidence packet**: atom หลัก, support atoms
+  ที่จำเป็น และ raw chunks ของ slot ก่อน neighbor ที่เกี่ยวข้อง
+- contract จัดอันดับ source chunks ตาม slot/atom ก่อน document order และ gate
+  `Operation` ให้ตรงกับ slot
+- application medium/hard ต้องระบุ `changed_condition` และ distractor rationale;
+  hard ต้องมี support atom และ reasoning steps อย่างน้อย 2 ขั้น
+- calculation ผูกกับ evidence ของ slot, ตรวจตัวเลขด้วย calculator และไม่รับ
+  คำตอบ symbolic ที่ยังไม่ได้แปลงเป็นค่าตัวเลขใน choice
+- DeepSeek ที่เห็น object แทน array ใน metadata ถูก normalize แบบ deterministic
+  ก่อนเข้า gate; ไม่ได้ลดความเข้มของ gate
+
+ความหมายของตัวเลขในรายงานใหม่แยกเป็น `drafts` กับ `ship-ready` แล้ว: `drafts`
+รวม output จาก first attempt และ bounded repair; draft ที่เกิน/ไม่ตรง contract
+จะยังนับเป็น draft แต่ไม่นับเป็นข้อพร้อมใช้ จึงไม่เอา pass rate ของ gate ไปอ้าง
+เป็น semantic quality
+
+## ผล hard/application ล่าสุดหลายวิชา
+
+เป็น targeted rerun หลังเพิ่ม support atoms; ใช้ DeepSeek, candidate เดียว,
+parallel 1 และอ่าน failure rows จริง ไม่ใช่ดู gate summary อย่างเดียว:
+
+| วิชา | ship-ready / target | raw drafts | ผลที่อ่านได้ |
+|---|---:|---:|---|
+| คณิตศาสตร์ | 3/3 | 3 | hard มี linked operations หลายขั้น |
+| ฟิสิกส์ | 3/3 | 3 | มีการเปลี่ยนเงื่อนไขและตัดสินหลายขั้น |
+| ชีววิทยา | 2/2 | 2 | ใช้ causal/conditional evidence ได้ครบ |
+| จิตวิทยา | 3/3 | 3 | application ผูกกับ source relationship |
+| สังคมวิทยา | 3/3 | 4 | 1 draft ตกเพราะอ้าง “passage” ที่ผู้สอบไม่เห็น; operation enum กัน failure เดิมได้ |
+| เศรษฐศาสตร์ | 3/3 | 5 | 2 draft ตกเพราะ quote ไม่ verbatim/operation ไม่ตรง contract |
+
+จุดสำคัญคือ sociology/economics ไม่ควรสรุปว่า “คุณภาพ 60%”: สามข้อที่อยู่ใน
+target และผ่านเป็น ship-ready ทั้งหมด แต่ generation efficiency ยังเสีย draft
+สองข้อ และควรลด failure แบบนี้ในรอบถัดไปด้วย prompt/repair ที่เฉพาะจุด
+
+Calculation targeted checks: คณิตศาสตร์ 3/3 และสังคมวิทยา 3/3 numeric verified;
+ฟิสิกส์ 1/2 เพราะอีกข้อให้คำตอบเป็น radical (`20√3 m`) ซึ่งอาจถูกทางคณิตศาสตร์
+แต่ไม่ตรง product contract ที่ต้องการค่าตัวเลขใน choice — gate จึงกันไว้โดยตั้งใจ
+
+## ตอบคำถามเรื่องการอ่านข้อสอบ
+
+gate ไม่ใช่ semantic grader และผมไม่ควรมั่นใจใน gate ขนาดนั้น: gate ตอบได้ว่า
+“ข้อสอบทำตาม contract ขั้นต่ำหรือไม่” เช่น quote ตรงไหม, operation ตรงไหม,
+ตัวเลขคำนวณได้ไหม, stem อ้างสิ่งที่มองไม่เห็นไหม แต่ตอบไม่ได้เต็มที่ว่า
+“ยากจริงไหม”, “ตัวลวงดีไหม” หรือ “นักเรียนต้องคิดกี่ขั้น”
+
+รอบนี้จึงอ่าน hard questions ที่ผ่านและ failure rows ของทั้งหกวิชาโดยตรง และใช้
+semantic quality reviewer เป็น advisory เท่านั้น. งาน benchmark ต่อไปควรรายงาน
+สามชั้นแยกกัน:
+
+1. `generated drafts` — model ส่งอะไรมา รวมข้อเกินและข้อที่ไม่ผ่าน
+2. `ship-ready QC` — deterministic acceptance ตาม source/contract
+3. `semantic review` — groundedness, correctness, distractor quality และ
+   difficulty fit; ถ้าจะใช้เป็นหลักฐานอิสระต้องเปลี่ยน reviewer/model หรือ human
+   sample ไม่ใช่ให้ generator ตัดสินตัวเอง
+
+## Dynamic workflow ที่ใช้ต่อ
+
+```text
+extract → extraction diagnostics → content chunks
+  → graph/outline compile → lesson + coverage slots
+  → preflight contract → slot-local evidence packet
+  → one set-generation call → deterministic QC
+  → repair เฉพาะ missing/failed slots → report drafts/QC/semantic แยกกัน
+```
+
+ลำดับนี้เป็น subject-agnostic; prompt หลักไม่ผูก biology/physics แล้ว. ข้อยกเว้น
+คือ legacy benchmark ที่ไม่มี lesson hint ซึ่งยังคงมี physics fixture เพื่อกัน
+regression ของชุดเก่า ไม่ใช่ข้อจำกัดของ runtime prompt ใหม่
+
+## สิ่งที่ยังไม่ควรทำ
+
+- ไม่เพิ่ม per-question semantic judge หรือ planner ใหม่ตอนนี้: เพิ่ม call โดยตรง
+  และไม่ได้แก้ root cause ที่เห็นใน failure rows
+- ไม่ขยับ DeepSeek compile จาก 4 เป็น 8 chunks: A/B เดิมลด atom/chunk coverage
+  แม้ JSON ยัง valid; 4 chunks / 8,000 runes ยังเป็น default
+- ไม่ผ่อน quote/operation/stem gate เพื่อดันตัวเลข: failures ล่าสุดแสดงว่า gate
+  กำลังกันข้อที่ไม่พร้อมใช้จริง
+
+รายละเอียด research และ source links อยู่ที่
+`docs/research/exam-quality-research-2026-08.md`
 
 ## ผลวัดล่าสุดที่ต้องถือเป็น baseline
 
@@ -49,17 +137,16 @@ PDF → Docling extraction → chunks
 
 ### จุดที่ยังไม่ถึงเป้าหมาย
 
-- compile รับ `chunks` ทั้งหมด แม้ map จะคัด apparatus/page furniture ออกแล้ว
-  จึงเสีย input tokens กับเนื้อหาที่ไม่มีสิทธิ์สร้างข้อสอบ
+- compile ปกติรับเฉพาะ content chunks; โหมด `KeepAllTopics` ยังรักษา behavior เดิม
+  สำหรับ regression และกรณีที่ต้องการ audit ทุกหน้า
 - edges ปัจจุบันเป็น `co_occurs`/`follows` จาก concept map ไม่ใช่ semantic
   relation ระหว่าง atoms
-- `CoverageSlot` ชี้ atom เดียวต่อข้อ และ `Operation` ยังไม่ได้ถูก gate ตรวจ
-  ดังนั้น graph ยังไม่ได้บังคับ reasoning path ที่ประกอบจาก 2+ atoms
-- `LessonContext` เดิน graph 2 hops แล้วขยายกว้างมาก ก่อนตัดเหลือไม่เกิน 24
-  chunks ตาม document order: ใน artifact เดียวกัน L01 ขยาย 30→90 chunks,
-  L03 50→106 และ L07 12→68 ก่อน cap
-- ผลคือ graph มี leverage สูงด้าน provenance แต่ leverage ต่ำด้านการคิดข้ามบท;
-  context ที่กว้างยังทำให้ writer มีหลักฐานอื่นให้ drift ไปหาได้
+- `CoverageSlot` มี support atoms สำหรับ hard application และ `Operation` ถูก gate
+  ให้ตรงกับ slot; graph ยังไม่ได้เป็น semantic multi-hop graph เต็มรูปแบบ
+- `LessonContext` เดิน graph 2 hops แล้วขยายกว้างมากได้เหมือนเดิม แต่ก่อน set
+  generation จะถูกตัดเป็น slot-local packet ไม่เกิน 10 chunks/18,000 runes
+- ผลใหม่คือ graph ยังทำหน้าที่ routing/provenance เป็นหลัก ส่วน raw chunk ทำหน้าที่
+  เป็นหลักฐานสำหรับ quote; การคิดข้ามบทที่ลึกกว่านี้ยังเป็นงานถัดไป
 
 ## DeepSeek graph-compile batching audit
 
@@ -102,9 +189,9 @@ claim มากเกินไป แม้ syntax จะยังถูกต�
 ให้ใช้ 4 chunks / 8k ต่อไป แล้วไปทำ P0 slot-local evidence packet และ deterministic
 context ranking ซึ่งมีโอกาสลด token ของ writer โดยไม่ลด provenance coverage
 
-## ลำดับปรับคุณภาพ โดยเพิ่ม token น้อยที่สุด
+## ลำดับปรับคุณภาพ — สถานะ
 
-### P0 — ไม่เพิ่ม LLM call
+### P0 — ทำแล้ว โดยไม่เพิ่ม LLM call
 
 1. **Slot-local evidence packet** — ใน set prompt ส่ง atom/quote/chunk ที่ slot
    เลือกเป็นหลัก และส่ง neighbor เฉพาะที่เกี่ยวกับ relation ของ slot แทนการส่ง
@@ -122,7 +209,7 @@ context ranking ซึ่งมีโอกาสลด token ของ writer �
    แทนการรวมข้อความของทุก application/calculation chunk เป็นก้อนเดียว ลดค่า
    facts ที่ไม่เกี่ยวและลด prompt leakage โดยไม่เพิ่ม call
 
-### P1 — ใช้ call เดิมให้คุ้มขึ้น
+### P1 — รอบถัดไป
 
 6. ปรับ `QualityPrompt` ให้ reviewer ตรวจ “claimed key” จาก stem/choices/source
    อย่างอิสระมากขึ้น และให้ `setCandidateScore` ใช้ semantic score เมื่อมีหลาย
@@ -134,10 +221,11 @@ context ranking ซึ่งมีโอกาสลด token ของ writer �
 
 ใช้ source/provider/pages/budget เดิมและ `set-candidates=1` ก่อน เพื่อแยกผล prompt:
 
-1. baseline ปัจจุบัน
-2. slot-local evidence packet
-3. slot-local + deterministic context ranking
-4. เพิ่ม operation/depth QC
+1. รัน baseline เดิมเทียบกับ current packet/ranking บน source เดียวกัน
+2. วัด draft waste แยก first attempt กับ bounded repair
+3. อ่าน hard/easy/medium ตัวอย่างจริงข้ามวิชา ไม่ดู gate summary อย่างเดียว
+4. เพิ่ม independent semantic/human calibration เฉพาะเมื่อ failure ยังเป็น
+   genuine difficulty หรือ distractor quality ไม่ใช่ provenance/contract
 
 เก็บทุกครั้ง: provider calls, input/output tokens, accepted rate, quote/coverage
 failures, จำนวน application ที่เป็น changed situation จริง และจำนวน hard ที่มี

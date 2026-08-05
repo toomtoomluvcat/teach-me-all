@@ -30,6 +30,7 @@ const (
 	GateUnit           = model.GateUnit
 	GateDistinct       = model.GateDistinct
 	GateCoverage       = model.GateCoverage
+	GateDemand         = model.GateDemand
 
 	ChoiceSupported   = model.ChoiceSupported
 	ChoiceUnsupported = model.ChoiceUnsupported

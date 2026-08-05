@@ -273,15 +273,18 @@ func QuestionSetSystem() string {
 You are writing a complete assessment set, not independent questions. The
 coverage contract is authoritative. Use each slot at most once and do not
 reuse the same claim, relationship, or scenario with different numbers. Every
-question must return its exact coverage_slot_id, evidence_atom_id, and
-evidence_chunk_id from the supplied contract/context. A quote being present is
+question must return its exact coverage_slot_id, evidence_atom_id, operation,
+supporting_atom_ids, and evidence_chunk_id from the supplied contract/context. A quote being present is
 not enough: it must support the answer target. If a slot is not supported by
 its atom and chunk, omit that slot rather than substituting a repeated one. For
 a slot that you do return, copy the slot's ID, atom ID, and chunk ID as one
-matched tuple; never mix IDs from different slots. Process slots in the listed
+matched tuple; never mix IDs from different slots. Copy the slot's operation
+label exactly; it is a contract value, not a free-text explanation. Process slots in the listed
 order, and before returning JSON check that every returned question has a
 non-empty ID tuple, the exact slot skill/difficulty, and a verbatim quote from
-that slot's chunk. A retry request may list only missing slots: do not repeat
+that slot's chunk. For medium or hard application, fill changed_condition and
+distractor_reasons; for hard application, copy every supporting atom ID and
+provide at least two distinct reasoning_steps. A retry request may list only missing slots: do not repeat
 questions that already passed. For a calculation slot, set skill to exactly calculation and make
 calculation.expression/expected mandatory. For every other slot, set skill to
 exactly the slot skill and omit calculation unless arithmetic is necessary. Do
@@ -316,9 +319,19 @@ func questionSetSchema(forceCalc bool, contract *CoverageContract) map[string]an
 		}
 		return ""
 	}))
-	properties["operation"] = str("short description of the reasoning operation used")
+	properties["operation"] = contractIDSchema("copy the exact operation label from the assigned coverage slot", contractOperations(contract))
+	properties["supporting_atom_ids"] = map[string]any{
+		"type": "array", "maxItems": 3,
+		"items": contractIDSchema("exact supporting atom ID from the assigned hard slot", supportAtomIDs(contract)),
+	}
 	required := append([]string{}, item["required"].([]string)...)
 	required = append(required, "coverage_slot_id", "evidence_atom_id", "evidence_chunk_id", "operation")
+	if contractNeedsDemand(contract) {
+		required = append(required, "reasoning_steps", "changed_condition", "distractor_reasons")
+	}
+	if contractNeedsHardSupport(contract) {
+		required = append(required, "supporting_atom_ids")
+	}
 	item["required"] = required
 	return schema
 }
@@ -346,6 +359,51 @@ func contractIDs(contract *CoverageContract, pick func(CoverageSlot) string) []s
 	return values
 }
 
+func contractOperations(contract *CoverageContract) []string {
+	return contractIDs(contract, func(slot CoverageSlot) string { return slot.Operation })
+}
+
+func supportAtomIDs(contract *CoverageContract) []string {
+	if contract == nil {
+		return nil
+	}
+	seen := map[string]bool{}
+	ids := make([]string, 0)
+	for _, slot := range contract.Slots {
+		for _, id := range slot.SupportAtomIDs {
+			if id != "" && !seen[id] {
+				seen[id] = true
+				ids = append(ids, id)
+			}
+		}
+	}
+	return ids
+}
+
+func contractNeedsDemand(contract *CoverageContract) bool {
+	if contract == nil {
+		return false
+	}
+	for _, slot := range contract.Slots {
+		if strings.EqualFold(slot.Skill, "application") && (strings.EqualFold(slot.Difficulty, "medium") || strings.EqualFold(slot.Difficulty, "hard")) {
+			return true
+		}
+	}
+	return false
+}
+
+func contractNeedsHardSupport(contract *CoverageContract) bool {
+	if contract == nil {
+		return false
+	}
+	for _, slot := range contract.Slots {
+		if strings.EqualFold(slot.Skill, "application") && strings.EqualFold(slot.Difficulty, "hard") && len(slot.SupportAtomIDs) > 0 {
+			return true
+		}
+	}
+	return false
+}
+
 func QuestionSetPrompt(lesson Lesson, graph *EvidenceGraph, chunks []Chunk, contract CoverageContract, feedback []RejectedDraft, forceCalc bool) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "Lesson: %s\n\n", lesson.Title)
@@ -357,15 +415,12 @@ func QuestionSetPrompt(lesson Lesson, graph *EvidenceGraph, chunks []Chunk, cont
 	}
 	b.WriteString("Coverage contract (one slot per distinct question):\n")
 	for _, slot := range contract.Slots {
-		fmt.Fprintf(&b, "- %s atom=%s chunk=%s skill=%s difficulty=%s operation=%s target=%s evidence_quote=%q\n",
-			slot.ID, slot.AtomID, strings.Join(slot.SourceChunkIDs, ","), slot.Skill, slot.Difficulty, slot.Operation, slot.Target, slot.EvidenceQuote)
+		fmt.Fprintf(&b, "- %s atom=%s support_atoms=%s chunk=%s skill=%s difficulty=%s operation=%s target=%s evidence_quote=%q\n",
+			slot.ID, slot.AtomID, strings.Join(slot.SupportAtomIDs, ","), strings.Join(slot.SourceChunkIDs, ","), slot.Skill, slot.Difficulty, slot.Operation, slot.Target, slot.EvidenceQuote)
 	}
-	b.WriteString("\nCompiled evidence atoms:\n")
-	if graph != nil {
-		for _, atom := range graph.Atoms {
-			if !containsString(contract.ContextChunkIDs, atom.ChunkID) {
-				continue
-			}
+	if atoms := contractEvidenceAtoms(graph, contract); len(atoms) > 0 {
+		b.WriteString("\nEvidence packet for the assigned slots:\n")
+		for _, atom := range atoms {
 			fmt.Fprintf(&b, "- %s chunk=%s concepts=%s relation=%s claim=%s evidence_quote=%q\n", atom.ID, atom.ChunkID, strings.Join(atom.ConceptIDs, ","), atom.Relation, atom.Claim, atom.Quote)
 		}
 	}
@@ -380,7 +435,8 @@ func QuestionSetPrompt(lesson Lesson, graph *EvidenceGraph, chunks []Chunk, cont
 	b.WriteString("1. Work through the slots in order; use one output object for one slot.\n")
 	b.WriteString("2. Copy the exact slot/atom/chunk ID tuple from that row; never invent or mix IDs.\n")
 	b.WriteString("3. Copy the row skill and difficulty exactly. If the row is unsupported, omit only that row.\n")
-	b.WriteString("4. Before returning, verify every source_quote is verbatim in its cited chunk and every ID is non-empty.\n\n")
+	b.WriteString("4. For medium or hard application, fill changed_condition; for hard application, copy every support atom ID and provide at least two distinct reasoning_steps. For medium and hard questions, provide one short distractor_reason per wrong choice.\n")
+	b.WriteString("5. Before returning, verify every source_quote is verbatim in its cited chunk and every ID is non-empty.\n\n")
 	fmt.Fprintf(&b, "Write up to %d questions, one for each supported slot. Keep the set varied and return empty only for an unsupported slot. ", len(contract.Slots))
 	if forceCalc {
 		b.WriteString("Every returned question must be a calculation with a valid calculation expression.")
@@ -388,6 +444,34 @@ func QuestionSetPrompt(lesson Lesson, graph *EvidenceGraph, chunks []Chunk, cont
 		b.WriteString("For slots marked calculation, calculation.expression and calculation.expected are mandatory. Use calculation only when arithmetic is necessary and supported by the atom.")
 	}
 	return b.String()
+}
+
+// contractEvidenceAtoms keeps the writer's claim vocabulary local to the
+// slots it must fill. The surrounding source chunks remain available for
+// cross-context reasoning, but unrelated atom rows no longer compete for
+// attention or input tokens.
+func contractEvidenceAtoms(graph *EvidenceGraph, contract CoverageContract) []EvidenceAtom {
+	if graph == nil || len(contract.Slots) == 0 {
+		return nil
+	}
+	byID := make(map[string]EvidenceAtom, len(graph.Atoms))
+	for _, atom := range graph.Atoms {
+		byID[atom.ID] = atom
+	}
+	seen := map[string]bool{}
+	atoms := make([]EvidenceAtom, 0, len(contract.Slots))
+	for _, slot := range contract.Slots {
+		ids := append([]string{slot.AtomID}, slot.SupportAtomIDs...)
+		for _, id := range ids {
+			atom, ok := byID[id]
+			if !ok || seen[atom.ID] {
+				continue
+			}
+			seen[atom.ID] = true
+			atoms = append(atoms, atom)
+		}
+	}
+	return atoms
 }
 
 // --- pass 2: question generation --------------------------------------------
@@ -399,7 +483,7 @@ func QuestionSchema(forceCalc bool) map[string]any {
 	calc := obj(map[string]any{
 		"expression": str("the arithmetic to solve this question, as a plain expression using numbers, + - * / ^, parentheses, decimal points, pi, and only these functions: sin, cos, tan, sqrt, abs, exp, ln. No variables or units. Trigonometric arguments are in radians. Example: (1200*0.07)/12 or 20*sin(30*pi/180)"),
 		"expected":   map[string]any{"type": "number", "description": "the value that expression produces"},
-		"unit":       str("the physical unit of the answer, such as m/s^2 or N; empty for a dimensionless ratio or coefficient"),
+		"unit":       str("the unit or notation used for the answer when the source provides one; empty for a dimensionless result or when no unit applies"),
 	}, "expression", "expected")
 
 	question := map[string]any{
@@ -409,6 +493,19 @@ func QuestionSchema(forceCalc bool) map[string]any {
 		"source_quote": str("an exact contiguous substring copied CHARACTER FOR CHARACTER from the passage that makes the correct answer true; prefer a complete sentence, but a shorter exact span is allowed. Must appear exactly."),
 		"difficulty":   enum("honest reasoning load: easy=one direct inference or operation, medium=one relationship with a meaningful distinction, hard=two linked inferences or competing constraints", "easy", "medium", "hard"),
 		"skill":        enum("honest reasoning mode: recall=fact, understanding=interpretation, application=new situation using a source relationship, calculation=numerical computation", "recall", "understanding", "application", "calculation"),
+		"reasoning_steps": map[string]any{
+			"type": "array", "maxItems": 4,
+			"items": str("one short, concrete reasoning step; required for hard and useful for medium"),
+		},
+		"changed_condition": str("the specific value, entity, constraint, exception, or context changed from the cited source; required for application medium/hard"),
+		"distractor_reasons": map[string]any{
+			"type": "array", "maxItems": 3,
+			"items": str("why a partially informed student might choose this wrong option; one short reason per distractor"),
+		},
+		"supporting_atom_ids": map[string]any{
+			"type": "array", "maxItems": 3,
+			"items": str("exact support atom ID from the assigned hard slot"),
+		},
 		"choices": map[string]any{
 			"type":     "array",
 			"minItems": 4,
@@ -438,9 +535,9 @@ func QuestionSchema(forceCalc bool) map[string]any {
 const questionSystem = `You are a domain-agnostic assessment writer. The source may
 teach any subject: science, mathematics, medicine, engineering, history,
 language, economics, or something else. Infer the domain, entities, notation,
-units, and relationships from the supplied passage. Never apply a biology-only
-template or import facts, vocabulary, or question patterns from a different
-subject.
+units, and relationships from the supplied passage. Never apply a
+subject-specific template or import facts, vocabulary, or question patterns
+from a different subject.
 
 The passage is the only evidence. A good question is self-contained for the
 student, but its answer must depend on a specific fact, relationship, sequence,
@@ -455,7 +552,7 @@ Choose honest labels:
 - application: apply a source relationship to a genuinely new situation or
   changed values. It must require the student to predict, choose, compare, or
   calculate an outcome in that situation. A stem that only asks for a name,
-  definition, force, component, label, or unchanged property is recall or
+definition, named part, label, or unchanged property is recall or
   understanding, not application. A stem that only asks "what is", "which is",
   or repeats a source example is not application unless the student must use the
   relationship to decide something new.
@@ -468,6 +565,18 @@ Choose honest labels:
   use at least two given inputs or conditions and make the student carry out at
   least two linked transformations or decisions. If one sentence of the source
   or one unchanged relationship answers it, it is not hard.
+
+Compact assessment contract:
+- For application medium or hard, changed_condition must name the exact
+  material condition changed from the cited source (value, entity, constraint,
+  exception, or context). Do not call wording changes a changed condition.
+- For medium and hard, include one concise distractor_reason for each wrong
+  choice. Each reason must name a plausible but wrong assumption, not merely
+  say "incorrect".
+- For hard application, include at least two distinct reasoning_steps in order
+  and copy every supporting_atom_id assigned to the slot. The steps must be
+  necessary to reach the keyed answer; adding connective words to a one-step
+  explanation does not count.
 
 Hard requirements for every question:
 - The stem stands alone. Never point at invisible material with phrases such as
@@ -490,15 +599,23 @@ Hard requirements for every question:
 
 For application questions, include enough scenario facts for the student to use
 the source relationship, and make the explanation show the reasoning in order.
-For hard application, the explanation must expose at least two linked steps.
+For medium or hard application, fill the compact assessment contract fields;
+for hard application, the reasoning_steps must expose at least two necessary
+steps rather than merely adding connective words.
 
 For calculation questions:
 	- Put the arithmetic in calculation.expression using numbers, + - * / ^,
 	  parentheses, decimal points, pi, and only these functions: sin, cos, tan,
 	  sqrt, abs, exp, ln. Trigonometric arguments are in radians. No variables,
 	  units, or other functions. The expression is checked independently.
-- calculation.expected is a bare JSON number, not a string and not a unit.
-- The correct choice contains the computed number and unit when a unit exists.
+	- calculation.expected is a bare JSON number, not a string and not a unit.
+	- Copy the calculator value exactly into calculation.expected; do not round
+	  it. If the student-facing choice is rounded, label it as approximate and
+	  keep the exact expected value in the calculation object.
+	- The correct choice contains the computed number and unit when a unit exists.
+	- The correct choice contains a decimal or integer numeric approximation and
+	  the unit when a unit exists. Do not use radicals, variables, or symbolic
+	  expressions as the answer to a calculation slot.
 - Every input number comes from the passage or the stem; never invent hidden
   constants, conversions, or assumptions.
 
@@ -526,6 +643,7 @@ func QuestionPrompt(lesson Lesson, graph *EvidenceGraph, c Chunk, feedback []Rej
 	if directive := strings.TrimSpace(c.GenerationDirective); directive != "" {
 		s += "Target for this generation call (follow exactly if the passage supports it): " + directive + "\n\n"
 	}
+	s += "If the target is application at medium or hard difficulty, return changed_condition and one short distractor_reason for each wrong choice. For hard application, also return at least two distinct reasoning_steps.\n\n"
 	s += fmt.Sprintf("Passage (page %d):\n\n%s\n\n", c.Page, c.Text)
 	if len(feedback) > 0 {
 		s += rejectionMemoryBlock(feedback)

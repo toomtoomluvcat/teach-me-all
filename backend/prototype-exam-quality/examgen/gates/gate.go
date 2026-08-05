@@ -31,17 +31,25 @@ func quoteFloor(quote string) int {
 	for _, r := range quote {
 		if r >= '0' && r <= '9' {
 			digits++
-			if digits >= 2 {
-				return minNumericQuoteRunes
-			}
 		}
+	}
+	// A compact equation such as "6^3" or "2-8" is more specific than a
+	// prose fragment even when it is only a few runes long. Do not discard a
+	// good numeric item merely because PDF extraction made the evidence terse.
+	if digits >= 2 && strings.ContainsAny(quote, "=^*/+-×") {
+		return 3
+	}
+	if digits >= 2 {
+		return minNumericQuoteRunes
 	}
 	return minQuoteRunes
 }
 
-// arithmeticTolerance is relative; expressions producing money or physical
-// quantities get rounded by the model in the choice text.
+// arithmeticTolerance is relative. A small absolute allowance below accepts
+// ordinary three-decimal rounding for results >= 1 without making tiny
+// scientific-notation answers effectively uncheckable.
 const arithmeticTolerance = 1e-6
+const roundedAnswerTolerance = 5e-4
 
 // RunCheapGates runs everything Go can decide by itself. No model, no network,
 // microseconds.
@@ -52,7 +60,75 @@ func RunCheapGates(q Question, chunk Chunk, ev Evaluator) *GateReport {
 	rep.Results = append(rep.Results, gateQuote(q, chunk))
 	rep.Results = append(rep.Results, gateArithmetic(q, ev))
 	rep.Results = append(rep.Results, gateUnitCheck(q))
+	rep.Results = append(rep.Results, gateDemandContract(q))
 	return rep
+}
+
+// gateDemandContract is a compact deterministic check for the claimed
+// cognitive load. It does not prove the item is good; it blocks the cheaper
+// failure where a hard/application label has no explicit changed condition,
+// support steps, or distractor rationale at all.
+func gateDemandContract(q Question) GateResult {
+	res := GateResult{Gate: GateDemand, Deterministic: true}
+	difficulty := strings.ToLower(strings.TrimSpace(q.Difficulty))
+	skill := strings.ToLower(strings.TrimSpace(q.Skill))
+	if skill != "application" || (difficulty != "medium" && difficulty != "hard") {
+		res.Pass = true
+		res.Reason = "no medium/hard application demand contract required"
+		return res
+	}
+	if isGenericChangedCondition(q.ChangedCondition) {
+		res.Reason = "application demand contract is missing a specific changed condition"
+		return res
+	}
+	if len(q.DistractorReasons) != len(q.Choices)-1 {
+		res.Reason = fmt.Sprintf("application %s needs one distractor_reason per wrong choice, got %d for %d choices", difficulty, len(q.DistractorReasons), len(q.Choices)-1)
+		return res
+	}
+	for i, reason := range q.DistractorReasons {
+		if model.RuneLen(strings.TrimSpace(reason)) < 8 {
+			res.Reason = fmt.Sprintf("distractor_reason %d is too short to name a wrong assumption", i+1)
+			return res
+		}
+	}
+	if difficulty == "hard" && !validDemandSteps(q.ReasoningSteps) {
+		res.Reason = "hard application needs at least two distinct concrete reasoning_steps"
+		return res
+	}
+	res.Pass = true
+	res.Reason = fmt.Sprintf("%s application demand contract is present", difficulty)
+	return res
+}
+
+func validDemandSteps(steps []string) bool {
+	if len(steps) < 2 {
+		return false
+	}
+	seen := map[string]bool{}
+	for _, step := range steps {
+		key := strings.ToLower(squeeze(step))
+		if model.RuneLen(key) < 8 || seen[key] {
+			return false
+		}
+		seen[key] = true
+	}
+	return true
+}
+
+func isGenericChangedCondition(condition string) bool {
+	lower := strings.ToLower(squeeze(condition))
+	if lower == "" {
+		return true
+	}
+	for _, generic := range []string{
+		"changed condition", "different condition", "a changed condition",
+		"เปลี่ยนเงื่อนไข", "เงื่อนไขที่เปลี่ยน", "เงื่อนไขใหม่",
+	} {
+		if lower == generic {
+			return true
+		}
+	}
+	return false
 }
 
 // gateSourceRole is a narrow structural QC check. It does not decide whether
@@ -139,11 +215,6 @@ func gateArithmetic(q Question, ev Evaluator) GateResult {
 		return res
 	}
 	if !choiceMentionsNumber(q.Choices[idx].Content, got) {
-		if q.Skill == "calculation" && choiceHasSymbolicMath(q.Choices[idx].Content) {
-			res.Pass = true
-			res.Reason = fmt.Sprintf("%s = %g; correct choice is a symbolic expression whose numeric substep is verified", q.Calculation.Expression, got)
-			return res
-		}
 		res.Reason = fmt.Sprintf("expression evaluates to %g but the correct choice reads %q",
 			got, q.Choices[idx].Content)
 		return res
@@ -154,22 +225,12 @@ func gateArithmetic(q Question, ev Evaluator) GateResult {
 	return res
 }
 
-func choiceHasSymbolicMath(choice string) bool {
-	if !strings.ContainsAny(choice, "^/") {
-		return false
-	}
-	for _, r := range choice {
-		if unicode.IsLetter(r) {
-			return true
-		}
-	}
-	return false
-}
-
 // gateUnitCheck is the lightweight unit tool. It validates the model's
 // declared answer unit and checks that the keyed choice carries the same unit.
 // It deliberately does not guess missing units: a dimensionless ratio or a
-// non-physical numeric answer is allowed to declare an empty unit.
+// numeric answer without a source-stated unit is allowed to declare an empty
+// unit. The accepted alphabet is intentionally subject-neutral so units such
+// as mol/L, %, kJ/mol, °C, and USD are not treated as physics-only.
 func gateUnitCheck(q Question) GateResult {
 	res := GateResult{Gate: GateUnit, Deterministic: true}
 	if q.Calculation == nil {
@@ -180,7 +241,7 @@ func gateUnitCheck(q Question) GateResult {
 	unit := strings.TrimSpace(q.Calculation.Unit)
 	if unit == "" {
 		res.Pass = true
-		res.Reason = "dimensionless or no physical unit declared"
+		res.Reason = "dimensionless or no source-stated unit declared"
 		return res
 	}
 	normal, ok := normaliseUnit(unit)
@@ -207,6 +268,7 @@ func normaliseUnit(unit string) (string, bool) {
 	s = strings.ReplaceAll(s, "²", "^2")
 	s = strings.ReplaceAll(s, "³", "^3")
 	s = strings.ReplaceAll(s, "⁻", "-")
+	s = strings.ReplaceAll(s, "−", "-")
 	s = strings.ReplaceAll(s, "·", "*")
 	s = strings.ReplaceAll(s, "×", "*")
 	s = strings.ReplaceAll(s, " ", "")
@@ -214,7 +276,7 @@ func normaliseUnit(unit string) (string, bool) {
 		return "", true
 	}
 	for _, r := range s {
-		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || strings.ContainsRune("*/^.-", r) {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) || strings.ContainsRune("*/^.-+%°()", r) {
 			continue
 		}
 		return "", false
@@ -229,6 +291,7 @@ func choiceHasUnit(choice, unit string) bool {
 	normalChoice := strings.ToLower(choice)
 	normalChoice = strings.ReplaceAll(normalChoice, "²", "^2")
 	normalChoice = strings.ReplaceAll(normalChoice, "³", "^3")
+	normalChoice = strings.ReplaceAll(normalChoice, "−", "-")
 	normalChoice = strings.ReplaceAll(normalChoice, "·", "*")
 	normalChoice = strings.ReplaceAll(normalChoice, "×", "*")
 	normalChoice = strings.ReplaceAll(normalChoice, " ", "")
@@ -403,6 +466,9 @@ func isQuoteMark(r rune) bool {
 
 func nearlyEqual(a, b float64) bool {
 	if a == b {
+		return true
+	}
+	if math.Abs(a) >= 1 && math.Abs(b) >= 1 && math.Abs(a-b) <= roundedAnswerTolerance {
 		return true
 	}
 	scale := math.Max(math.Abs(a), math.Abs(b))

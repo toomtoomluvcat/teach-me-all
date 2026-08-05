@@ -11,6 +11,30 @@ the same file — has not been done, so the question is not closed.
 
 Everything below was measured on this machine, not estimated.
 
+## Update — 2026-08-06
+
+The current `prototype/exam-quality` path now has a subject-neutral set prompt,
+slot-local evidence packets, operation-constrained coverage, hard/application
+demand metadata, numeric calculator verification, and separate `drafts` versus
+`ship-ready` reporting. A targeted hard/application read across six subjects
+produced the following latest result:
+
+| subject | ship-ready / target | raw drafts |
+|---|---:|---:|
+| mathematics | 3/3 | 3 |
+| physics | 3/3 | 3 |
+| biology | 2/2 | 2 |
+| psychology | 3/3 | 3 |
+| sociology | 3/3 | 4 |
+| economics | 3/3 | 5 |
+
+These are not a NotebookLM win claim. The accepted hard questions and failed
+rows were read manually; the remaining failures are primarily draft efficiency
+and well-formed/provenance contract issues. Semantic quality still needs an
+independent reviewer or calibrated human sample on the same source before a
+quality claim is closed. See `E:\contribute\teach-me-all\docs\HANDOFF.md` and
+`E:\contribute\teach-me-all\docs\research\exam-quality-research-2026-08.md`.
+
 ## Setup
 
 | | |

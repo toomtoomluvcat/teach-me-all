@@ -30,7 +30,7 @@ type LessonPlanner interface {
 
 func QuestionPlanSystem() string {
 	return `You are planning a coherent assessment set from source material from any subject.
-Infer the domain from the source; never use a biology-only or
+Infer the domain from the source; never use a subject-specific or
 teacher-edition template. Do not write questions yet. Create a compact set of
 question slots that a later writer can fill.
 
