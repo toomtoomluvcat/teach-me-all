@@ -1,0 +1,1344 @@
+{
+  "source": "../../samples/openstax-physics.pdf",
+  "pages": "140-220",
+  "suite": "all",
+  "cases": [
+    {
+      "name": "application-easy",
+      "lesson": "Projectile Motion",
+      "budget": 5,
+      "drafts": 5,
+      "accepted": 5,
+      "pass_rate": 1,
+      "target_drafts": 5,
+      "target_accepted": 5,
+      "calculation_drafts": 0,
+      "calculation_accepted": 0,
+      "quality": {
+        "verdicts": [
+          {
+            "question_index": 0,
+            "score": 4,
+            "source_dependency": "specific",
+            "correctness": "supported",
+            "distractor_quality": "clean",
+            "skill_difficulty_fit": "fit",
+            "reason": "Directly supported by source quote; distractors are plausible but incorrect."
+          },
+          {
+            "question_index": 1,
+            "score": 4,
+            "source_dependency": "specific",
+            "correctness": "supported",
+            "distractor_quality": "clean",
+            "skill_difficulty_fit": "fit",
+            "reason": "Uses F=ma from source; calculation is straightforward and unique."
+          },
+          {
+            "question_index": 2,
+            "score": 4,
+            "source_dependency": "specific",
+            "correctness": "supported",
+            "distractor_quality": "clean",
+            "skill_difficulty_fit": "fit",
+            "reason": "Directly applies source statement about mass and force; distractors are clean."
+          },
+          {
+            "question_index": 3,
+            "score": 4,
+            "source_dependency": "specific",
+            "correctness": "supported",
+            "distractor_quality": "clean",
+            "skill_difficulty_fit": "fit",
+            "reason": "Applies inverse proportionality from source; correct answer is unique."
+          },
+          {
+            "question_index": 4,
+            "score": 4,
+            "source_dependency": "specific",
+            "correctness": "supported",
+            "distractor_quality": "clean",
+            "skill_difficulty_fit": "fit",
+            "reason": "Uses Newton's third law and external force concept from source; answer is supported."
+          }
+        ],
+        "total_score": 20,
+        "max_score": 20
+      },
+      "questions": [
+        {
+          "kind": "mcq_single",
+          "stem": "A skydiver falls with negligible air resistance. What is the net external force acting on the skydiver?",
+          "choices": [
+            {
+              "content": "Only the gravitational force (weight)",
+              "is_correct": true
+            },
+            {
+              "content": "The gravitational force plus air resistance",
+              "is_correct": false
+            },
+            {
+              "content": "Zero, because the skydiver is falling",
+              "is_correct": false
+            },
+            {
+              "content": "The air resistance only",
+              "is_correct": false
+            }
+          ],
+          "explanation": "When air resistance is negligible, the only force acting on a falling object is its weight, so the net external force equals the gravitational force.",
+          "source_quote": "If air resistance is negligible, the net external force on a falling object is only the gravitational force (i.e., the weight of the object).",
+          "difficulty": "easy",
+          "skill": "application",
+          "coverage_slot_id": "S01",
+          "evidence_atom_id": "A027",
+          "evidence_chunk_id": "p141-c6",
+          "passed": true,
+          "gates": [
+            {
+              "Gate": "well_formed",
+              "Pass": true,
+              "Reason": "structurally sound",
+              "Deterministic": true
+            },
+            {
+              "Gate": "source_role",
+              "Pass": true,
+              "Reason": "chunk p141-c6, page 141 is usable source text",
+              "Deterministic": true
+            },
+            {
+              "Gate": "quote_verbatim",
+              "Pass": true,
+              "Reason": "verbatim in chunk p141-c6, page 141",
+              "Deterministic": true
+            },
+            {
+              "Gate": "arithmetic",
+              "Pass": true,
+              "Reason": "no arithmetic in this question",
+              "Deterministic": true
+            },
+            {
+              "Gate": "unit_check",
+              "Pass": true,
+              "Reason": "no arithmetic in this question",
+              "Deterministic": true
+            },
+            {
+              "Gate": "coverage_contract",
+              "Pass": true,
+              "Reason": "slot S01 uses atom A027 from chunk p141-c6",
+              "Deterministic": true
+            },
+            {
+              "Gate": "not_a_duplicate",
+              "Pass": true,
+              "Reason": "distinct from the questions already accepted",
+              "Deterministic": true
+            }
+          ]
+        },
+        {
+          "kind": "mcq_single",
+          "stem": "A net force of 12 N acts on a 3-kg object. What is the acceleration of the object?",
+          "choices": [
+            {
+              "content": "4 m/s²",
+              "is_correct": true
+            },
+            {
+              "content": "36 m/s²",
+              "is_correct": false
+            },
+            {
+              "content": "0.25 m/s²",
+              "is_correct": false
+            },
+            {
+              "content": "9 m/s²",
+              "is_correct": false
+            }
+          ],
+          "explanation": "Using Newton's second law, a = Fnet / m = 12 N / 3 kg = 4 m/s².",
+          "source_quote": "Because Fnet and m are given, the acceleration can be calculated directly from Newton’s second law: Fnet = ma.",
+          "difficulty": "easy",
+          "skill": "application",
+          "coverage_slot_id": "S02",
+          "evidence_atom_id": "A052",
+          "evidence_chunk_id": "p144-c13",
+          "passed": true,
+          "gates": [
+            {
+              "Gate": "well_formed",
+              "Pass": true,
+              "Reason": "structurally sound",
+              "Deterministic": true
+            },
+            {
+              "Gate": "source_role",
+              "Pass": true,
+              "Reason": "chunk p144-c13, page 144 is usable source text",
+              "Deterministic": true
+            },
+            {
+              "Gate": "quote_verbatim",
+              "Pass": true,
+              "Reason": "verbatim in chunk p144-c13, page 144",
+              "Deterministic": true
+            },
+            {
+              "Gate": "arithmetic",
+              "Pass": true,
+              "Reason": "no arithmetic in this question",
+              "Deterministic": true
+            },
+            {
+              "Gate": "unit_check",
+              "Pass": true,
+              "Reason": "no arithmetic in this question",
+              "Deterministic": true
+            },
+            {
+              "Gate": "coverage_contract",
+              "Pass": true,
+              "Reason": "slot S02 uses atom A052 from chunk p144-c13",
+              "Deterministic": true
+            },
+            {
+              "Gate": "not_a_duplicate",
+              "Pass": true,
+              "Reason": "distinct from the questions already accepted",
+              "Deterministic": true
+            }
+          ]
+        },
+        {
+          "kind": "mcq_single",
+          "stem": "Two objects start from rest and are accelerated to the same final velocity. Object A has a mass of 2 kg, and object B has a mass of 4 kg. Which object requires more force to reach that velocity?",
+          "choices": [
+            {
+              "content": "Object B, because it is more massive",
+              "is_correct": true
+            },
+            {
+              "content": "Object A, because it is less massive",
+              "is_correct": false
+            },
+            {
+              "content": "Both require the same force",
+              "is_correct": false
+            },
+            {
+              "content": "The lighter object requires more force",
+              "is_correct": false
+            }
+          ],
+          "explanation": "To accelerate two objects from rest to the same velocity, more force is required for the more massive object, so object B needs more force.",
+          "source_quote": "To accelerate two objects from rest to the same velocity, you would expect more force to be required to accelerate the more massive object.",
+          "difficulty": "easy",
+          "skill": "application",
+          "coverage_slot_id": "S03",
+          "evidence_atom_id": "A011",
+          "evidence_chunk_id": "p140-c2",
+          "passed": true,
+          "gates": [
+            {
+              "Gate": "well_formed",
+              "Pass": true,
+              "Reason": "structurally sound",
+              "Deterministic": true
+            },
+            {
+              "Gate": "source_role",
+              "Pass": true,
+              "Reason": "chunk p140-c2, page 140 is usable source text",
+              "Deterministic": true
+            },
+            {
+              "Gate": "quote_verbatim",
+              "Pass": true,
+              "Reason": "verbatim in chunk p140-c2, page 140",
+              "Deterministic": true
+            },
+            {
+              "Gate": "arithmetic",
+              "Pass": true,
+              "Reason": "no arithmetic in this question",
+              "Deterministic": true
+            },
+            {
+              "Gate": "unit_check",
+              "Pass": true,
+              "Reason": "no arithmetic in this question",
+              "Deterministic": true
+            },
+            {
+              "Gate": "coverage_contract",
+              "Pass": true,
+              "Reason": "slot S03 uses atom A011 from chunk p140-c2",
+              "Deterministic": true
+            },
+            {
+              "Gate": "not_a_duplicate",
+              "Pass": true,
+              "Reason": "distinct from the questions already accepted",
+              "Deterministic": true
+            }
+          ]
+        },
+        {
+          "kind": "mcq_single",
+          "stem": "A person pushes a shopping cart with a certain force, and it accelerates at 2 m/s². If the same person pushes a loaded cart with the same force but the loaded cart has twice the mass, what happens to the acceleration?",
+          "choices": [
+            {
+              "content": "It becomes 1 m/s²",
+              "is_correct": true
+            },
+            {
+              "content": "It becomes 4 m/s²",
+              "is_correct": false
+            },
+            {
+              "content": "It stays 2 m/s²",
+              "is_correct": false
+            },
+            {
+              "content": "It becomes 0.5 m/s²",
+              "is_correct": false
+            }
+          ],
+          "explanation": "The same force on a more massive object produces a smaller acceleration. Since mass doubles, acceleration halves, so 2 m/s² becomes 1 m/s².",
+          "source_quote": "The same boy pushing with identical force on a stalled car produces a far smaller acceleration (friction is negligible).",
+          "difficulty": "easy",
+          "skill": "application",
+          "coverage_slot_id": "S04",
+          "evidence_atom_id": "A021",
+          "evidence_chunk_id": "p141-c5",
+          "passed": true,
+          "gates": [
+            {
+              "Gate": "well_formed",
+              "Pass": true,
+              "Reason": "structurally sound",
+              "Deterministic": true
+            },
+            {
+              "Gate": "source_role",
+              "Pass": true,
+              "Reason": "chunk p141-c5, page 141 is usable source text",
+              "Deterministic": true
+            },
+            {
+              "Gate": "quote_verbatim",
+              "Pass": true,
+              "Reason": "verbatim in chunk p141-c5, page 141",
+              "Deterministic": true
+            },
+            {
+              "Gate": "arithmetic",
+              "Pass": true,
+              "Reason": "no arithmetic in this question",
+              "Deterministic": true
+            },
+            {
+              "Gate": "unit_check",
+              "Pass": true,
+              "Reason": "no arithmetic in this question",
+              "Deterministic": true
+            },
+            {
+              "Gate": "coverage_contract",
+              "Pass": true,
+              "Reason": "slot S04 uses atom A021 from chunk p141-c5",
+              "Deterministic": true
+            },
+            {
+              "Gate": "not_a_duplicate",
+              "Pass": true,
+              "Reason": "distinct from the questions already accepted",
+              "Deterministic": true
+            }
+          ]
+        },
+        {
+          "kind": "mcq_single",
+          "stem": "A person stands on a skateboard and pushes against a wall. Which force is external to the person-skateboard system and causes the person to move?",
+          "choices": [
+            {
+              "content": "The force the wall exerts on the person",
+              "is_correct": true
+            },
+            {
+              "content": "The force the person exerts on the wall",
+              "is_correct": false
+            },
+            {
+              "content": "The force the person exerts on the skateboard",
+              "is_correct": false
+            },
+            {
+              "content": "The force the skateboard exerts on the person",
+              "is_correct": false
+            }
+          ],
+          "explanation": "Newton's third law helps identify external forces. The wall's force on the person is external to the person-skateboard system and causes acceleration, while the person's force on the wall acts on the wall, not on the system.",
+          "source_quote": "Newton’s third law is useful for figuring out which forces are external to a system.",
+          "difficulty": "easy",
+          "skill": "application",
+          "coverage_slot_id": "S05",
+          "evidence_atom_id": "A074",
+          "evidence_chunk_id": "p146-c19",
+          "passed": true,
+          "gates": [
+            {
+              "Gate": "well_formed",
+              "Pass": true,
+              "Reason": "structurally sound",
+              "Deterministic": true
+            },
+            {
+              "Gate": "source_role",
+              "Pass": true,
+              "Reason": "chunk p146-c19, page 146 is usable source text",
+              "Deterministic": true
+            },
+            {
+              "Gate": "quote_verbatim",
+              "Pass": true,
+              "Reason": "verbatim in chunk p146-c19, page 146",
+              "Deterministic": true
+            },
+            {
+              "Gate": "arithmetic",
+              "Pass": true,
+              "Reason": "no arithmetic in this question",
+              "Deterministic": true
+            },
+            {
+              "Gate": "unit_check",
+              "Pass": true,
+              "Reason": "no arithmetic in this question",
+              "Deterministic": true
+            },
+            {
+              "Gate": "coverage_contract",
+              "Pass": true,
+              "Reason": "slot S05 uses atom A074 from chunk p146-c19",
+              "Deterministic": true
+            },
+            {
+              "Gate": "not_a_duplicate",
+              "Pass": true,
+              "Reason": "distinct from the questions already accepted",
+              "Deterministic": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "application-hard",
+      "lesson": "Projectile Motion",
+      "budget": 5,
+      "drafts": 5,
+      "accepted": 5,
+      "pass_rate": 1,
+      "target_drafts": 5,
+      "target_accepted": 5,
+      "calculation_drafts": 3,
+      "calculation_accepted": 3,
+      "quality": {
+        "verdicts": [
+          {
+            "question_index": 0,
+            "score": 4,
+            "source_dependency": "specific",
+            "correctness": "supported",
+            "distractor_quality": "clean",
+            "skill_difficulty_fit": "fit",
+            "reason": "The question directly applies the source statement that net external force equals weight when air resistance is negligible. Weight = mg = 2.0 kg * 9.8 m/s² = 19.6 N. Distractors are plausible but incorrect. Difficulty is appropriate for application."
+          },
+          {
+            "question_index": 1,
+            "score": 4,
+            "source_dependency": "specific",
+            "correctness": "supported",
+            "distractor_quality": "clean",
+            "skill_difficulty_fit": "fit",
+            "reason": "Direct application of Fnet = ma with given values: a = 12 N / 3.0 kg = 4.0 m/s². Distractors include common errors (inverting, multiplying, using mass as acceleration). Difficulty is appropriate."
+          },
+          {
+            "question_index": 2,
+            "score": 4,
+            "source_dependency": "specific",
+            "correctness": "supported",
+            "distractor_quality": "clean",
+            "skill_difficulty_fit": "fit",
+            "reason": "The source states that more force is required for more massive object to reach same velocity. Since force is proportional to mass for same acceleration, the 8-kg object requires 4 times the force of the 2-kg object. Distractors are plausible but incorrect. Difficulty is appropriate."
+          },
+          {
+            "question_index": 3,
+            "score": 4,
+            "source_dependency": "specific",
+            "correctness": "supported",
+            "distractor_quality": "clean",
+            "skill_difficulty_fit": "fit",
+            "reason": "Uses the source relationship that same force on larger mass produces smaller acceleration. Since acceleration is inversely proportional to mass, if mass is 1000 times larger, acceleration is 1000 times smaller: 40 m/s² / 1000 = 0.04 m/s². Distractors are plausible. Difficulty is appropriate."
+          },
+          {
+            "question_index": 4,
+            "score": 4,
+            "source_dependency": "specific",
+            "correctness": "supported",
+            "distractor_quality": "clean",
+            "skill_difficulty_fit": "fit",
+            "reason": "The source explains that Newton's third law helps identify external forces. For the person, the wall's force on the person is external, while the person's force on the wall acts on the wall, not the person. The correct choice is the force the wall exerts on the person. Distractors are plausible but incorrect. Difficulty is appropriate."
+          }
+        ],
+        "total_score": 20,
+        "max_score": 20
+      },
+      "questions": [
+        {
+          "kind": "mcq_single",
+          "stem": "A 2.0-kg object is dropped near Earth's surface, and air resistance is negligible. What is the magnitude of the net external force on the object?",
+          "choices": [
+            {
+              "content": "19.6 N",
+              "is_correct": true
+            },
+            {
+              "content": "9.8 N",
+              "is_correct": false
+            },
+            {
+              "content": "2.0 N",
+              "is_correct": false
+            },
+            {
+              "content": "0 N",
+              "is_correct": false
+            }
+          ],
+          "explanation": "With air resistance negligible, the net external force equals the weight, W = mg. For m = 2.0 kg and g = 9.8 m/s², W = 2.0 × 9.8 = 19.6 N.",
+          "source_quote": "If air resistance is negligible, the net external force on a falling object is only the gravitational force (i.e., the weight of the object).",
+          "difficulty": "hard",
+          "skill": "application",
+          "calculation": {
+            "expression": "2.0*9.8",
+            "expected": 19.6
+          },
+          "coverage_slot_id": "S01",
+          "evidence_atom_id": "A027",
+          "evidence_chunk_id": "p141-c6",
+          "passed": true,
+          "gates": [
+            {
+              "Gate": "well_formed",
+              "Pass": true,
+              "Reason": "structurally sound",
+              "Deterministic": true
+            },
+            {
+              "Gate": "source_role",
+              "Pass": true,
+              "Reason": "chunk p141-c6, page 141 is usable source text",
+              "Deterministic": true
+            },
+            {
+              "Gate": "quote_verbatim",
+              "Pass": true,
+              "Reason": "verbatim in chunk p141-c6, page 141",
+              "Deterministic": true
+            },
+            {
+              "Gate": "arithmetic",
+              "Pass": true,
+              "Reason": "2.0*9.8 = 19.6, matches the correct choice",
+              "Deterministic": true
+            },
+            {
+              "Gate": "unit_check",
+              "Pass": true,
+              "Reason": "dimensionless or no physical unit declared",
+              "Deterministic": true
+            },
+            {
+              "Gate": "coverage_contract",
+              "Pass": true,
+              "Reason": "slot S01 uses atom A027 from chunk p141-c6",
+              "Deterministic": true
+            },
+            {
+              "Gate": "not_a_duplicate",
+              "Pass": true,
+              "Reason": "distinct from the questions already accepted",
+              "Deterministic": true
+            }
+          ]
+        },
+        {
+          "kind": "mcq_single",
+          "stem": "A net external force of 12 N acts on a 3.0-kg object. What is the magnitude of the object's acceleration?",
+          "choices": [
+            {
+              "content": "4.0 m/s²",
+              "is_correct": true
+            },
+            {
+              "content": "0.25 m/s²",
+              "is_correct": false
+            },
+            {
+              "content": "36 m/s²",
+              "is_correct": false
+            },
+            {
+              "content": "9.0 m/s²",
+              "is_correct": false
+            }
+          ],
+          "explanation": "Newton's second law gives a = Fnet / m. Substituting Fnet = 12 N and m = 3.0 kg gives a = 12 / 3.0 = 4.0 m/s².",
+          "source_quote": "Because Fnet and m are given, the acceleration can be calculated directly from Newton’s second law: Fnet = ma.",
+          "difficulty": "hard",
+          "skill": "application",
+          "calculation": {
+            "expression": "12/3.0",
+            "expected": 4
+          },
+          "coverage_slot_id": "S02",
+          "evidence_atom_id": "A052",
+          "evidence_chunk_id": "p144-c13",
+          "passed": true,
+          "gates": [
+            {
+              "Gate": "well_formed",
+              "Pass": true,
+              "Reason": "structurally sound",
+              "Deterministic": true
+            },
+            {
+              "Gate": "source_role",
+              "Pass": true,
+              "Reason": "chunk p144-c13, page 144 is usable source text",
+              "Deterministic": true
+            },
+            {
+              "Gate": "quote_verbatim",
+              "Pass": true,
+              "Reason": "verbatim in chunk p144-c13, page 144",
+              "Deterministic": true
+            },
+            {
+              "Gate": "arithmetic",
+              "Pass": true,
+              "Reason": "12/3.0 = 4, matches the correct choice",
+              "Deterministic": true
+            },
+            {
+              "Gate": "unit_check",
+              "Pass": true,
+              "Reason": "dimensionless or no physical unit declared",
+              "Deterministic": true
+            },
+            {
+              "Gate": "coverage_contract",
+              "Pass": true,
+              "Reason": "slot S02 uses atom A052 from chunk p144-c13",
+              "Deterministic": true
+            },
+            {
+              "Gate": "not_a_duplicate",
+              "Pass": true,
+              "Reason": "distinct from the questions already accepted",
+              "Deterministic": true
+            }
+          ]
+        },
+        {
+          "kind": "mcq_single",
+          "stem": "Two objects, one with mass 2 kg and the other with mass 8 kg, start from rest. The same net force is applied to each for the same duration. Which statement correctly compares the forces needed to give them the same final velocity?",
+          "choices": [
+            {
+              "content": "The 8-kg object requires four times the force of the 2-kg object.",
+              "is_correct": true
+            },
+            {
+              "content": "The 2-kg object requires four times the force of the 8-kg object.",
+              "is_correct": false
+            },
+            {
+              "content": "Both require the same force because they start from rest.",
+              "is_correct": false
+            },
+            {
+              "content": "The 8-kg object requires twice the force of the 2-kg object.",
+              "is_correct": false
+            }
+          ],
+          "explanation": "To reach the same velocity from rest in the same time, both must have the same acceleration. Since F = ma, the required force is proportional to mass. The 8-kg object is four times as massive, so it requires four times the force.",
+          "source_quote": "To accelerate two objects from rest to the same velocity, you would expect more force to be required to accelerate the more massive object.",
+          "difficulty": "hard",
+          "skill": "application",
+          "coverage_slot_id": "S03",
+          "evidence_atom_id": "A011",
+          "evidence_chunk_id": "p140-c2",
+          "passed": true,
+          "gates": [
+            {
+              "Gate": "well_formed",
+              "Pass": true,
+              "Reason": "structurally sound",
+              "Deterministic": true
+            },
+            {
+              "Gate": "source_role",
+              "Pass": true,
+              "Reason": "chunk p140-c2, page 140 is usable source text",
+              "Deterministic": true
+            },
+            {
+              "Gate": "quote_verbatim",
+              "Pass": true,
+              "Reason": "verbatim in chunk p140-c2, page 140",
+              "Deterministic": true
+            },
+            {
+              "Gate": "arithmetic",
+              "Pass": true,
+              "Reason": "no arithmetic in this question",
+              "Deterministic": true
+            },
+            {
+              "Gate": "unit_check",
+              "Pass": true,
+              "Reason": "no arithmetic in this question",
+              "Deterministic": true
+            },
+            {
+              "Gate": "coverage_contract",
+              "Pass": true,
+              "Reason": "slot S03 uses atom A011 from chunk p140-c2",
+              "Deterministic": true
+            },
+            {
+              "Gate": "not_a_duplicate",
+              "Pass": true,
+              "Reason": "distinct from the questions already accepted",
+              "Deterministic": true
+            }
+          ]
+        },
+        {
+          "kind": "mcq_single",
+          "stem": "A boy pushes a basketball with a force of 20 N, producing an acceleration of 40 m/s². If he pushes a stalled car with the same force and the car's mass is 1000 times the basketball's mass, what is the car's acceleration (friction is negligible)?",
+          "choices": [
+            {
+              "content": "0.04 m/s²",
+              "is_correct": true
+            },
+            {
+              "content": "0.4 m/s²",
+              "is_correct": false
+            },
+            {
+              "content": "4 m/s²",
+              "is_correct": false
+            },
+            {
+              "content": "40 m/s²",
+              "is_correct": false
+            }
+          ],
+          "explanation": "The basketball's mass is m = F/a = 20/40 = 0.5 kg. The car's mass is 1000 × 0.5 = 500 kg. With the same 20 N force, the car's acceleration is a = F/m = 20/500 = 0.04 m/s².",
+          "source_quote": "The same boy pushing with identical force on a stalled car produces a far smaller acceleration (friction is negligible).",
+          "difficulty": "hard",
+          "skill": "application",
+          "calculation": {
+            "expression": "20/(1000*(20/40))",
+            "expected": 0.04
+          },
+          "coverage_slot_id": "S04",
+          "evidence_atom_id": "A021",
+          "evidence_chunk_id": "p141-c5",
+          "passed": true,
+          "gates": [
+            {
+              "Gate": "well_formed",
+              "Pass": true,
+              "Reason": "structurally sound",
+              "Deterministic": true
+            },
+            {
+              "Gate": "source_role",
+              "Pass": true,
+              "Reason": "chunk p141-c5, page 141 is usable source text",
+              "Deterministic": true
+            },
+            {
+              "Gate": "quote_verbatim",
+              "Pass": true,
+              "Reason": "verbatim in chunk p141-c5, page 141",
+              "Deterministic": true
+            },
+            {
+              "Gate": "arithmetic",
+              "Pass": true,
+              "Reason": "20/(1000*(20/40)) = 0.04, matches the correct choice",
+              "Deterministic": true
+            },
+            {
+              "Gate": "unit_check",
+              "Pass": true,
+              "Reason": "dimensionless or no physical unit declared",
+              "Deterministic": true
+            },
+            {
+              "Gate": "coverage_contract",
+              "Pass": true,
+              "Reason": "slot S04 uses atom A021 from chunk p141-c5",
+              "Deterministic": true
+            },
+            {
+              "Gate": "not_a_duplicate",
+              "Pass": true,
+              "Reason": "distinct from the questions already accepted",
+              "Deterministic": true
+            }
+          ]
+        },
+        {
+          "kind": "mcq_single",
+          "stem": "A person stands on a skateboard and pushes against a wall. The wall exerts a force on the person. Which force should be included in the net external force on the person to determine her acceleration?",
+          "choices": [
+            {
+              "content": "The force the wall exerts on the person",
+              "is_correct": true
+            },
+            {
+              "content": "The force the person exerts on the wall",
+              "is_correct": false
+            },
+            {
+              "content": "Both the force on the wall and the force on the person",
+              "is_correct": false
+            },
+            {
+              "content": "Neither force, because they cancel",
+              "is_correct": false
+            }
+          ],
+          "explanation": "To find the net external force on the person, only forces acting on the person count. The wall's force on the person is external to the person and affects her motion. The force the person exerts on the wall acts on the wall, not on the person, so it is not included.",
+          "source_quote": "Newton’s third law is useful for figuring out which forces are external to a system.",
+          "difficulty": "hard",
+          "skill": "application",
+          "coverage_slot_id": "S05",
+          "evidence_atom_id": "A074",
+          "evidence_chunk_id": "p146-c19",
+          "passed": true,
+          "gates": [
+            {
+              "Gate": "well_formed",
+              "Pass": true,
+              "Reason": "structurally sound",
+              "Deterministic": true
+            },
+            {
+              "Gate": "source_role",
+              "Pass": true,
+              "Reason": "chunk p146-c19, page 146 is usable source text",
+              "Deterministic": true
+            },
+            {
+              "Gate": "quote_verbatim",
+              "Pass": true,
+              "Reason": "verbatim in chunk p146-c19, page 146",
+              "Deterministic": true
+            },
+            {
+              "Gate": "arithmetic",
+              "Pass": true,
+              "Reason": "no arithmetic in this question",
+              "Deterministic": true
+            },
+            {
+              "Gate": "unit_check",
+              "Pass": true,
+              "Reason": "no arithmetic in this question",
+              "Deterministic": true
+            },
+            {
+              "Gate": "coverage_contract",
+              "Pass": true,
+              "Reason": "slot S05 uses atom A074 from chunk p146-c19",
+              "Deterministic": true
+            },
+            {
+              "Gate": "not_a_duplicate",
+              "Pass": true,
+              "Reason": "distinct from the questions already accepted",
+              "Deterministic": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "calculation",
+      "lesson": "Newton's Laws of Motion",
+      "budget": 5,
+      "drafts": 5,
+      "accepted": 5,
+      "pass_rate": 1,
+      "target_drafts": 5,
+      "target_accepted": 5,
+      "calculation_drafts": 5,
+      "calculation_accepted": 5,
+      "quality": {
+        "verdicts": [
+          {
+            "question_index": 0,
+            "score": 4,
+            "source_dependency": "specific",
+            "correctness": "supported",
+            "distractor_quality": "clean",
+            "skill_difficulty_fit": "fit",
+            "reason": "Direct application of W=mg from source; answer 29.4 N is correct and unique."
+          },
+          {
+            "question_index": 1,
+            "score": 4,
+            "source_dependency": "specific",
+            "correctness": "supported",
+            "distractor_quality": "clean",
+            "skill_difficulty_fit": "fit",
+            "reason": "Uses moon gravity from source; calculation 2.0*1.67=3.34 N is correct."
+          },
+          {
+            "question_index": 2,
+            "score": 4,
+            "source_dependency": "specific",
+            "correctness": "supported",
+            "distractor_quality": "clean",
+            "skill_difficulty_fit": "fit",
+            "reason": "Direct conversion from source; 5*0.225=1.125 lb is correct."
+          },
+          {
+            "question_index": 3,
+            "score": 4,
+            "source_dependency": "specific",
+            "correctness": "supported",
+            "distractor_quality": "clean",
+            "skill_difficulty_fit": "fit",
+            "reason": "Conversion from source; 8*0.225=1.8 lb is correct."
+          },
+          {
+            "question_index": 4,
+            "score": 4,
+            "source_dependency": "specific",
+            "correctness": "supported",
+            "distractor_quality": "clean",
+            "skill_difficulty_fit": "fit",
+            "reason": "Uses F=ma from source; 51/240=0.2125 m/s², rounds to 0.21, correct."
+          }
+        ],
+        "total_score": 20,
+        "max_score": 20
+      },
+      "questions": [
+        {
+          "kind": "mcq_single",
+          "stem": "A 3.0-kg object is dropped near Earth's surface with negligible air resistance. Using the relationship W = mg and g = 9.8 m/s², what is the weight of the object in newtons?",
+          "choices": [
+            {
+              "content": "29.4 N",
+              "is_correct": true
+            },
+            {
+              "content": "3.0 N",
+              "is_correct": false
+            },
+            {
+              "content": "9.8 N",
+              "is_correct": false
+            },
+            {
+              "content": "32.8 N",
+              "is_correct": false
+            }
+          ],
+          "explanation": "Weight is the gravitational force on a mass, given by W = mg. Substituting m = 3.0 kg and g = 9.8 m/s² gives W = 3.0 × 9.8 = 29.4 N.",
+          "source_quote": "By using Newton’s second law, we can figure out the equation for weight. Consider an object with mass m falling toward Earth. It experiences only the force of gravity (i.e., the gravitational force or weight), which is represented by W. Newton’s second law states that Because the only force acting on the object is the gravitational force, we have We know that the acceleration of an object due to gravity is g, so we have Substituting these two expressions into Newton’s second law gives This is the equation for weight—the gravitational force on a mass m.",
+          "difficulty": "easy",
+          "skill": "calculation",
+          "calculation": {
+            "expression": "3.0*9.8",
+            "expected": 29.4
+          },
+          "coverage_slot_id": "S01",
+          "evidence_atom_id": "A029",
+          "evidence_chunk_id": "p142-c7",
+          "passed": true,
+          "gates": [
+            {
+              "Gate": "well_formed",
+              "Pass": true,
+              "Reason": "structurally sound",
+              "Deterministic": true
+            },
+            {
+              "Gate": "source_role",
+              "Pass": true,
+              "Reason": "chunk p142-c7, page 142 is usable source text",
+              "Deterministic": true
+            },
+            {
+              "Gate": "quote_verbatim",
+              "Pass": true,
+              "Reason": "verbatim in chunk p142-c7, page 142",
+              "Deterministic": true
+            },
+            {
+              "Gate": "arithmetic",
+              "Pass": true,
+              "Reason": "3.0*9.8 = 29.400000000000002, matches the correct choice",
+              "Deterministic": true
+            },
+            {
+              "Gate": "unit_check",
+              "Pass": true,
+              "Reason": "dimensionless or no physical unit declared",
+              "Deterministic": true
+            },
+            {
+              "Gate": "coverage_contract",
+              "Pass": true,
+              "Reason": "slot S01 uses atom A029 from chunk p142-c7",
+              "Deterministic": true
+            },
+            {
+              "Gate": "not_a_duplicate",
+              "Pass": true,
+              "Reason": "distinct from the questions already accepted",
+              "Deterministic": true
+            }
+          ]
+        },
+        {
+          "kind": "mcq_single",
+          "stem": "A 2.0-kg object is taken to the moon, where the acceleration due to gravity is 1.67 m/s². What is its weight on the moon?",
+          "choices": [
+            {
+              "content": "3.34 N",
+              "is_correct": true
+            },
+            {
+              "content": "1.67 N",
+              "is_correct": false
+            },
+            {
+              "content": "2.0 N",
+              "is_correct": false
+            },
+            {
+              "content": "19.6 N",
+              "is_correct": false
+            }
+          ],
+          "explanation": "Weight is the gravitational force on a mass, W = mg. On the moon, g = 1.67 m/s², so W = 2.0 kg × 1.67 m/s² = 3.34 N.",
+          "source_quote": "Because weight depends on the force of gravity, a 1.0-kg mass weighs 9.8 N on Earth and only about 1.7 N on the moon.",
+          "difficulty": "easy",
+          "skill": "calculation",
+          "calculation": {
+            "expression": "2.0*1.67",
+            "expected": 3.34
+          },
+          "coverage_slot_id": "S02",
+          "evidence_atom_id": "A041",
+          "evidence_chunk_id": "p142-c9",
+          "passed": true,
+          "gates": [
+            {
+              "Gate": "well_formed",
+              "Pass": true,
+              "Reason": "structurally sound",
+              "Deterministic": true
+            },
+            {
+              "Gate": "source_role",
+              "Pass": true,
+              "Reason": "chunk p142-c9, page 142 is usable source text",
+              "Deterministic": true
+            },
+            {
+              "Gate": "quote_verbatim",
+              "Pass": true,
+              "Reason": "verbatim in chunk p142-c9, page 142",
+              "Deterministic": true
+            },
+            {
+              "Gate": "arithmetic",
+              "Pass": true,
+              "Reason": "2.0*1.67 = 3.34, matches the correct choice",
+              "Deterministic": true
+            },
+            {
+              "Gate": "unit_check",
+              "Pass": true,
+              "Reason": "dimensionless or no physical unit declared",
+              "Deterministic": true
+            },
+            {
+              "Gate": "coverage_contract",
+              "Pass": true,
+              "Reason": "slot S02 uses atom A041 from chunk p142-c9",
+              "Deterministic": true
+            },
+            {
+              "Gate": "not_a_duplicate",
+              "Pass": true,
+              "Reason": "distinct from the questions already accepted",
+              "Deterministic": true
+            }
+          ]
+        },
+        {
+          "kind": "mcq_single",
+          "stem": "Using the conversion 1 N = 0.225 lb, what is 5 N of force expressed in pounds?",
+          "choices": [
+            {
+              "content": "1.125 lb",
+              "is_correct": true
+            },
+            {
+              "content": "0.045 lb",
+              "is_correct": false
+            },
+            {
+              "content": "2.025 lb",
+              "is_correct": false
+            },
+            {
+              "content": "5.000 lb",
+              "is_correct": false
+            }
+          ],
+          "explanation": "Multiply the force in newtons by the conversion factor: 5 N × 0.225 lb/N = 1.125 lb.",
+          "source_quote": "If 1 N is equal to 0.225 lb, how many pounds is 5 N of force?",
+          "difficulty": "easy",
+          "skill": "calculation",
+          "calculation": {
+            "expression": "5*0.225",
+            "expected": 1.125
+          },
+          "coverage_slot_id": "S03",
+          "evidence_atom_id": "A067",
+          "evidence_chunk_id": "p145-c16",
+          "passed": true,
+          "gates": [
+            {
+              "Gate": "well_formed",
+              "Pass": true,
+              "Reason": "structurally sound",
+              "Deterministic": true
+            },
+            {
+              "Gate": "source_role",
+              "Pass": true,
+              "Reason": "chunk p145-c16, page 145 is usable source text",
+              "Deterministic": true
+            },
+            {
+              "Gate": "quote_verbatim",
+              "Pass": true,
+              "Reason": "verbatim in chunk p145-c16, page 145",
+              "Deterministic": true
+            },
+            {
+              "Gate": "arithmetic",
+              "Pass": true,
+              "Reason": "5*0.225 = 1.125, matches the correct choice",
+              "Deterministic": true
+            },
+            {
+              "Gate": "unit_check",
+              "Pass": true,
+              "Reason": "dimensionless or no physical unit declared",
+              "Deterministic": true
+            },
+            {
+              "Gate": "coverage_contract",
+              "Pass": true,
+              "Reason": "slot S03 uses atom A067 from chunk p145-c16",
+              "Deterministic": true
+            },
+            {
+              "Gate": "not_a_duplicate",
+              "Pass": true,
+              "Reason": "distinct from the questions already accepted",
+              "Deterministic": true
+            }
+          ]
+        },
+        {
+          "kind": "mcq_single",
+          "stem": "A force of 8 N is applied to an object. What is this force in pounds, given that 1 N = 0.225 lb?",
+          "choices": [
+            {
+              "content": "1.8 lb",
+              "is_correct": true
+            },
+            {
+              "content": "0.028 lb",
+              "is_correct": false
+            },
+            {
+              "content": "3.6 lb",
+              "is_correct": false
+            },
+            {
+              "content": "8.0 lb",
+              "is_correct": false
+            }
+          ],
+          "explanation": "Using the conversion factor 1 N = 0.225 lb, multiply the force in newtons by 0.225: 8 N × 0.225 lb/N = 1.8 lb.",
+          "source_quote": "Although most of the world uses newtons as the unit of force, in the United States the most familiar unit of force is the pound (lb), where 1 N = 0.225 lb.",
+          "difficulty": "easy",
+          "skill": "calculation",
+          "calculation": {
+            "expression": "8*0.225",
+            "expected": 1.8
+          },
+          "coverage_slot_id": "S04",
+          "evidence_atom_id": "A031",
+          "evidence_chunk_id": "p142-c7",
+          "passed": true,
+          "gates": [
+            {
+              "Gate": "well_formed",
+              "Pass": true,
+              "Reason": "structurally sound",
+              "Deterministic": true
+            },
+            {
+              "Gate": "source_role",
+              "Pass": true,
+              "Reason": "chunk p142-c7, page 142 is usable source text",
+              "Deterministic": true
+            },
+            {
+              "Gate": "quote_verbatim",
+              "Pass": true,
+              "Reason": "verbatim in chunk p142-c7, page 142",
+              "Deterministic": true
+            },
+            {
+              "Gate": "arithmetic",
+              "Pass": true,
+              "Reason": "8*0.225 = 1.8, matches the correct choice",
+              "Deterministic": true
+            },
+            {
+              "Gate": "unit_check",
+              "Pass": true,
+              "Reason": "dimensionless or no physical unit declared",
+              "Deterministic": true
+            },
+            {
+              "Gate": "coverage_contract",
+              "Pass": true,
+              "Reason": "slot S04 uses atom A031 from chunk p142-c7",
+              "Deterministic": true
+            },
+            {
+              "Gate": "not_a_duplicate",
+              "Pass": true,
+              "Reason": "distinct from the questions already accepted",
+              "Deterministic": true
+            }
+          ]
+        },
+        {
+          "kind": "mcq_single",
+          "stem": "A net external force of 51 N acts on a lawn mower of mass 240 kg. What is the magnitude of its acceleration?",
+          "choices": [
+            {
+              "content": "0.21 m/s²",
+              "is_correct": true
+            },
+            {
+              "content": "0.51 m/s²",
+              "is_correct": false
+            },
+            {
+              "content": "4.7 m/s²",
+              "is_correct": false
+            },
+            {
+              "content": "12,240 m/s²",
+              "is_correct": false
+            }
+          ],
+          "explanation": "Newton's second law gives Fnet = ma, so a = Fnet / m. Substituting Fnet = 51 N and m = 240 kg gives a = 51 / 240 = 0.2125 m/s², which rounds to 0.21 m/s².",
+          "source_quote": "Because Fnet and m are given, the acceleration can be calculated directly from Newton’s second law: Fnet = ma.",
+          "difficulty": "easy",
+          "skill": "calculation",
+          "calculation": {
+            "expression": "51/240",
+            "expected": 0.2125
+          },
+          "coverage_slot_id": "S05",
+          "evidence_atom_id": "A052",
+          "evidence_chunk_id": "p144-c13",
+          "passed": true,
+          "gates": [
+            {
+              "Gate": "well_formed",
+              "Pass": true,
+              "Reason": "structurally sound",
+              "Deterministic": true
+            },
+            {
+              "Gate": "source_role",
+              "Pass": true,
+              "Reason": "chunk p144-c13, page 144 is usable source text",
+              "Deterministic": true
+            },
+            {
+              "Gate": "quote_verbatim",
+              "Pass": true,
+              "Reason": "verbatim in chunk p144-c13, page 144",
+              "Deterministic": true
+            },
+            {
+              "Gate": "arithmetic",
+              "Pass": true,
+              "Reason": "51/240 = 0.2125, matches the correct choice",
+              "Deterministic": true
+            },
+            {
+              "Gate": "unit_check",
+              "Pass": true,
+              "Reason": "dimensionless or no physical unit declared",
+              "Deterministic": true
+            },
+            {
+              "Gate": "coverage_contract",
+              "Pass": true,
+              "Reason": "slot S05 uses atom A052 from chunk p144-c13",
+              "Deterministic": true
+            },
+            {
+              "Gate": "not_a_duplicate",
+              "Pass": true,
+              "Reason": "distinct from the questions already accepted",
+              "Deterministic": true
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

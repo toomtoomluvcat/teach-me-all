@@ -1,0 +1,25 @@
+{
+  "paths": [
+    ".scratch\\e0312e3e107a1953\\benchmark-all.json",
+    ".scratch\\e0312e3e107a1953\\nlm-physics-thai.normalized.txt",
+    ".scratch\\e0312e3e107a1953\\nlm-physics-thai-partial.normalized.txt"
+  ],
+  "suite": "all",
+  "sources": [
+    {
+      "key": "ours",
+      "label": "ของเรา · ชุดฟิสิกส์ล่าสุด",
+      "detail": "ชุดที่สร้างล่าสุด"
+    },
+    {
+      "key": "nlm-whole",
+      "label": "NotebookLM · ทั้งแหล่งข้อมูล",
+      "detail": "15 ข้อจากทั้งเอกสาร · ภาษาไทย"
+    },
+    {
+      "key": "nlm-partial",
+      "label": "NotebookLM · บางส่วน",
+      "detail": "15 ข้อจากหัวข้อที่จำกัด · ภาษาไทย"
+    }
+  ]
+}
