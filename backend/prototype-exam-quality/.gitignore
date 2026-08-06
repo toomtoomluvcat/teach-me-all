@@ -1,4 +1,9 @@
 .scratch/
 *.png
+# Go on Windows cannot delete a running/locked exe, so it renames the old one
+# aside on rebuild. That leaves a second 10 MB binary that git add -A will
+# happily commit if it is not named here.
 protoexam.exe
+protoexam.exe~
+protoexam-*.exe
 __pycache__/
