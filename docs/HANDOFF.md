@@ -31,6 +31,37 @@ prompt/schema text), `examgen/model/calc.go` (+`calc_test.go`)
 ปัจจุบันถูกเอาออกจาก handoff แล้ว; รายละเอียดเชิงประวัติยังอยู่ใน artifact และ
 `backend/prototype-exam-quality/VERDICT.md`.
 
+## ผลวัด optimize (session 2026-08-07, physics 140-220, DeepSeek, candidate 3, parallel 1)
+
+`--benchmark "calculation,analysis"` รันสองรอบบนโค้ดหลัง optimize
+(pass 1 hit cache `outline-v4` ทั้งสองรอบ ตัวเลขข้างล่างจึงเป็น pass 2 ล้วน):
+
+| | calls | in tok | out tok | wall | calculation | analysis |
+|---|---:|---:|---:|---:|---:|---:|
+| default | 18 | 61,884 + 8,792 + 5,617 | 23,805 | 2m48s | 5/5 | 4/10 |
+| `--stop-on-full-set` | 11 | 43,125 + 4,076 + 4,093 | 15,548 | 1m54s | 5/5 | 4/6 |
+
+แยกตาม label (default → stop-on-full-set): `generate-set` 10 → 7,
+`quality/set` 4 → 2, `calc-tool` 4 → 2. รวม **−39% calls, −38% input token,
+−32% wall** โดย accepted ไม่ลด (calculation 5/5 เท่ากัน, analysis ได้ 4 ข้อ
+เท่ากันทั้งสองรอบ ต่างที่จำนวน draft)
+
+สิ่งที่ยืนยันจากตัวเลขนี้:
+
+- **calc-tool memoization ทำงาน**: 4 calls สำหรับ 10 `generate-set` calls
+  (เดิมคือ 1 tool loop ต่อ 1 generate-set call). ที่ยังไม่เป็น 1 ต่อ lesson
+  เพราะ retry contract มี slot น้อยกว่า → chunk ID set ต่าง → cache key คนละอัน
+  ยังเหลือช่องให้บีบอีกถ้าคิดคีย์จาก lesson แทน slot subset
+- **lazy quality grading ทำงาน**: analysis รอบ default เจน 3 candidate แต่
+  grade แค่ 1 (candidate 2/3 ได้ 0/10 แพ้ตั้งแต่ acceptance) ประหยัด 2 calls
+- **analysis variance สูงตามเดิม ไม่ใช่ regression**: candidate 1 ของทั้งสอง
+  รอบใช้ prompt/contract เดียวกันเป๊ะ (prompt string ไม่ถูกแก้ในงานนี้) และ
+  ผลที่เลือกได้ 4 ข้อเท่ากัน ส่วน 4/10 vs 5/5 ใน matrix เก่าอยู่ในช่วงแกว่ง
+  เดิมของ physics analysis (เคยได้ 4/9 มาก่อน) — ตัวที่ตกคือ `demand_contract`
+  ซึ่งเป็น gate ที่ไม่มีอะไรในงาน optimize นี้ไปแตะ
+
+**ยังไม่ได้รัน**: full matrix 5 วิชา × 9 case บนโค้ดใหม่
+
 ## สถานะสั้น ๆ
 
 prototype รันครบตั้งแต่ PDF ถึงข้อสอบ และมี provenance/contract QC ที่แน่นขึ้น
