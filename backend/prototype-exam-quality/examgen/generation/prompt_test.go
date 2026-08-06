@@ -117,3 +117,26 @@ func TestQuestionSetSchemaForContractRestrictsProvenanceIDs(t *testing.T) {
 		}
 	}
 }
+
+// The source context is the byte-identical block across candidates and cases
+// for a lesson, so it must precede every per-case block (directive, coverage
+// contract) and every per-candidate block (the candidate marker) to stay in
+// the provider's prompt-cache prefix.
+func TestQuestionSetPromptOrdersSourceContextForCaching(t *testing.T) {
+	contract := CoverageContract{Budget: 1, Variant: 2, Slots: []CoverageSlot{
+		{ID: "S1", AtomID: "A1", SourceChunkIDs: []string{"p31-c43"}, Skill: "understanding", Difficulty: "easy"},
+	}}
+	prompt := QuestionSetPrompt(Lesson{ID: "L01", Title: "Digestive system"}, nil,
+		[]Chunk{{ID: "p31-c43", Page: 31, Text: "source passage"}}, contract, nil, false)
+
+	sourceAt := strings.Index(prompt, "Source context")
+	contractAt := strings.Index(prompt, "Coverage contract")
+	markerAt := strings.Index(prompt, "This is candidate set 2")
+	if sourceAt < 0 || contractAt < 0 || markerAt < 0 {
+		t.Fatalf("prompt is missing a required block:\n%s", prompt)
+	}
+	if !(sourceAt < contractAt && contractAt < markerAt) {
+		t.Fatalf("expected Source context before Coverage contract before candidate marker, got positions %d, %d, %d:\n%s",
+			sourceAt, contractAt, markerAt, prompt)
+	}
+}

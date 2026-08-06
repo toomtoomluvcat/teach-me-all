@@ -3,7 +3,9 @@ package gates
 import (
 	"fmt"
 	"math"
+	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"unicode"
 )
@@ -371,6 +373,57 @@ func similarQuestions(q, other Question) bool {
 	return float64(shared) >= duplicateRatio*float64(shorter)
 }
 
+// expressionNumberPattern matches a numeric literal in a calculation
+// expression, including an exponent ("6.02e23", "9.6e-3"). A leading sign is
+// left out of the match so it stays in the structure, keeping "19.6/2" from
+// collapsing into "2/19.6".
+var expressionNumberPattern = regexp.MustCompile(`\d+(?:\.\d+)?(?:[eE][+-]?\d+)?`)
+
+// sameCalculationOperation reports whether two arithmetic expressions are the
+// same measurement asked with different numbers. Reading a run turned up
+// 5*0.225 and 2*0.225 — both the N→lb conversion — which the stem and
+// embedding duplicate checks cannot see because the stems differ.
+//
+// Two expressions count as the same operation when they have the same
+// operator shape once every number is replaced with N, and the operand in the
+// same position is the same distinctive constant in both. The constant is
+// what carries the operation's identity: the 0.225 conversion factor, g=9.8,
+// a molar mass, or a fixed friction in a rocket-sled problem. Requiring it in
+// the same position keeps 5*0.225 (N→lb) from being called a duplicate of
+// 3*9.8 (W=mg) and 19.6/2 from being called a duplicate of 2/19.6.
+func sameCalculationOperation(a, b string) bool {
+	if strings.TrimSpace(a) == "" || strings.TrimSpace(b) == "" {
+		return false
+	}
+	if expressionNumberPattern.ReplaceAllString(a, "N") != expressionNumberPattern.ReplaceAllString(b, "N") {
+		return false
+	}
+	an := expressionNumberPattern.FindAllString(a, -1)
+	bn := expressionNumberPattern.FindAllString(b, -1)
+	for i := 0; i < len(an) && i < len(bn); i++ {
+		if an[i] == bn[i] && operationDistinctiveNumber(an[i]) {
+			return true
+		}
+	}
+	return false
+}
+
+// operationDistinctiveNumber reports whether a numeric literal is a stable
+// constant rather than a free input. Decimals and exponents are almost always
+// constants (0.225, 9.8, 6.02e23); an integer of magnitude 100 or more is
+// rarely a per-question input. Small integers (2, 3, 5) are the values a
+// question plugs in, so sharing one is not evidence of a duplicate operation.
+func operationDistinctiveNumber(num string) bool {
+	if strings.Contains(num, ".") || strings.ContainsAny(num, "eE") {
+		return true
+	}
+	n, err := strconv.ParseFloat(num, 64)
+	if err != nil {
+		return false
+	}
+	return math.Abs(n) >= 100
+}
+
 // gateDistinct rejects a question that asks what an already-accepted one asks.
 //
 // This one cannot live in RunCheapGates: it is the only check that depends on the
@@ -391,6 +444,23 @@ func gateDistinct(q Question, accepted []Question, vec []float32, acceptedVecs [
 			if sim := cosine(vec, ov); sim >= duplicateCosine {
 				res.Reason = fmt.Sprintf("%.0f%% the same question as accepted #%d: %q",
 					sim*100, i+1, excerpt(accepted[i].Stem, 55))
+				return res
+			}
+		}
+	}
+
+	// The stem and embedding checks cannot see two questions that are the same
+	// measurement with different numbers (5*0.225 and 2*0.225, both N→lb).
+	// Compare the calculation expressions' operator shape and shared constants
+	// when both questions carry arithmetic.
+	if q.Calculation != nil && strings.TrimSpace(q.Calculation.Expression) != "" {
+		for i, other := range accepted {
+			if other.Calculation == nil || strings.TrimSpace(other.Calculation.Expression) == "" {
+				continue
+			}
+			if sameCalculationOperation(q.Calculation.Expression, other.Calculation.Expression) {
+				res.Reason = fmt.Sprintf("same calculation operation as accepted question %d (%s): %s vs %s",
+					i+1, excerpt(other.Stem, 50), other.Calculation.Expression, q.Calculation.Expression)
 				return res
 			}
 		}

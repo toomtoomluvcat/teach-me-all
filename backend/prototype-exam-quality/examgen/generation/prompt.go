@@ -408,6 +408,16 @@ func contractNeedsHardSupport(contract *CoverageContract) bool {
 func QuestionSetPrompt(lesson Lesson, graph *EvidenceGraph, chunks []Chunk, contract CoverageContract, feedback []RejectedDraft, forceCalc bool) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "Lesson: %s\n\n", lesson.Title)
+	// Source context sits at the very top, above the directive, the coverage
+	// contract, and the evidence packet. The contract slots change on every
+	// benchmark case, so anything below them is re-paid per case; the source
+	// context is byte-identical across candidates and across cases for the
+	// same lesson, so it must stay inside the provider's prompt-cache prefix.
+	// It is ~45-50% of the generate-set prompt (a 9-case run paid it 37 times).
+	b.WriteString("Source context (the cited quote must come from the exact evidence_chunk_id):\n")
+	for _, chunk := range chunks {
+		fmt.Fprintf(&b, "[%s | page %d]\n%s\n\n", chunk.ID, chunk.Page, chunk.Text)
+	}
 	if strings.TrimSpace(contract.GenerationDirective) != "" {
 		fmt.Fprintf(&b, "Benchmark/Run directive (must be obeyed while staying source-grounded): %s\n\n", strings.TrimSpace(contract.GenerationDirective))
 	}
@@ -421,10 +431,6 @@ func QuestionSetPrompt(lesson Lesson, graph *EvidenceGraph, chunks []Chunk, cont
 		for _, atom := range atoms {
 			fmt.Fprintf(&b, "- %s chunk=%s concepts=%s relation=%s claim=%s evidence_quote=%q\n", atom.ID, atom.ChunkID, strings.Join(atom.ConceptIDs, ","), atom.Relation, atom.Claim, atom.Quote)
 		}
-	}
-	b.WriteString("\nSource context (the cited quote must come from the exact evidence_chunk_id):\n")
-	for _, chunk := range chunks {
-		fmt.Fprintf(&b, "[%s | page %d]\n%s\n\n", chunk.ID, chunk.Page, chunk.Text)
 	}
 	if len(feedback) > 0 {
 		b.WriteString(rejectionMemoryBlock(feedback))

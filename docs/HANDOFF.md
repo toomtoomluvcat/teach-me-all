@@ -112,17 +112,29 @@ duplicate ระดับ operation ที่ gate ปัจจุบันม�
 
 - อีก 4 วิชา (เคมี/เศรษฐศาสตร์/US history/ชีววิทยา) — session นี้ผู้ใช้เลือกรัน
   physics อย่างเดียวก่อน physics รันครบทั้ง 5-case suite และ generic 9-case
-- **ผลของ commit `b547be9` ยังไม่เคยถูกวัด** — prompt reorder (ให้ prefix
-  เสถียรข้าม candidate) กับ facts cache key ใหม่ ผ่าน unit test แต่ยังไม่มี run
-  ไหนแสดงตัวเลข: รอบ apples-to-apples เก็บ cache-hit token ไว้แล้วทิ้งตอนพิมพ์
-  เพราะ format string ยังไม่ได้แก้ (แก้ทีหลังใน `7fe201c`) ตัวเลขประหยัดของ
-  commit นั้นจึงเป็น **คาดว่า ไม่ใช่วัดได้**
-- คำสั่งพิสูจน์ทั้งสองอย่างในรอบเดียว (~8 calls):
-  `protoexam.exe --provider deepseek --pdf ../../samples/openstax-physics.pdf --pages 140-220 --benchmark calculation --set-candidates 3 --parallel 1`
-  ดู `cached in` ของ `generate-set` ต้องไม่เป็น 0 (แปลว่า prefix cache ติด) และ
-  `calc-tool` ต้องค้างที่ 1 แม้มี retry (แปลว่า key ใหม่ทำงาน) ถ้า `cached in`
-  ออกมา 0 นั่นก็เป็น finding ที่ต้องบันทึก ไม่ใช่ความล้มเหลว — DeepSeek cache
-  ทำงานเป็นบล็อก 64 token ขอบอาจไม่ตรง
+- **ผลของ commit `b547be9` วัดแล้ว (session 2026-08-07, physics 140-220,
+  calculation, DeepSeek, candidate 3, parallel 1)**: 8 calls (generate-set 3,
+  quality/set 3, calc-tool 2), 55.8s, calculation 5/5 (quality 20/20),
+  `contract_retries` 0
+
+  | call | count | in tok | cached in | out tok |
+  |---|---|---:|---:|---:|
+  | generate-set | 3 | 17,964 | 17,664 | 6,457 |
+  | quality/set | 3 | 6,898 | 4,608 | 1,232 |
+  | calc-tool | 2 | 4,093 | 3,968 | 215 |
+
+  - **prefix cache ติด (ยืนยัน)**: `generate-set` cached in 17,664/17,964 ≈
+    98% — candidate marker ที่ย้ายลงใต้ source context ทำงานจริง (ก่อน
+    `b547be9` ตัว marker อยู่ต้น prompt ทำให้ทุกบล็อกใต้มัน cache ข้าม candidate
+    ไม่ได้ ≈ 0)
+  - **calc-tool key ใหม่: ยืนยันบางส่วน** — calc-tool 2 calls = 1 ครั้ง
+    `ComputeFacts` (tool loop 2 รอบ: เสนอ expression → DONE) แชร์ข้าม 3
+    generate-set calls หมายถึง memoization ทำงานจริง แต่รอบนี้
+    `contract_retries` = 0 ไม่มี bounded repair มา exercise เส้นทางที่ key ใหม่
+    (lesson+packet) ต่างจาก key เก่า (slot chunk set) — ตอนไม่มี retry ทั้งสอง
+    key ให้ผลเท่ากันเพราะ slot set เหมือนเดิมทุก candidate ต้องรันเคสที่ repair
+    เกิดจริง (เช่น analysis-hard หรือวิชาที่พลาดบ่อย) เพื่อแยกผลของ key ใหม่
+    จริง ๆ (มี unit test ปักหมุดไว้แล้วใน `calctool_test.go`)
 - interactive path (`renderSummary`, `writeRun`) — session นี้รันแต่ทาง
   `--benchmark`
 - `--provider ollama` ซึ่งเป็น default — ตอนนี้ต้อง compile evidence เสมอ
@@ -131,26 +143,53 @@ duplicate ระดับ operation ที่ gate ปัจจุบันม�
   (`contract fully covered; skipping the remaining candidates`) แต่ field
   เพิ่งถูกใส่ลง benchmark JSON รอบนี้ ยังไม่มี artifact ที่มีค่านี้
 
-## ที่ยังไม่ได้ทำ แต่มีหลักฐานว่าคุ้ม (seed ของ session ถัดไป)
+## เลเวอร์ที่ทำแล้ว (session 2026-08-07, ยังไม่ commit)
 
-**1. ย้าย source context ขึ้นก่อน coverage contract ใน `QuestionSetPrompt`**
+**1. ย้าย source context ขึ้นบนสุดของ `QuestionSetPrompt`** (`prompt.go`)
 
-ตอนนี้เรียง contract slots → evidence packet → source context. `contract.Slots`
-ต่างกันทุก case ดังนั้น source context ที่อยู่ใต้มัน cache ข้าม case ไม่ได้
-ทั้งที่เนื้อหาเดียวกันเป๊ะ รอบ 9-case: `generate-set` 37 calls บน lesson เดียว
-input รวม 217,092 token (~5,868/call) source context = 10 chunk × ~868 rune
-≈ 45-50% ของ prompt **จ่ายซ้ำ 37 รอบ**
+เรียงใหม่: Lesson → source context → directive → coverage contract →
+evidence packet → rejection memory → candidate marker → slot protocol
+(เดิม: lesson → directive → contract → packet → source context) source
+context เป็นบล็อกที่ byte-identical ข้าม candidate และข้าม case ของ lesson
+เดียวกัน จึงต้องอยู่เหนือทุกบล็อกที่เปลี่ยนต่อ case เพื่ออยู่ใน provider prefix
+cache (~45-50% ของ prompt; รอบ 9-case เคยจ่ายซ้ำ 37 รอบ)
 
-ย้ายขึ้นบนสุดแล้ว prefix จะแชร์ข้ามทั้ง candidate และ case และเป็น layout ที่ดี
-ต่อ long-context attention ด้วย (คำสั่งอยู่ใกล้ท้าย) ต้อง verify ด้วย benchmark
-ก่อน ไม่ใช่เดา
+- unit test `TestQuestionSetPromptOrdersSourceContextForCaching` ปักหมุดลำดับ
+  source context < coverage contract < candidate marker
+- verify สด (physics 140-220, DeepSeek, candidate 3, parallel 1):
+  - 2 case ไม่ pin lesson (calculation + application-easy, lesson คนละอัน):
+    5/5 + 5/5, generate-set cached in 36,096/55,464 ≈ 65% — มี cold start 2
+    ครั้ง (lesson ใหม่ 2 อัน + layout ใหม่ทำให้ prefix cache ของรอบก่อนใช้ไม่ได้)
+  - 2 case pin lesson เดียวกัน (`--benchmark-lesson "Newton"`): 5/5 + 5/5,
+    generate-set cached in 34,560/50,390 ≈ 69% — case 2 candidate แรกได้
+    lesson+source context จาก cache ข้าม case
+  - cross-candidate caching ยังทำงานครบ (candidate 2-3 warm ต่อ case)
+  - ยังไม่ได้ตัวเลขเต็มของ cross-case: aggregate 2-case แยก delta ไม่ได้ชัด
+    ต้องรัน 9-case บน lesson เดียว (37 generate-set calls ตามที่วัดเดิม) ถึงจะ
+    เห็นผลรวม ถ้าต้องการ
 
-**2. `gateDistinct` มองไม่เห็น duplicate ระดับ operation**
+**2. `gateDistinct` จับ duplicate ระดับ operation** (`wellformed.go`)
 
-เจอจากการอ่านผลรอบล่าสุด: calculation Q3 `5*0.225` กับ Q4 `2*0.225` เป็นการ
-แปลงหน่วย N→lb แบบเดียวกันสองข้อ gate ปล่อยผ่านเพราะเทียบ stem/vector ซึ่ง
-ต่างกันจริง แนวทางที่น่าจะได้ผลคือเทียบ `calculation.expression` แบบ normalize
-รูปแบบ (ตัวเลขต่างได้ แต่โครงสร้าง operator เดียวกัน = ซ้ำ)
+`sameCalculationOperation`: normalize `calculation.expression` (ตัวเลข → `N`)
+เทียบโครงสร้าง operator; ถ้าโครงสร้างเท่ากันและ operand ตำแหน่งเดียวกันเป็น
+constant เดียวกัน (มีทศนิยม/exponent หรือ |n| ≥ 100 เช่น 0.225, 9.8, 6.02e23)
+→ reject เป็น duplicate ของข้อที่ผ่านไปแล้ว
+
+- จับ `5*0.225` vs `2*0.225` (N→lb เหมือนกัน) แต่ไม่จับ `5*0.225` vs `3*9.8`
+  (N→lb vs W=mg ต่างกันจริง — คนละ constant) และไม่จับ `19.6/2` vs `2/19.6`
+  (กลับ operand — ต่าง operation)
+- unit tests: reject same-op 2 ตัว, allow different-op same-shape, allow
+  operand reversal
+- verify สด: calculation case ได้ 5 operation ต่างกันครบ (`2.0*1.67`,
+  `5*0.225`, `10/2`, `1000*45/4`, `1/0.225`) — `2*0.225` ที่เคยซ้ำหายไป;
+  `5*0.225` vs `1/0.225` (N*N vs N/N) ไม่ถูก flag อย่างถูกต้อง; ทั้งสอง case
+  ยัง 5/5 ไม่มี yield regression
+
+**Blob `protoexam.exe~` (session 2026-08-07)**: ตรวจแล้ว commit ที่มี blob
+ถูก push ไปแล้วจริง (origin/prototype/exam-quality = bfdf084 = HEAD; blob เก่า
+ยังอยู่ใน origin/main + `refs/pull/*/head`) — เลือก **ไม่ rewrite history**
+(ผู้ใช้ตัดสินใจ) เพราะ blob อยู่บน GitHub อยู่แล้วและ gitignore ที่ `c84678e`
+ใส่ไว้กันไม่ให้กลับมาอีกก็เพียงพอ
 
 ## สถานะสั้น ๆ
 
