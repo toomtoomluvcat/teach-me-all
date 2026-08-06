@@ -135,3 +135,25 @@ the sheet, a different seed changes it, the sheet really does carry no answer
 and no provenance, and a PASS verdict comes out of a fully-labelled sheet. The
 INCONCLUSIVE and FAILS PREMISE branches were checked by hand, not by this
 script.
+
+## What else is in this directory
+
+`labelkit.py` and `selftest.py` are the blind-labelling toolkit documented
+above. The rest are report and diagnostic scripts, listed here so nobody has to
+open each one to find out whether it is still live:
+
+| script | what it is |
+|---|---|
+| `normalize_nlm.py` | Feeds `labelkit`. Turns a raw NotebookLM Markdown export into the strict shape the parser accepts, so a paste that would otherwise exit 2 becomes usable. |
+| `render_liveverify_html.py` | The current report renderer: one tab per subject, one table per skill, difficulty across the columns. This is what produced `comparisons/liveverify-all-subjects.html`. |
+| `analyze_length_bias.py` | Diagnostic behind the `lenbias` column in HANDOFF: does a longer keyed choice pass the gates more often than a short one? Reads a `benchmark-*.json`. |
+| `show_lenbias_examples.py` | The per-question view of the same question — prints correct/average-wrong length ratios and flags the lopsided ones. Takes a report path as its first argument; its built-in default points at one old run. |
+
+Two scripts are **frozen one-offs**, kept because the artifacts they built are
+committed and could not otherwise be rebuilt. Neither is a general tool, and
+neither should be extended — write a new script instead:
+
+| script | tied to |
+|---|---|
+| `compare_latest.py` | `comparisons/comparison-physics-thai.html`. It embeds one specific set of NotebookLM answers as Python literals, so it only ever produces that one comparison. |
+| `assemble_thai_table.py` | `comparisons/liveverify-all-subjects.th.html`. It splices the already-translated fragments in `liveverify_split/` into the current layout rather than re-translating ~300KB. It needs that directory; delete one and the other becomes useless. |
