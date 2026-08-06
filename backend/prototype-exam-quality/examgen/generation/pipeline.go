@@ -232,7 +232,10 @@ func generateExamSet(ctx context.Context, outline *Outline, lesson Lesson, chunk
 
 	best := selectSetCandidate(ctx, lesson, outline.EvidenceGraph, contextChunks, drafted, d)
 	best.Contract = &contract
-	best.SetCandidates = candidates
+	// len(drafted), not the requested count: --stop-on-full-set and a failed
+	// candidate both make those differ, and the artifact should say what the run
+	// actually generated.
+	best.SetCandidates = len(drafted)
 	best.SelectedSetScore = setCandidateScore(best, outline.EvidenceGraph)
 	return best, nil
 }

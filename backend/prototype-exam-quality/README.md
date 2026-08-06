@@ -99,10 +99,16 @@ will have to do anyway. Building it here is not throwaway work.
   Whether embeddings work is a property of the host, not the protocol, so
   `--embed-model` stays empty unless you name one.
 - Preset provider names fill in a base URL, key variable, and default model, and
-  everything they set can still be overridden on the command line:
-  `--provider deepseek` (`DEEPSEEK_API_KEY`, `deepseek-chat`) and
-  `--provider local` (Ollama's `/v1` endpoint). Adding a vendor needs a base
-  URL, not code.
+  everything they set can still be overridden on the command line. There is one
+  today: `--provider deepseek` (`DEEPSEEK_API_KEY`, `deepseek-chat`). Adding a
+  vendor needs a base URL, not code.
+- For a local model, `--provider ollama` and `--provider openai --base-url
+  http://localhost:11434/v1` are not equivalent. The native Ollama path keeps
+  the measured one-call-per-chunk map step and defaults `--embed-model` to
+  `bge-m3`; the OpenAI-compatible path maps chunks in large batches and leaves
+  embeddings off unless you name a model. Batched mapping suits a
+  large-context server (vLLM, llama.cpp with a big window); for a small local
+  model served by Ollama, prefer `--provider ollama`.
 - The CLI also loads the nearest `.env` from the working directory or its
   parents. Already-exported environment variables take precedence.
 - For the best `--extract=auto` path: Python 3.12 plus the project-local
@@ -141,7 +147,7 @@ Flags:
 | Flag | Default | Meaning |
 |------|---------|---------|
 | `--pdf` | *(required)* | source PDF |
-| `--provider` | `ollama` | `ollama`, `openai`, `gemini`, or a preset (`deepseek`, `local`) |
+| `--provider` | `ollama` | `ollama`, `openai`, `gemini`, or the `deepseek` preset |
 | `--extract` | `auto` | `auto` and `docling` both run the single supported Docling pipeline; there is no lower-quality fallback |
 | `--extract-dir` | `.scratch/<hash>/extract` | output directory for the reusable extraction bundle |
 | `--docling-python` | auto-detected | Python executable containing Docling; overrides `DOCLING_PYTHON` |

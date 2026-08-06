@@ -190,9 +190,6 @@ type providerPreset struct {
 
 var providerPresets = map[string]providerPreset{
 	"deepseek": {baseURL: "https://api.deepseek.com", keyEnv: "DEEPSEEK_API_KEY", model: "deepseek-chat"},
-	// Ollama's OpenAI-compatible endpoint, for running the same code path
-	// against a local model instead of the native Ollama client.
-	"local": {baseURL: "http://localhost:11434/v1", keyEnv: "LLM_API_KEY", model: "scb10x/typhoon2.5-qwen3-4b"},
 }
 
 // loadDotEnv loads the nearest .env from the working directory or one of its

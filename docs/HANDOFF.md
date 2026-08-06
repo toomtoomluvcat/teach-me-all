@@ -1,5 +1,21 @@
 # Handoff — exam-quality prototype
 
+> **อ่านก่อน (2026-08-07, session optimize/refactor):** CLI เปลี่ยนไปแล้ว
+> คำสั่งเก่าในเอกสารนี้จะขึ้น `flag provided but not defined`
+>
+> - `--set-generation` / `--graph-compile` / `--question-plan` / `--per-chunk`
+>   **ถูกลบ** — graph-backed set generation เป็นเส้นทางเดียวแล้ว ไม่ต้องเปิดเอง
+> - `--deepseek-host` / `--deepseek-api-key` **ถูกลบ** → `--base-url` /
+>   `--api-key` (`LLM_API_KEY`). `--provider deepseek` ยังใช้ได้ในฐานะ preset
+>   และยังอ่าน `DEEPSEEK_API_KEY` เหมือนเดิม
+> - เพิ่ม `--stop-on-full-set` (default off) และ `--provider openai --base-url`
+>   สำหรับ provider ใดก็ได้ที่พูด OpenAI wire format รวม local server
+> - outline cache pin ที่ `outline-v4` — cache เก่าไม่มี atom รันต่อไม่ได้
+>   รอบแรกหลัง pull จะจ่าย pass 1 ใหม่หนึ่งครั้ง (ไม่ใช่ regression)
+>
+> คำสั่ง benchmark ที่ถูกต้องตอนนี้:
+> `protoexam.exe --provider deepseek --pdf <pdf> --pages <range> --benchmark all --set-candidates 3 --parallel 1`
+
 อัปเดต 2026-08-06 บน branch `prototype/exam-quality` — สอง session ต่อเนื่องกันวันเดียว
 
 session แรกจบที่ commit `0d7985c` (`refactor: make calculation an orthogonal
@@ -210,7 +226,7 @@ humanities ตัวเดียวที่ session นี้หาไว้ �
 ### Live-verify ข้ามวิชา (session 2026-08-06 ต่อเนื่อง 2, หลัง commit `97e6587`)
 
 ผู้ใช้สั่ง live-verify ทุกวิชา (pending #10) — รัน `--benchmark all` แบบเดียวกับ
-Thai biology รอบก่อน (DeepSeek, candidate 3, parallel 1, `--set-generation`).
+Thai biology รอบก่อน (DeepSeek, candidate 3, parallel 1; ตอนนั้นต้องใส่ `--set-generation`, ตอนนี้เป็น default).
 เจอ findings ใหม่ 4 ตัวที่แก้แล้ว (commit `623018c`) แล้ว rerun:
 physics application-hard 0/6 → 5/5, chemistry calc 50% → 66.7% → 80%.
 จากนั้นรันวิชาที่เหลือครบทุกวิชา

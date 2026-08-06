@@ -464,6 +464,3 @@ func (r *GateReport) Failures() []GateResult {
 }
 
 // add appends a result, tolerating a nil report.
-func (r *GateReport) add(res GateResult) {
-	r.Results = append(r.Results, res)
-}

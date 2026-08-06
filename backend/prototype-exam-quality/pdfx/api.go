@@ -33,8 +33,4 @@ func ExtractAuto(ctx context.Context, opts AutoOptions) (AutoResult, error) {
 func ExtractDocling(ctx context.Context, opts DoclingOptions) (DoclingResult, error) {
 	return extract.ExtractDocling(ctx, opts)
 }
-func ResolveDoclingPython(explicit string) (string, error) {
-	return extract.ResolveDoclingPython(explicit)
-}
 func WriteBundle(opts BundleOptions) (BundleResult, error) { return bundle.WriteBundle(opts) }
-func MarkdownToPlainText(markdown string) string           { return bundle.MarkdownToPlainText(markdown) }
