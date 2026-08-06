@@ -14,10 +14,9 @@ ROOT = os.path.abspath(os.path.join(HERE, ".."))
 
 REPORTS = [
     ("physics", ".scratch/e0312e3e107a1953/benchmark-all.json"),
-    ("physics-fix", ".scratch/e0312e3e107a1953/benchmark-applicationhard.json"),
     ("chemistry", ".scratch/a4508f0287624222/benchmark-calculation.json"),
     ("economics", ".scratch/411dd75621fa43f9/benchmark-all.json"),
-    ("us-history", ".scratch/bc9cce4c7060c17e/benchmark-all.json"),
+    ("us-history", ".scratch/bc9cce4c7060c17e/benchmark-recallunderstandingapplicationeasyapplic.json"),
     ("biology", ".scratch/87040807ef7f73b8/benchmark-all.json"),
 ]
 

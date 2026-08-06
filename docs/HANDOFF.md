@@ -239,6 +239,38 @@ physics application-hard 0/6 → 5/5, chemistry calc 50% → 66.7% → 80%.
 - **calculation skip ถูกต้อง** ในบทที่ไม่มี numeric content (biology cellular
   respiration) และ US history ได้ 2/4 (บทนี้แทบไม่มีตัวเลข โมเดลฝืนสร้าง)
 
+### Rerun หลัง prompt fix (session 2026-08-07, หลัง commit `b76c51e`)
+
+rerun ทั้ง 5 วิชาหลัง prompt length-bias fix เพื่อดู pass rate + `lenbias` ใหม่
+(DeepSeek candidate 3 parallel 1 เดิม). US history ข้าม calculation เพราะบทนี้
+ฝืนสร้างแล้วติดหล่ม (เพิ่ม `--benchmark "case1,case2,..."` comma-list ให้ข้าม
+case ที่ไม่เหมาะได้):
+
+| วิชา | recall | under. | app-e | app-m | app-h | calc | ana-e | ana-m | ana-h |
+|---|---|---|---|---|---|---|---|---|---|
+| ฟิสิกส์ | 5/6 | 5/5 | 5/5 | 5/5 | 5/7 | 5/5 | 5/5 | 5/5 | 5/5 |
+| เคมี | — | — | — | — | — | 4/6 | — | — | — |
+| เศรษฐศาสตร์ | 5/5 | 5/5 | 5/5 | 5/5 | 5/5 | 5/7 | 5/10 | 5/5 | 5/10 |
+| US History | 5/5 | 5/5 | 5/5 | 5/5 | 5/5 | (ข้าม) | 5/6 | 5/5 | 5/10 |
+| ชีววิทยา | 5/5 | 5/6 | 5/7 | 5/5 | 5/5 | skip | 5/5 | 4/6 | 5/10 |
+
+`lenbias` (passed/total, เฉพาะ case ที่มี): physics understanding 3/3,
+economics app-easy 2/2 ana-hard 2/4, US history ana-easy 5/6 ana-hard 4/8
+app-hard 3/3 — **humanities/narrative ยัง bias สูง** เพราะ correct ต้องอธิบาย
+ยาวบ่อย; STEM เกือบ 0/0
+
+ข้อสังเกต rerun:
+
+- **fix ช่วย analysis/app-hard จริง**: physics app-hard 0/6→5/7, ana-m/h 4/9→5/5;
+  US history ana-medium 3/10→5/5; economics app-hard 5/8→5/5 — แต่บาง case
+  กลับลง (stochastic): economics ana-e/h 5/5→5/10, biology ana-h 3/7→5/10
+- **prompt length fix ครอบคลุมไม่ถึงข้อที่ต้องอธิบาย "ทำไม" สั้นๆ** (understanding
+  physics lenbias 3/3) — เป็น advisory ไม่ reject ตามที่ตกลง; ตัวเลขรวม 206 ข้อ
+  173 ผ่าน (84%) ยังยืนยัน "ข้อ fail ยาวกว่าข้อผ่าน" (stem 194 vs 159) = draft
+  ที่ยาวมักพัง ไม่ใช่ข้อยาวผ่าน
+- US history report อยู่ใน `benchmark-recallunderstandingapplicationeasyapplic.json`
+  (comma-list เก่าตั้งชื่อ suite ยาว; หลังแก้ suite เป็น "first-et-al" แล้ว)
+
 ### Findings ใหม่ที่เจอ live (แก้แล้วใน commit `623018c`, มี unit test ปักหมุด)
 
 1. **`distractor_reasons` schema mismatch** — DeepSeek ส่ง array of objects
@@ -344,11 +376,15 @@ error message ระบุ `(widened retry)` ตรง ๆ ตอนเคมี
    แย่ง atom เดียวกัน) — ยังไม่วัดว่ากระทบ yield ของ analysis slot บนวิชาที่
    คำนวณเยอะ (ฟิสิกส์/เคมี) มากกว่าวิชาที่ไม่ค่อยมีเลข (ชีวะ/สังคม) แค่ไหน
 10. live-verify ซ้ำ bug 1 (rounding tolerance) กับ bug 3 (coverage_contract
-    asymmetry) — **เริ่มแล้ว (session 2026-08-06 ต่อเนื่อง 2) ยังไม่จบ**: physics
-    + algebra บางส่วนรันแล้ว (ผลในหัวข้อ Live-verify ด้านบน) ยังไม่เจอ live
-    run ที่ exercise bug 1/3 ตรง ๆ; **ต้องสืบ findings ใหม่ 3 ข้อ** (application-
-    hard physics 0/6, analysis-easy algebra 0/10, `distractor_reasons` schema
-    mismatch) ก่อนรันวิชาที่เหลือ (chemistry/economics/US history/biology)
+    asymmetry) — **ส่วนใหญ่เสร็จ (session 2026-08-06/07)**: physics/chemistry/
+    economics/US history/biology rerun แล้ว post-fix; bug 1/3 พิสูจน์แล้วว่าไม่มี
+    ผลใน live (numeric 4/4, app-hard 5/7) — เหลือ rerun algebra หลัง fix
+    (รอบแรกหยุดกลางคัน) ถ้าต้องการ matrix ครบทุกวิชา
+
+11. **`--benchmark` รองรับ comma-list แล้ว** (`--benchmark "recall,understanding,
+    application-hard"`) — เพิ่ม session 2026-08-07 เพื่อข้าม case ที่ไม่เหมาะกับ
+    source (เช่น US history ข้าม calculation ที่ฝืนสร้างแล้วติดหล่ม). report
+    suite ตั้งชื่อเป็น "first-et-al" เมื่อ list ยาวเกิน 2 ตัว
 
 ## เกณฑ์รอบถัดไป
 

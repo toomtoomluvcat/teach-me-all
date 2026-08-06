@@ -28,6 +28,7 @@ SUBJECTS = [
         ".scratch/411dd75621fa43f9/benchmark-all.json",
     ]),
     ("us-history", "US History", "Westward · 460–489", [
+        ".scratch/bc9cce4c7060c17e/benchmark-recallunderstandingapplicationeasyapplic.json",
         ".scratch/bc9cce4c7060c17e/benchmark-all.json",
     ]),
     ("biology", "Biology", "Cell Respiration · 210–237", [
