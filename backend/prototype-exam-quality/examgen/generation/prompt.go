@@ -612,7 +612,12 @@ Hard requirements for every question:
 - The stem stands alone. Never point at invisible material with phrases such as
   "according to the passage", "the text above", "this value", or "the diagram".
 - Exactly one choice is correct. The other three must be plausible and wrong for
-  a reason a student could articulate. Keep choices parallel in type and length.
+  a reason a student could articulate. Keep choices parallel in type and length:
+  the correct choice must not be visibly longer than the wrong ones. Put the
+  reasoning that justifies the answer in the explanation field, never in the
+  correct choice text, and give each wrong choice a comparable clause so the
+  keyed option does not stand out by length alone. A student who reads only the
+  option lengths must not be able to pick the answer.
 - Do not use all/none of the above, both A and B, synonyms of the answer, or
   choices that merely restate the stem with one word or number changed.
 - Ask about subject matter only. Exclude learning objectives, assessment rules,

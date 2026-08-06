@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"unicode/utf8"
 
 	"protoexam/examgen"
 )
@@ -201,6 +202,12 @@ type benchmarkQuestion struct {
 	examgen.Question
 	Passed bool                 `json:"passed"`
 	Gates  []examgen.GateResult `json:"gates"`
+	// LengthBias is advisory, not a gate: true when the keyed choice is
+	// disproportionately longer than the distractors, which makes the answer
+	// decodable by length. It does not set Passed=false because a verbose
+	// correct option is not a deterministic defect — a human reviewer should
+	// decide. Reported so benchmark reports surface the answer-length tell.
+	LengthBias bool `json:"length_bias,omitempty"`
 }
 
 type benchmarkCaseResult struct {
@@ -221,6 +228,8 @@ type benchmarkCaseResult struct {
 	NumericVerified     int                    `json:"numeric_verified"`
 	WellFormedPassed    int                    `json:"well_formed_passed"`
 	ContractRetries     int                    `json:"contract_retries"`
+	LengthBiasPassed    int                    `json:"length_bias_passed"`
+	LengthBiasTotal     int                    `json:"length_bias_total"`
 	Quality             *examgen.QualityReport `json:"quality,omitempty"`
 	Questions           []benchmarkQuestion    `json:"questions"`
 }
@@ -279,11 +288,12 @@ func runBenchmark(ctx context.Context, cfg config, outline *examgen.Outline, chu
 		}
 		caseResult := makeBenchmarkCaseResult(benchmark, res)
 		report.Cases = append(report.Cases, caseResult)
-		fmt.Printf("%s%s: %d/%d accepted (%.1f%%), target %d/%d, calc %d/%d, demand %d, changed %d, numeric %d, retries %d%s\n",
+		fmt.Printf("%s%s: %d/%d accepted (%.1f%%), target %d/%d, calc %d/%d, demand %d, changed %d, numeric %d, retries %d, lenbias %d/%d%s\n",
 			dim, benchmark.Name, caseResult.Accepted, caseResult.Drafts, caseResult.PassRate*100,
 			caseResult.TargetAccepted, caseResult.TargetDrafts,
 			caseResult.CalculationAccepted, caseResult.CalculationDrafts,
-			caseResult.DemandPassed, caseResult.ChangedCondition, caseResult.NumericVerified, caseResult.ContractRetries, reset)
+			caseResult.DemandPassed, caseResult.ChangedCondition, caseResult.NumericVerified, caseResult.ContractRetries,
+			caseResult.LengthBiasPassed, caseResult.LengthBiasTotal, reset)
 	}
 
 	dir := scratchDir(cfg)
@@ -356,6 +366,13 @@ func makeBenchmarkCaseResult(benchmark benchmarkCase, res *examgen.ExamResult) b
 		if q.Report != nil {
 			reported.Gates = q.Report.Results
 		}
+		if lengthBiasRatio(q) > 0 {
+			out.LengthBiasTotal++
+			reported.LengthBias = true
+			if passed {
+				out.LengthBiasPassed++
+			}
+		}
 		out.Questions = append(out.Questions, reported)
 	}
 	if out.Drafts > 0 {
@@ -374,4 +391,38 @@ func gatePassed(report *examgen.GateReport, wanted examgen.GateName) bool {
 		}
 	}
 	return false
+}
+
+// lengthBiasRatio returns the correct-choice length divided by the average
+// wrong-choice length, or 0 when the tell does not apply (no key, fewer than
+// two choices, or distractors too short to matter). This mirrors the intended
+// gate A check but stays advisory: it only reports the bias so a reviewer can
+// decide, it never rejects the question. The 1.4 threshold and the 25-rune
+// prose floor match what gate A used.
+func lengthBiasRatio(q examgen.Question) float64 {
+	idx := q.CorrectIndex()
+	if len(q.Choices) < 2 || idx < 0 {
+		return 0
+	}
+	var wrongSum, wrongN int
+	for i, c := range q.Choices {
+		if i == idx {
+			continue
+		}
+		wrongSum += utf8.RuneCountInString(strings.TrimSpace(c.Content))
+		wrongN++
+	}
+	if wrongN == 0 {
+		return 0
+	}
+	avgWrong := float64(wrongSum) / float64(wrongN)
+	if avgWrong < 25 {
+		return 0
+	}
+	correctLen := utf8.RuneCountInString(strings.TrimSpace(q.Choices[idx].Content))
+	ratio := float64(correctLen) / avgWrong
+	if ratio <= 1.4 {
+		return 0
+	}
+	return ratio
 }
