@@ -34,10 +34,6 @@ type GeminiClient struct {
 	lastRequest time.Time
 }
 
-func NewGemini(apiKey string) *GeminiClient {
-	return NewGeminiAt(defaultGeminiHost, apiKey, nil)
-}
-
 // NewGeminiAt exists so tests can point the client at an httptest.Server.
 func NewGeminiAt(host, apiKey string, httpClient *http.Client) *GeminiClient {
 	if httpClient == nil {

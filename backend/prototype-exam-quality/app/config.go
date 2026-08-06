@@ -42,10 +42,6 @@ type config struct {
 	scope              string
 	pages              string
 	budget             int
-	perChunk           int
-	questionPlan       bool
-	graphCompile       bool
-	setGeneration      bool
 	setCandidates      int
 	contractPreflight  bool
 	fresh              bool
@@ -96,10 +92,6 @@ func parseConfig() config {
 	flag.StringVar(&cfg.scope, "scope", "", "free-text focus; chunks are ranked against this instead of the lesson title")
 	flag.StringVar(&cfg.pages, "pages", "", "page range, e.g. 10-40")
 	flag.IntVar(&cfg.budget, "budget", 0, "override the model's own question budget")
-	flag.IntVar(&cfg.perChunk, "per-chunk", 0, "questions requested per generation call; 0 uses the default")
-	flag.BoolVar(&cfg.questionPlan, "question-plan", false, "plan lesson-level coverage slots before generating questions")
-	flag.BoolVar(&cfg.graphCompile, "graph-compile", false, "compile source chunks into atomic evidence claims")
-	flag.BoolVar(&cfg.setGeneration, "set-generation", false, "generate a complete question set from graph evidence and cross-lesson context")
 	flag.IntVar(&cfg.setCandidates, "set-candidates", 3, "independent set candidates to generate and score when --set-generation is enabled")
 	flag.BoolVar(&cfg.contractPreflight, "contract-preflight", true, "normalize/drop deterministic coverage-slot defects before generation")
 	flag.BoolVar(&cfg.fresh, "fresh", false, "ignore the cache")

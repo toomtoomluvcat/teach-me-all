@@ -23,10 +23,6 @@ type DeepSeekClient struct {
 	Stats  *Stats
 }
 
-func NewDeepSeek(apiKey string) *DeepSeekClient {
-	return NewDeepSeekAt(defaultDeepSeekHost, apiKey, nil)
-}
-
 func NewDeepSeekAt(host, apiKey string, httpClient *http.Client) *DeepSeekClient {
 	if httpClient == nil {
 		httpClient = &http.Client{Timeout: 10 * time.Minute}

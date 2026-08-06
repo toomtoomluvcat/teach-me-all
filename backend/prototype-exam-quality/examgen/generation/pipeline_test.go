@@ -6,22 +6,6 @@ import (
 	"testing"
 )
 
-type batchTestGenerator struct {
-	questions []Question
-}
-
-func (g batchTestGenerator) Topics(context.Context, Chunk) (ChunkTopics, error) {
-	return ChunkTopics{}, nil
-}
-
-func (g batchTestGenerator) Outline(context.Context, EvidenceGraph) (*Outline, []LessonConcepts, error) {
-	return nil, nil, nil
-}
-
-func (g batchTestGenerator) Questions(context.Context, Lesson, *EvidenceGraph, Chunk, []RejectedDraft, int, bool) ([]Question, error) {
-	return append([]Question(nil), g.questions...), nil
-}
-
 type feedbackRecordingGenerator struct {
 	calls    int
 	feedback [][]RejectedDraft
@@ -30,10 +14,13 @@ type feedbackRecordingGenerator struct {
 func (*feedbackRecordingGenerator) Topics(context.Context, Chunk) (ChunkTopics, error) {
 	return ChunkTopics{}, nil
 }
+func (*feedbackRecordingGenerator) CompileEvidence(_ context.Context, graph EvidenceGraph, _ []Chunk) (EvidenceGraph, error) {
+	return graph, nil
+}
 func (*feedbackRecordingGenerator) Outline(context.Context, EvidenceGraph) (*Outline, []LessonConcepts, error) {
 	return nil, nil, nil
 }
-func (g *feedbackRecordingGenerator) Questions(_ context.Context, _ Lesson, _ *EvidenceGraph, _ Chunk, feedback []RejectedDraft, _ int, _ bool) ([]Question, error) {
+func (g *feedbackRecordingGenerator) QuestionsSet(_ context.Context, _ Lesson, _ *EvidenceGraph, _ []Chunk, _ CoverageContract, feedback []RejectedDraft, _ bool) ([]Question, error) {
 	g.calls++
 	g.feedback = append(g.feedback, append([]RejectedDraft(nil), feedback...))
 	q := Question{
@@ -74,6 +61,10 @@ func (g *graphTestGenerator) Topics(context.Context, Chunk) (ChunkTopics, error)
 	return ChunkTopics{}, nil
 }
 
+func (g *graphTestGenerator) CompileEvidence(_ context.Context, graph EvidenceGraph, _ []Chunk) (EvidenceGraph, error) {
+	return graph, nil
+}
+
 func (g *graphTestGenerator) Outline(_ context.Context, graph EvidenceGraph) (*Outline, []LessonConcepts, error) {
 	g.graph = graph
 	ids := make([]string, len(graph.Concepts))
@@ -84,7 +75,7 @@ func (g *graphTestGenerator) Outline(_ context.Context, graph EvidenceGraph) (*O
 		[]LessonConcepts{{LessonID: "L01", ConceptIDs: ids}}, nil
 }
 
-func (*graphTestGenerator) Questions(context.Context, Lesson, *EvidenceGraph, Chunk, []RejectedDraft, int, bool) ([]Question, error) {
+func (*graphTestGenerator) QuestionsSet(context.Context, Lesson, *EvidenceGraph, []Chunk, CoverageContract, []RejectedDraft, bool) ([]Question, error) {
 	return nil, nil
 }
 
@@ -104,6 +95,10 @@ func (omittingGraphGenerator) Topics(context.Context, Chunk) (ChunkTopics, error
 	return ChunkTopics{}, nil
 }
 
+func (omittingGraphGenerator) CompileEvidence(_ context.Context, graph EvidenceGraph, _ []Chunk) (EvidenceGraph, error) {
+	return graph, nil
+}
+
 func (omittingGraphGenerator) Outline(_ context.Context, _ EvidenceGraph) (*Outline, []LessonConcepts, error) {
 	return &Outline{CourseTitle: "Biology", Lessons: []Lesson{
 			{ID: "L01", Title: "Digestion", QuestionBudget: 2},
@@ -114,7 +109,7 @@ func (omittingGraphGenerator) Outline(_ context.Context, _ EvidenceGraph) (*Outl
 		}, nil
 }
 
-func (omittingGraphGenerator) Questions(context.Context, Lesson, *EvidenceGraph, Chunk, []RejectedDraft, int, bool) ([]Question, error) {
+func (omittingGraphGenerator) QuestionsSet(context.Context, Lesson, *EvidenceGraph, []Chunk, CoverageContract, []RejectedDraft, bool) ([]Question, error) {
 	return nil, nil
 }
 
@@ -162,8 +157,7 @@ func TestBuildOutlineCompilesOnlyContentChunks(t *testing.T) {
 	chunks := []Chunk{{ID: "c1", Page: 1, Text: "subject"}, {ID: "c2", Page: 2, Text: "answer key"}}
 	gen := &compileRecordingGenerator{}
 	_, _, err := BuildOutline(context.Background(), chunks, Deps{
-		Gen:          gen,
-		CompileGraph: true,
+		Gen: gen,
 		TopicBatcher: graphTopicBatcher{topics: []ChunkTopics{
 			content("Subject"),
 			{Kind: TopicApparatus, Topics: []string{"answer key"}},
@@ -209,28 +203,21 @@ func (e *recordingTestEmbedder) Embed(_ context.Context, texts []string) ([][]fl
 	return vecs, nil
 }
 
-func TestGenerateExamEmbedsOnlyCheapPassingQuestionsAsOneBatch(t *testing.T) {
+func TestSetCandidateEmbedsOnlyCheapPassingQuestionsAsOneBatch(t *testing.T) {
 	questions := []Question{
-		{Stem: "This truncated statement has no question word", Choices: testChoices(), SourceQuote: testQuote()},
-		{Stem: "Which concept explains the observed result?", Choices: testChoices(), SourceQuote: testQuote()},
-		{Stem: "What changes when the input is increased?", Choices: testChoices(), SourceQuote: testQuote()},
+		{Stem: "This truncated statement has no question word", Choices: testChoices(), SourceQuote: testQuote(), EvidenceChunkID: "c1"},
+		{Stem: "Which concept explains the observed result?", Choices: testChoices(), SourceQuote: testQuote(), EvidenceChunkID: "c1"},
+		{Stem: "What changes when the input is increased?", Choices: testChoices(), SourceQuote: testQuote(), EvidenceChunkID: "c1"},
 	}
 	embedder := &recordingTestEmbedder{}
-	outline := &Outline{Lessons: []Lesson{{ID: "L01", Title: "Lesson", Summary: "Summary", QuestionBudget: 2, ChunkIDs: []string{"c1"}}}}
-	lesson := outline.Lessons[0]
+	lesson := Lesson{ID: "L01", Title: "Lesson", Summary: "Summary", QuestionBudget: 2, ChunkIDs: []string{"c1"}}
 	chunk := Chunk{ID: "c1", Page: 1, Text: testQuote(), LessonID: lesson.ID}
 
-	res, err := GenerateExam(context.Background(), outline, lesson, []Chunk{chunk}, Deps{
-		Gen:      batchTestGenerator{questions: questions},
-		Eval:     Arith{},
-		Embedder: embedder,
-	}, ExamOptions{Budget: 2, PerChunk: 3, MaxChunkVisits: 1})
-	if err != nil {
-		t.Fatalf("GenerateExam() error = %v", err)
-	}
-	if len(res.Passed) != 2 {
-		t.Fatalf("passed = %d, want 2", len(res.Passed))
-	}
+	evaluateSetCandidate(context.Background(), lesson, nil, []Chunk{chunk},
+		CoverageContract{Budget: 2}, questions, Deps{Eval: Arith{}, Embedder: embedder})
+
+	// One question fails a cheap gate, so only the other two are worth a vector,
+	// and they go in a single call rather than one per question.
 	if len(embedder.calls) != 1 {
 		t.Fatalf("embedding calls = %d, want 1", len(embedder.calls))
 	}

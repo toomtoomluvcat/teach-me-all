@@ -5,40 +5,41 @@ import (
 	"testing"
 )
 
-func TestQuestionPromptIncludesSourceGroundedConceptFocus(t *testing.T) {
-	graph := &EvidenceGraph{Concepts: []ConceptNode{
-		{ID: "C001", Title: "การย่อยอาหาร", ChunkIDs: []string{"p31-c43"}, Pages: []int{31}},
-		{ID: "C002", Title: "การแลกเปลี่ยนแก๊ส", ChunkIDs: []string{"p60-c90"}, Pages: []int{60}},
+func TestQuestionSetPromptKeepsTheEvidencePacketSlotLocal(t *testing.T) {
+	graph := &EvidenceGraph{Atoms: []EvidenceAtom{
+		{ID: "A1", ChunkID: "p31-c43", ConceptIDs: []string{"C001"}, Claim: "digestion begins in the mouth"},
+		{ID: "A2", ChunkID: "p60-c90", ConceptIDs: []string{"C002"}, Claim: "gas exchange happens in the alveoli"},
 	}}
-	lesson := Lesson{ID: "L01", Title: "ระบบย่อยอาหาร", ConceptIDs: []string{"C001", "C002"}}
-	prompt := QuestionPrompt(lesson, graph, Chunk{ID: "p31-c43", Page: 31, Text: "source passage"}, nil, 2, false)
+	contract := CoverageContract{Budget: 1, Slots: []CoverageSlot{
+		{ID: "S1", AtomID: "A1", SourceChunkIDs: []string{"p31-c43"}, Skill: "understanding", Difficulty: "easy"},
+	}}
+	prompt := QuestionSetPrompt(Lesson{ID: "L01", Title: "Digestive system"}, graph,
+		[]Chunk{{ID: "p31-c43", Page: 31, Text: "source passage"}}, contract, nil, false)
 
-	if !strings.Contains(prompt, "C001 | การย่อยอาหาร") {
-		t.Fatalf("prompt omitted concept evidenced by this chunk:\n%s", prompt)
+	if !strings.Contains(prompt, "digestion begins in the mouth") {
+		t.Fatalf("prompt omitted the atom assigned to the slot:\n%s", prompt)
 	}
-	if strings.Contains(prompt, "การแลกเปลี่ยนแก๊ส") {
-		t.Fatalf("prompt included concept with no evidence in this chunk:\n%s", prompt)
+	if strings.Contains(prompt, "gas exchange") {
+		t.Fatalf("prompt included an atom no slot asked for:\n%s", prompt)
 	}
-	if !strings.Contains(QuestionSystem(), "choices that merely restate the stem") {
-		t.Fatalf("question system does not prevent restated distractors:\n%s", QuestionSystem())
+	if !strings.Contains(QuestionSetSystem(), "choices that merely restate the stem") {
+		t.Fatalf("question system does not prevent restated distractors:\n%s", QuestionSetSystem())
 	}
-	for _, want := range []string{"learning objectives", "assessment rules", "numbering"} {
-		if !strings.Contains(QuestionSystem(), want) {
-			t.Fatalf("question system does not ban teacher-guide metadata %q:\n%s", want, QuestionSystem())
+	for _, want := range []string{"learning objectives", "assessment rules", "numbering", "pre-learning checks", "answer keys"} {
+		if !strings.Contains(QuestionSetSystem(), want) {
+			t.Fatalf("question system does not ban teacher-guide metadata %q:\n%s", want, QuestionSetSystem())
 		}
-	}
-	if !strings.Contains(QuestionSystem(), "pre-learning checks") || !strings.Contains(QuestionSystem(), "answer keys") {
-		t.Fatalf("question system does not restrict evidence to core text:\n%s", QuestionSystem())
 	}
 }
 
-func TestQuestionPromptCarriesGateFailureAsNegativeMemory(t *testing.T) {
+func TestQuestionSetPromptCarriesGateFailureAsNegativeMemory(t *testing.T) {
 	feedback := []RejectedDraft{{
 		Stem:     "Which list is correct?",
 		Choices:  []string{"A", "B", "A paraphrased", "D"},
 		Failures: []GateResult{{Gate: GateCoverage, Reason: "slot S2 was already used"}},
 	}}
-	prompt := QuestionPrompt(Lesson{Title: "Lesson"}, nil, Chunk{Page: 2, Text: "new source"}, feedback, 1, false)
+	prompt := QuestionSetPrompt(Lesson{Title: "Lesson"}, nil,
+		[]Chunk{{ID: "c1", Page: 2, Text: "new source"}}, CoverageContract{Budget: 1}, feedback, false)
 	for _, want := range []string{"Rejected draft memory", "Which list is correct?", "A paraphrased", "coverage_contract", "slot S2 was already used", "materially different question"} {
 		if !strings.Contains(prompt, want) {
 			t.Fatalf("generation prompt omitted %q:\n%s", want, prompt)
@@ -46,15 +47,12 @@ func TestQuestionPromptCarriesGateFailureAsNegativeMemory(t *testing.T) {
 	}
 }
 
-func TestQuestionPromptCarriesBenchmarkDirective(t *testing.T) {
-	prompt := QuestionPrompt(Lesson{Title: "Projectile Motion"}, nil, Chunk{
-		Page:                182,
-		Text:                "A projectile is launched at an angle.",
-		GenerationDirective: "Generate an easy application question.",
-	}, nil, 1, false)
-	if !strings.Contains(prompt, "Target for this generation call (follow exactly if the passage supports it)") ||
-		!strings.Contains(prompt, "Generate an easy application question.") {
-		t.Fatalf("benchmark directive missing from question prompt:\n%s", prompt)
+func TestQuestionSetPromptCarriesBenchmarkDirective(t *testing.T) {
+	contract := CoverageContract{Budget: 1, GenerationDirective: "Generate an easy application question."}
+	prompt := QuestionSetPrompt(Lesson{Title: "Projectile Motion"}, nil,
+		[]Chunk{{ID: "c1", Page: 182, Text: "A projectile is launched at an angle."}}, contract, nil, false)
+	if !strings.Contains(prompt, "Benchmark/Run directive") || !strings.Contains(prompt, "Generate an easy application question.") {
+		t.Fatalf("set prompt dropped the run directive:\n%s", prompt)
 	}
 }
 

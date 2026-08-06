@@ -21,7 +21,6 @@ type QualityVerdict = model.QualityVerdict
 type Arith = model.Arith
 type EvidenceGraph = evidence.EvidenceGraph
 type EvidenceAtom = evidence.EvidenceAtom
-type EvidenceCompiler = evidence.EvidenceCompiler
 type CoverageContract = evidence.CoverageContract
 type CoverageSlot = evidence.CoverageSlot
 type ConceptNode = evidence.ConceptNode
@@ -43,16 +42,6 @@ const (
 
 func ChunkByID(chunks []Chunk) map[string]Chunk { return model.ChunkByID(chunks) }
 func RuneLen(s string) int                      { return model.RuneLen(s) }
-
-func containsString(values []string, want string) bool {
-	for _, value := range values {
-		if value == want {
-			return true
-		}
-	}
-	return false
-}
-
 func BuildEvidenceGraph(chunks []Chunk, topics []ChunkTopics) EvidenceGraph {
 	return evidence.BuildEvidenceGraph(chunks, topics)
 }
@@ -87,4 +76,13 @@ func RunCheapGates(q Question, chunk Chunk, ev Evaluator) *GateReport {
 }
 func gateDistinct(q Question, accepted []Question, vec []float32, acceptedVecs [][]float32) GateResult {
 	return gates.RunDistinctGate(q, accepted, vec, acceptedVecs)
+}
+
+func containsString(values []string, want string) bool {
+	for _, value := range values {
+		if value == want {
+			return true
+		}
+	}
+	return false
 }

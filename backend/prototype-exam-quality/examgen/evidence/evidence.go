@@ -1,20 +1,12 @@
 package evidence
 
 import (
-	"context"
 	"fmt"
 	"regexp"
 	"sort"
 	"strings"
 	"unicode"
 )
-
-// EvidenceCompiler is optional at the interface boundary. The lightweight
-// unit-test generators do not need another model pass, while the production
-// generator can compile the graph into claims before set generation.
-type EvidenceCompiler interface {
-	CompileEvidence(ctx context.Context, graph EvidenceGraph, chunks []Chunk) (EvidenceGraph, error)
-}
 
 // CoverageSlot is a deterministic target for one question. It is not a draft:
 // it tells the writer which atom, operation, and source provenance to use.
@@ -418,14 +410,6 @@ func SlotLocalContextChunks(chunks []Chunk, graph *EvidenceGraph, contract Cover
 		used += RuneLen(chunk.Text)
 	}
 	return limited
-}
-
-// BuildCoverageContract converts compiled atoms into a small, varied set
-// contract without asking a second planner to invent free-text targets. It
-// prefers distinct claims/relations and cycles through available reasoning
-// modes before allowing a repeated mode.
-func BuildCoverageContract(lesson Lesson, graph *EvidenceGraph, contextChunks []Chunk, budget int) CoverageContract {
-	return buildCoverageContract(lesson, graph, contextChunks, budget, "", "", false)
 }
 
 // BuildCoverageContractForRun applies explicit benchmark targets before atom
@@ -920,18 +904,6 @@ func supportsForm(atom EvidenceAtom, form string) bool {
 		}
 	}
 	return false
-}
-
-func chooseForm(atom EvidenceAtom, preferred string) string {
-	if supportsForm(atom, preferred) {
-		return preferred
-	}
-	for _, form := range []string{"application", "understanding", "recall"} {
-		if supportsForm(atom, form) {
-			return form
-		}
-	}
-	return preferred
 }
 
 func chooseNonCalculationForm(atom EvidenceAtom) string {

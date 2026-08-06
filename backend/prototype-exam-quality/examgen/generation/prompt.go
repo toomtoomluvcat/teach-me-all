@@ -291,10 +291,6 @@ requires_calculation exactly to the contract values. Do not add arithmetic to
 a slot whose flag is false. Never duplicate choice text.`
 }
 
-func QuestionSetSchema(forceCalc bool) map[string]any {
-	return questionSetSchema(forceCalc, nil)
-}
-
 // QuestionSetSchemaForContract adds the finite ID vocabularies for a specific
 // contract. Ollama can enforce these through its grammar; providers that only
 // support JSON mode still get the same contract in the prompt and deterministic
@@ -304,7 +300,7 @@ func QuestionSetSchemaForContract(forceCalc bool, contract CoverageContract) map
 }
 
 func questionSetSchema(forceCalc bool, contract *CoverageContract) map[string]any {
-	schema := QuestionSchema(forceCalc)
+	schema := questionSchema(forceCalc)
 	root := schema["properties"].(map[string]any)
 	questions := root["questions"].(map[string]any)
 	item := questions["items"].(map[string]any)
@@ -479,12 +475,12 @@ func contractEvidenceAtoms(graph *EvidenceGraph, contract CoverageContract) []Ev
 	return atoms
 }
 
-// --- pass 2: question generation --------------------------------------------
+// --- pass 2: question-set generation ----------------------------------------
 
-// QuestionSchema constrains generation. forceCalc requires the arithmetic
-// object and the requires_calculation flag at the schema level rather than by
-// asking nicely in the prompt.
-func QuestionSchema(forceCalc bool) map[string]any {
+// questionSchema is the shared per-question shape the set schema builds on.
+// forceCalc requires the arithmetic object and the requires_calculation flag at
+// the schema level rather than by asking nicely in the prompt.
+func questionSchema(forceCalc bool) map[string]any {
 	calc := obj(map[string]any{
 		"expression": str("the arithmetic to solve this question, as a plain expression using numbers, + - * / ^, parentheses, decimal points, pi, and only these functions: sin, cos, tan, sqrt, abs, exp, ln. No variables or units. Trigonometric arguments are in radians. Example: (1200*0.07)/12 or 20*sin(30*pi/180)"),
 		"expected":   map[string]any{"type": "number", "description": "the value that expression produces"},
@@ -657,42 +653,6 @@ When requires_calculation=true:
 Write fewer, better questions. If the passage supports fewer good questions,
 return fewer. Return exactly this JSON shape:
 {"questions":[{"kind":"mcq_single","stem":"...","choices":[{"content":"...","is_correct":true},{"content":"...","is_correct":false},{"content":"...","is_correct":false},{"content":"...","is_correct":false}],"explanation":"...","source_quote":"...","difficulty":"easy","skill":"recall","requires_calculation":false}]}`
-
-func QuestionSystem() string { return questionSystem }
-
-// QuestionPrompt builds the generation message.
-func QuestionPrompt(lesson Lesson, graph *EvidenceGraph, c Chunk, feedback []RejectedDraft, want int, forceCalc bool) string {
-	s := fmt.Sprintf("Lesson: %s\n\n", lesson.Title)
-	s += "The subject and domain are inferred from this passage. Use no preselected subject template.\n\n"
-	if graph != nil {
-		var focus []string
-		for _, concept := range graph.Concepts {
-			if containsString(lesson.ConceptIDs, concept.ID) && containsString(concept.ChunkIDs, c.ID) {
-				focus = append(focus, fmt.Sprintf("- %s | %s", concept.ID, concept.Title))
-			}
-		}
-		if len(focus) > 0 {
-			s += "Concepts evidenced by this passage:\n" + strings.Join(focus, "\n") + "\n\n"
-		}
-	}
-	if directive := strings.TrimSpace(c.GenerationDirective); directive != "" {
-		s += "Target for this generation call (follow exactly if the passage supports it): " + directive + "\n\n"
-	}
-	s += "If the target is application at medium or hard difficulty, return changed_condition and one short distractor_reason for each wrong choice. For hard application, also return at least two distinct reasoning_steps.\n\n"
-	s += fmt.Sprintf("Passage (page %d):\n\n%s\n\n", c.Page, c.Text)
-	if len(feedback) > 0 {
-		s += rejectionMemoryBlock(feedback)
-	}
-	s += fmt.Sprintf("Write up to %d question(s) from this passage. ", want)
-	s += "If the passage only supports fewer, write fewer. "
-	if forceCalc {
-		s += "Every question must set requires_calculation=true and include a calculation expression. " +
-			"If this passage contains no numbers to compute with, return an empty list."
-	} else {
-		s += "Set requires_calculation=true only when arithmetic is necessary and the passage contains numbers worth computing with."
-	}
-	return s
-}
 
 func rejectionMemoryBlock(feedback []RejectedDraft) string {
 	var b strings.Builder

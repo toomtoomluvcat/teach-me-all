@@ -3,8 +3,6 @@ package generation
 import (
 	"context"
 	"fmt"
-	"math"
-	"sort"
 	"strings"
 )
 
@@ -12,14 +10,13 @@ import (
 // kept outside the acceptance loop so deterministic QC stays cheap and clear.
 type Generator interface {
 	Topics(ctx context.Context, c Chunk) (ChunkTopics, error)
+	// CompileEvidence splits the classified source into atomic claims. Set
+	// generation writes against those atoms, so this is not optional.
+	CompileEvidence(ctx context.Context, graph EvidenceGraph, chunks []Chunk) (EvidenceGraph, error)
 	Outline(ctx context.Context, graph EvidenceGraph) (*Outline, []LessonConcepts, error)
-	Questions(ctx context.Context, lesson Lesson, graph *EvidenceGraph, c Chunk, feedback []RejectedDraft, want int, forceCalc bool) ([]Question, error)
-}
-
-// QuestionSetGenerator receives the whole lesson context and a validated
-// coverage contract in one call. It is optional so the original chunk path
-// remains usable for small models and test doubles.
-type QuestionSetGenerator interface {
+	// QuestionsSet receives the whole lesson context and a validated coverage
+	// contract in one call, so the writer can keep target variety across the
+	// set instead of being reset once per chunk.
 	QuestionsSet(ctx context.Context, lesson Lesson, graph *EvidenceGraph, chunks []Chunk, contract CoverageContract, feedback []RejectedDraft, forceCalc bool) ([]Question, error)
 }
 
@@ -63,7 +60,6 @@ func (p Progress) report(stage string, done, total int, note string) {
 // Deps bundles everything the pipeline needs from the outside world.
 type Deps struct {
 	Gen          Generator
-	CompileGraph bool
 	TopicBatcher TopicBatcher
 	Eval         Evaluator
 	Embedder     Embedder
@@ -100,29 +96,17 @@ type ExamOptions struct {
 	// GenerationDirective is an optional benchmark-only instruction appended to
 	// the question prompt. Normal production generation leaves it empty.
 	GenerationDirective string
-	// PerChunk is how many questions to ask for from one chunk at a time.
-	PerChunk int
-	// PlanFirst asks an optional LessonPlanner for a set-level coverage plan
-	// before generation. Each subsequent call receives its current slot and the
-	// already-used targets.
-	PlanFirst bool
-	// SetGeneration sends the whole lesson context and a graph-derived coverage
-	// contract to a set-capable generator in one call.
-	SetGeneration bool
 	// SetCandidates asks the set-capable generator for independent candidate
 	// sets. The deterministic selector keeps the best accepted/diverse set.
 	SetCandidates int
 	// ContractPreflight repairs/drops deterministic slot defects before asking
 	// the model to write the set. It costs no model call.
 	ContractPreflight bool
-	// MaxChunkVisits caps total work so a lesson that cannot fill its budget
-	// stops instead of grinding through the whole book.
-	MaxChunkVisits int
 }
 
 // DefaultExamOptions is sized so a run finishes in minutes, not hours.
 func DefaultExamOptions() ExamOptions {
-	return ExamOptions{PerChunk: 2, SetCandidates: 1, ContractPreflight: true, MaxChunkVisits: 24}
+	return ExamOptions{SetCandidates: 1, ContractPreflight: true}
 }
 
 // ExamResult is everything one generation run produced, kept whole. Questions
@@ -131,19 +115,15 @@ func DefaultExamOptions() ExamOptions {
 type ExamResult struct {
 	Lesson             Lesson
 	Budget             int
-	Plan               *QuestionPlan     `json:"plan,omitempty"`
 	Contract           *CoverageContract `json:"contract,omitempty"`
 	Questions          []Question
 	Passed             []Question
-	ChunkVisits        int
 	SetCandidates      int `json:"set_candidates,omitempty"`
 	SetContractRetries int `json:"set_contract_retries,omitempty"`
 	SelectedSetScore   int `json:"selected_set_score,omitempty"`
 	// Quality is advisory semantic review for the selected set. It is not a
 	// hard acceptance gate and may be nil when the grader was unavailable.
 	Quality *QualityReport `json:"quality,omitempty"`
-	// ToppedUpFrom names lessons other than this one that were drawn on.
-	ToppedUpFrom []string
 	// Ceiling is true when the run stopped short of Budget because the material
 	// ran out. This is the honest answer, not a failure.
 	Ceiling bool
@@ -155,7 +135,7 @@ type ExamResult struct {
 // It never reaches outside the uploaded material. When the material cannot
 // support the budget it stops and sets Ceiling.
 func GenerateExam(ctx context.Context, outline *Outline, lesson Lesson, chunks []Chunk, d Deps, opt ExamOptions) (*ExamResult, error) {
-	if opt.PerChunk <= 0 {
+	if opt.SetCandidates <= 0 {
 		opt = DefaultExamOptions()
 	}
 	budget := lesson.QuestionBudget
@@ -165,151 +145,10 @@ func GenerateExam(ctx context.Context, outline *Outline, lesson Lesson, chunks [
 	if budget <= 0 {
 		budget = 5
 	}
-	byID := ChunkByID(chunks)
-	res := &ExamResult{Lesson: lesson, Budget: budget}
-
-	primary := chunksFor(lesson.ChunkIDs, byID)
-	query := lesson.Title + " " + lesson.Summary
-	if opt.Scope != "" {
-		query = opt.Scope
-	}
-	primary = rankByRelevance(ctx, primary, query, d)
-	if opt.SetGeneration {
-		return generateExamSet(ctx, outline, lesson, chunks, d, opt, budget)
-	}
-
-	var plan *QuestionPlan
-	if opt.PlanFirst {
-		planner, ok := d.Gen.(LessonPlanner)
-		if !ok {
-			return nil, fmt.Errorf("question plan requested but generator has no lesson planner")
-		}
-		planned, err := planner.PlanQuestions(ctx, lesson, outline.EvidenceGraph, primary, budget)
-		if err != nil {
-			return nil, fmt.Errorf("plan questions: %w", err)
-		}
-		if len(planned.Slots) == 0 {
-			return nil, fmt.Errorf("question planner returned no usable slots")
-		}
-		plan = &planned
-		res.Plan = plan
-		d.Log.report("question-plan", len(plan.Slots), budget, "lesson-level coverage slots")
-	}
-
-	// Sibling chunks are the top-up pool: still the user's own document, just
-	// from a different lesson.
-	var siblings []Chunk
-	for _, c := range chunks {
-		if c.LessonID != "" && c.LessonID != lesson.ID {
-			siblings = append(siblings, c)
-		}
-	}
-	siblings = rankByRelevance(ctx, siblings, query, d)
-
-	lessonName := map[string]string{}
-	for _, l := range outline.Lessons {
-		lessonName[l.ID] = l.Title
-	}
-
-	pool := append(append([]Chunk{}, primary...), siblings...)
-	toppedUp := map[string]bool{}
-
-	// acceptedVecs runs in lockstep with res.Passed so the duplicate check can
-	// compare against everything already in the exam.
-	var acceptedVecs [][]float32
-	var feedback []RejectedDraft
-	planIndex := 0
-
-	for _, c := range pool {
-		if len(res.Passed) >= budget || res.ChunkVisits >= opt.MaxChunkVisits {
-			break
-		}
-		res.ChunkVisits++
-		want := budget - len(res.Passed)
-		if want > opt.PerChunk {
-			want = opt.PerChunk
-		}
-		if plan != nil {
-			// A plan slot is a single semantic target. Keeping this one question
-			// per call makes the experiment measure shared planning rather than
-			// allowing two questions to consume the same slot.
-			want = 1
-		}
-
-		note := fmt.Sprintf("page %d", c.Page)
-		if len(feedback) > 0 {
-			note += fmt.Sprintf(" · avoiding %d rejected pattern(s)", len(feedback))
-		}
-		d.Log.report("generate", len(res.Passed), budget, note)
-
-		generationChunk := c
-		generationChunk.GenerationDirective = opt.GenerationDirective
-		if plan != nil {
-			generationChunk.GenerationDirective = joinDirectives(
-				generationChunk.GenerationDirective,
-				questionPlanDirective(plan, planIndex, res.Passed),
-			)
-		}
-		qs, err := d.Gen.Questions(ctx, lesson, outline.EvidenceGraph, generationChunk, feedback, want, opt.ForceCalc)
-		if err != nil {
-			return nil, fmt.Errorf("generate from chunk %s: %w", c.ID, err)
-		}
-
-		// Run all cheap checks before touching the embedder. A rejected question
-		// cannot become accepted, so embedding its stem only causes an avoidable
-		// model swap. Batch the remaining stems: one chunk commonly returns two
-		// questions, and two one-item embed calls would evict and reload bge-m3
-		// twice on a small GPU.
-		cheap := make([]*GateReport, len(qs))
-		eligible := make([]Question, 0, len(qs))
-		eligibleAt := make([]int, 0, len(qs))
-		for i, q := range qs {
-			q.ChunkID = c.ID
-			cheap[i] = RunCheapGates(q, c, d.Eval)
-			if len(cheap[i].Failures()) == 0 && strings.TrimSpace(q.Stem) != "" {
-				eligible = append(eligible, q)
-				eligibleAt = append(eligibleAt, i)
-			}
-		}
-		vectors := stemVectors(ctx, eligible, d)
-		vectorsByQuestion := make([][]float32, len(qs))
-		if len(vectors) == len(eligible) {
-			for i, questionAt := range eligibleAt {
-				vectorsByQuestion[questionAt] = vectors[i]
-			}
-		}
-
-		for i, q := range qs {
-			q.ChunkID = c.ID
-
-			// Run deterministic QC before accepting a draft. Semantic review is an
-			// advisory set-level signal, not part of the production acceptance path.
-			rep := cheap[i]
-			vec := vectorsByQuestion[i]
-			rep.Results = append(rep.Results, gateDistinct(q, res.Passed, vec, acceptedVecs))
-			q.Report = rep
-			res.Questions = append(res.Questions, q)
-			passedBefore := len(res.Passed)
-			keep(res, q, c, lesson, lessonName, toppedUp, vec, &acceptedVecs)
-			if plan != nil && len(res.Passed) > passedBefore {
-				planIndex++
-			}
-			d.Log.report("gate", len(res.Passed), budget, gateNote(rep))
-			if !rep.Passed() {
-				feedback = appendRejectedDraft(feedback, q, rep)
-			}
-		}
-	}
-
-	res.Ceiling = len(res.Passed) < budget
-	return res, nil
+	return generateExamSet(ctx, outline, lesson, chunks, d, opt, budget)
 }
 
 func generateExamSet(ctx context.Context, outline *Outline, lesson Lesson, chunks []Chunk, d Deps, opt ExamOptions, budget int) (*ExamResult, error) {
-	generator, ok := d.Gen.(QuestionSetGenerator)
-	if !ok {
-		return nil, fmt.Errorf("set generation requested but generator has no question-set method")
-	}
 	if outline.EvidenceGraph == nil || len(outline.EvidenceGraph.Atoms) == 0 {
 		return nil, fmt.Errorf("set generation requires a compiled evidence graph with atomic claims")
 	}
@@ -343,7 +182,7 @@ func generateExamSet(ctx context.Context, outline *Outline, lesson Lesson, chunk
 	for i := 1; i <= candidates; i++ {
 		candidateContract := contract
 		candidateContract.Variant = i
-		qs, err := generator.QuestionsSet(ctx, lesson, outline.EvidenceGraph, contextChunks, candidateContract, nil, opt.ForceCalc)
+		qs, err := d.Gen.QuestionsSet(ctx, lesson, outline.EvidenceGraph, contextChunks, candidateContract, nil, opt.ForceCalc)
 		if err != nil {
 			if firstErr == nil {
 				firstErr = fmt.Errorf("generate question set candidate %d: %w", i, err)
@@ -360,7 +199,7 @@ func generateExamSet(ctx context.Context, outline *Outline, lesson Lesson, chunk
 			)
 			candidate.SetContractRetries = 1
 			d.Log.report("set-retry", 1, maxSetContractRetries, fmt.Sprintf("%d missing slot(s)", len(retryContract.Slots)))
-			retryQS, retryErr := generator.QuestionsSet(ctx, lesson, outline.EvidenceGraph, contextChunks, retryContract, rejectedDrafts(candidate.Questions), opt.ForceCalc)
+			retryQS, retryErr := d.Gen.QuestionsSet(ctx, lesson, outline.EvidenceGraph, contextChunks, retryContract, rejectedDrafts(candidate.Questions), opt.ForceCalc)
 			if retryErr != nil {
 				d.Log.report("set-retry", 0, maxSetContractRetries, fmt.Sprintf("repair failed: %v", retryErr))
 			} else {
@@ -556,55 +395,6 @@ func joinDirectives(left, right string) string {
 	}
 }
 
-func questionPlanDirective(plan *QuestionPlan, current int, accepted []Question) string {
-	if plan == nil || current >= len(plan.Slots) {
-		return "The planned slots are exhausted. Return no question unless this passage supports a genuinely distinct additional target."
-	}
-
-	var b strings.Builder
-	b.WriteString("Lesson-level question plan (shared across generation calls):\n")
-	for i, slot := range plan.Slots {
-		status := "upcoming"
-		if i < current {
-			status = "completed"
-		} else if i == current {
-			status = "CURRENT — generate this slot if this passage supports it"
-		}
-		fmt.Fprintf(&b, "%d. [%s] skill=%s requires_calculation=%t difficulty=%s focus=%s target=%s", i+1, status,
-			slot.Skill, slot.RequiresCalculation, slot.Difficulty, slot.Focus, slot.Target)
-		if slot.Scenario != "" {
-			fmt.Fprintf(&b, " scenario=%s", slot.Scenario)
-		}
-		if slot.SourceChunkID != "" {
-			fmt.Fprintf(&b, " evidence_chunk=%s", slot.SourceChunkID)
-		}
-		b.WriteByte('\n')
-	}
-	if len(accepted) > 0 {
-		b.WriteString("Already accepted targets; do not repeat them:\n")
-		start := 0
-		if len(accepted) > 6 {
-			start = len(accepted) - 6
-		}
-		for i := start; i < len(accepted); i++ {
-			fmt.Fprintf(&b, "- %s\n", excerpt(accepted[i].Stem, 180))
-		}
-	}
-	b.WriteString("Generate one question for the CURRENT slot only. If the current passage does not support it, return an empty list; do not substitute a repeated target.")
-	return b.String()
-}
-
-// stemVector embeds a question stem for the duplicate check. Returns nil when
-// no embedder is configured or the call fails — the check then falls back to
-// literal text comparison rather than blocking the run.
-func stemVector(ctx context.Context, q Question, d Deps) []float32 {
-	vecs := stemVectors(ctx, []Question{q}, d)
-	if len(vecs) != 1 {
-		return nil
-	}
-	return vecs[0]
-}
-
 func stemVectors(ctx context.Context, qs []Question, d Deps) [][]float32 {
 	if d.Embedder == nil || len(qs) == 0 {
 		return nil
@@ -623,98 +413,12 @@ func stemVectors(ctx context.Context, qs []Question, d Deps) [][]float32 {
 	return vecs
 }
 
-// keep records a question that survived every gate, and notes when it came
-// from a lesson other than the one being generated for.
-func keep(res *ExamResult, q Question, c Chunk, lesson Lesson, lessonName map[string]string, toppedUp map[string]bool, vec []float32, vecs *[][]float32) {
-	if q.Report == nil || !q.Report.Passed() {
-		return
-	}
-	res.Passed = append(res.Passed, q)
-	*vecs = append(*vecs, vec)
-
-	if c.LessonID == lesson.ID || toppedUp[c.LessonID] {
-		return
-	}
-	toppedUp[c.LessonID] = true
-	name := lessonName[c.LessonID]
-	if name == "" {
-		name = c.LessonID
-	}
-	res.ToppedUpFrom = append(res.ToppedUpFrom, name)
-}
-
 func gateNote(r *GateReport) string {
 	if r.Passed() {
 		return "passed"
 	}
 	f := r.Failures()
 	return fmt.Sprintf("failed %s", f[0].Gate)
-}
-
-func chunksFor(ids []string, byID map[string]Chunk) []Chunk {
-	out := make([]Chunk, 0, len(ids))
-	for _, id := range ids {
-		if c, ok := byID[id]; ok {
-			out = append(out, c)
-		}
-	}
-	return out
-}
-
-// rankByRelevance orders chunks by cosine similarity to the query. With no
-// embedder configured it returns the chunks in document order, which is a
-// reasonable fallback and keeps the pipeline runnable without embeddings.
-func rankByRelevance(ctx context.Context, chunks []Chunk, query string, d Deps) []Chunk {
-	if d.Embedder == nil || len(chunks) < 2 || strings.TrimSpace(query) == "" {
-		return chunks
-	}
-
-	texts := make([]string, 0, len(chunks)+1)
-	texts = append(texts, query)
-	for _, c := range chunks {
-		texts = append(texts, c.Text)
-	}
-
-	vecs, err := d.Embedder.Embed(ctx, texts)
-	if err != nil || len(vecs) != len(texts) {
-		// Ranking is an optimisation, not a correctness requirement. Losing it
-		// should not abort a run that is otherwise fine.
-		d.Log.report("embed", 0, 0, fmt.Sprintf("ranking skipped: %v", err))
-		return chunks
-	}
-
-	type scored struct {
-		c Chunk
-		s float64
-	}
-	list := make([]scored, len(chunks))
-	for i, c := range chunks {
-		list[i] = scored{c: c, s: cosine(vecs[0], vecs[i+1])}
-	}
-	sort.SliceStable(list, func(a, b int) bool { return list[a].s > list[b].s })
-
-	out := make([]Chunk, len(list))
-	for i, s := range list {
-		out[i] = s.c
-	}
-	return out
-}
-
-func cosine(a, b []float32) float64 {
-	if len(a) != len(b) || len(a) == 0 {
-		return 0
-	}
-	var dot, na, nb float64
-	for i := range a {
-		x, y := float64(a[i]), float64(b[i])
-		dot += x * y
-		na += x * x
-		nb += y * y
-	}
-	if na == 0 || nb == 0 {
-		return 0
-	}
-	return dot / (math.Sqrt(na) * math.Sqrt(nb))
 }
 
 // PassRate is the headline number of the whole prototype.

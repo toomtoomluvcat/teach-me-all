@@ -16,9 +16,8 @@ type ToolFunction = core.ToolFunction
 type Options = core.Options
 type ModelClient = core.ModelClient
 
-func NewStats() *Stats                                            { return core.NewStats() }
-func WithLabel(ctx context.Context, label string) context.Context { return core.WithLabel(ctx, label) }
-func labelOf(ctx context.Context) string                          { return core.LabelOf(ctx) }
+func NewStats() *Stats                   { return core.NewStats() }
+func labelOf(ctx context.Context) string { return core.LabelOf(ctx) }
 
 func excerpt(s string, max int) string {
 	runes := []rune(strings.TrimSpace(s))
@@ -27,3 +26,7 @@ func excerpt(s string, max int) string {
 	}
 	return string(runes[:max]) + "…"
 }
+
+// WithLabel is re-exported for the provider tests, which assert that each
+// client tags its stats bucket.
+func WithLabel(ctx context.Context, label string) context.Context { return core.WithLabel(ctx, label) }

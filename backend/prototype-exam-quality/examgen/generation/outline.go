@@ -89,17 +89,13 @@ func BuildOutline(ctx context.Context, chunks []Chunk, d Deps) (*Outline, []Chun
 	if len(graph.Concepts) == 0 {
 		return nil, nil, fmt.Errorf("pass 1 found no teaching content in %d chunks — check the extracted text before blaming the model", len(chunks))
 	}
-	if d.CompileGraph {
-		compiler, ok := d.Gen.(EvidenceCompiler)
-		if !ok {
-			return nil, nil, fmt.Errorf("graph compilation requested but generator has no evidence compiler")
-		}
+	{
 		d.Log.report("outline/compile", 0, 1, "splitting source into atomic evidence")
 		compileChunks := chunks
 		if !d.KeepAllTopics {
 			compileChunks = contentChunks(chunks, perChunk)
 		}
-		compiled, err := compiler.CompileEvidence(ctx, graph, compileChunks)
+		compiled, err := d.Gen.CompileEvidence(ctx, graph, compileChunks)
 		if err != nil {
 			return nil, nil, fmt.Errorf("compile evidence graph: %w", err)
 		}

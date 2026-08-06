@@ -73,7 +73,6 @@ type runArtifact struct {
 	SetCandidates    int                       `json:"set_candidates,omitempty"`
 	SelectedSetScore int                       `json:"selected_set_score,omitempty"`
 	Quality          *examgen.QualityReport    `json:"quality,omitempty"`
-	Plan             *examgen.QuestionPlan     `json:"plan,omitempty"`
 	Contract         *examgen.CoverageContract `json:"contract,omitempty"`
 	Questions        []runQuestionArtifact     `json:"questions"`
 }
@@ -95,7 +94,6 @@ func writeRun(cfg config, res *examgen.ExamResult) error {
 		SetCandidates:    res.SetCandidates,
 		SelectedSetScore: res.SelectedSetScore,
 		Quality:          res.Quality,
-		Plan:             res.Plan,
 		Contract:         res.Contract,
 	}
 

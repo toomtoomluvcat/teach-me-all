@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"protoexam/llm/providers"
 	"strings"
 	"testing"
 
@@ -101,7 +102,7 @@ func TestBatchedTopicsCarriesTheClassificationThrough(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := NewDeepSeekAt(server.URL, "test-key", server.Client())
+	client := providers.NewDeepSeekAt(server.URL, "test-key", server.Client())
 	batcher := NewBatchedTopicGenerator(client, "deepseek-chat")
 	got, err := batcher.BatchTopics(context.Background(), []examgen.Chunk{
 		{ID: "p1-c0", Page: 1, Text: "digestion in the mouth"},
@@ -131,7 +132,7 @@ func TestBatchedTopicsFallsBackForOmittedChunks(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := NewDeepSeekAt(server.URL, "test-key", server.Client())
+	client := providers.NewDeepSeekAt(server.URL, "test-key", server.Client())
 	batcher := NewBatchedTopicGenerator(client, "deepseek-chat")
 	got, err := batcher.BatchTopics(context.Background(), []examgen.Chunk{
 		{ID: "p1-c0", Page: 1, Text: "first passage"},
@@ -173,7 +174,7 @@ func TestBatchedTopicsBoundsLargeDocumentRequests(t *testing.T) {
 		}
 	}
 	wantCalls := PlannedTopicBatches(chunks)
-	client := NewDeepSeekAt(server.URL, "test-key", server.Client())
+	client := providers.NewDeepSeekAt(server.URL, "test-key", server.Client())
 	batcher := NewBatchedTopicGenerator(client, "deepseek-chat")
 	got, err := batcher.BatchTopics(context.Background(), chunks, nil)
 	if err != nil {
@@ -208,7 +209,7 @@ func TestBatchedTopicsSplitsOnlyMalformedBatch(t *testing.T) {
 	for i := range chunks {
 		chunks[i] = examgen.Chunk{ID: fmt.Sprintf("p1-c%d", i), Page: 1, Text: "passage"}
 	}
-	client := NewDeepSeekAt(server.URL, "test-key", server.Client())
+	client := providers.NewDeepSeekAt(server.URL, "test-key", server.Client())
 	batcher := NewBatchedTopicGenerator(client, "deepseek-chat")
 	got, err := batcher.BatchTopics(context.Background(), chunks, nil)
 	if err != nil {
@@ -236,7 +237,7 @@ func TestBatchedTopicsStopsAfterTerminalBatchFailure(t *testing.T) {
 	for i := range chunks {
 		chunks[i] = examgen.Chunk{ID: fmt.Sprintf("p1-c%d", i), Page: 1, Text: "passage"}
 	}
-	client := NewDeepSeekAt(server.URL, "test-key", server.Client())
+	client := providers.NewDeepSeekAt(server.URL, "test-key", server.Client())
 	batcher := NewBatchedTopicGenerator(client, "deepseek-chat")
 	_, err := batcher.BatchTopics(context.Background(), chunks, nil)
 	if err == nil {

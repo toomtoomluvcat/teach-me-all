@@ -120,7 +120,6 @@ func buildDependencies(cfg config, modelClient llm.ModelClient) examgen.Deps {
 
 	deps := examgen.Deps{
 		Gen:           gen,
-		CompileGraph:  cfg.graphCompile || cfg.setGeneration,
 		Eval:          examgen.Arith{},
 		Quality:       llm.NewQualityGrader(modelClient, cfg.model),
 		Log:           examgen.Progress(safeProgress()),
@@ -183,11 +182,10 @@ func buildOutline(ctx context.Context, cfg config, chunks []examgen.Chunk, deps 
 	// keys and assessment rubrics as concepts, with nothing left in the code able
 	// to tell which ones they are. Reusing it would silently serve lessons the
 	// current pipeline would never have produced.
-	outlineCacheName := "outline-v3"
-	if deps.CompileGraph {
-		outlineCacheName = "outline-v4"
-	}
-	oc, err := cachedT(cfg, outlineCacheName, func() (outlineCache, error) {
+	//
+	// v4: evidence compilation is no longer optional, so every cached outline
+	// carries atoms. A v3 cache has none and set generation cannot run on it.
+	oc, err := cachedT(cfg, "outline-v4", func() (outlineCache, error) {
 		clear()
 		header("STEP 2 — reading the whole document (pass 1)")
 		mapPlan := "one model call each"
@@ -222,13 +220,8 @@ func interactiveGeneration(ctx context.Context, in *bufio.Scanner, cfg config, o
 		opt.ForceCalc = cfg.forceCalc
 		opt.Scope = cfg.scope
 		opt.Budget = cfg.budget
-		opt.PlanFirst = cfg.questionPlan
-		opt.SetGeneration = cfg.setGeneration
 		opt.SetCandidates = cfg.setCandidates
 		opt.ContractPreflight = cfg.contractPreflight
-		if cfg.perChunk > 0 {
-			opt.PerChunk = cfg.perChunk
-		}
 
 		clear()
 		header("STEP 3 — generating and gating: " + lesson.Title)

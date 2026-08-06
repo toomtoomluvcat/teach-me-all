@@ -291,22 +291,6 @@ func evidenceBatches(chunks []examgen.Chunk) [][]examgen.Chunk {
 	return batches
 }
 
-// PlanQuestions creates one lesson-level coverage plan before the pipeline
-// starts making individual question calls. It is optional at the interface
-// boundary so the lightweight test generators do not need a planning model.
-func (g *Generator) PlanQuestions(ctx context.Context, lesson examgen.Lesson, graph *examgen.EvidenceGraph, chunks []examgen.Chunk, budget int) (examgen.QuestionPlan, error) {
-	ctx = WithLabel(ctx, "question-plan")
-	var out examgen.QuestionPlan
-	msgs := []Message{
-		{Role: "system", Content: examgen.QuestionPlanSystem()},
-		{Role: "user", Content: examgen.QuestionPlanPrompt(lesson, graph, chunks, budget)},
-	}
-	if err := g.c.ChatJSON(ctx, g.model, msgs, examgen.QuestionPlanSchema(), genOptions(16384, 0), &out); err != nil {
-		return examgen.QuestionPlan{}, err
-	}
-	return out, nil
-}
-
 // QuestionsSet writes the complete set against the graph-derived contract and
 // the lesson's bounded two-hop context. This is the path that can keep target variety
 // across chunks instead of resetting the writer on every generation call.
@@ -354,43 +338,6 @@ func (g *Generator) QuestionsSet(ctx context.Context, lesson examgen.Lesson, gra
 	if err := g.c.ChatJSON(ctx, g.model, msgs, examgen.QuestionSetSchemaForContract(forceCalc, contract), genOptions(32768, 0.35), &out); err != nil {
 		return nil, err
 	}
-	for i := range out.Questions {
-		dropEmptyCalculation(&out.Questions[i])
-	}
-	return out.Questions, nil
-}
-
-func (g *Generator) Questions(ctx context.Context, lesson examgen.Lesson, graph *examgen.EvidenceGraph, c examgen.Chunk, feedback []examgen.RejectedDraft, want int, forceCalc bool) ([]examgen.Question, error) {
-	var out struct {
-		Questions []examgen.Question `json:"questions"`
-	}
-	genCtx := WithLabel(ctx, "generate")
-
-	// Phase A: let the model do its arithmetic with a real calculator before it
-	// writes anything. See calctool.go for why this beats correcting it after.
-	user := examgen.QuestionPrompt(lesson, graph, c, feedback, want, forceCalc)
-	if g.UseCalcTool {
-		facts, err := g.ComputeFacts(ctx, c, forceCalc)
-		if err == nil {
-			user += FactsBlock(facts)
-		}
-	}
-
-	// Phase B: schema-constrained generation. Tools are deliberately absent —
-	// with a format schema set the model will not call them anyway.
-	msgs := []Message{
-		{Role: "system", Content: examgen.QuestionSystem()},
-		{Role: "user", Content: user},
-	}
-	// A little temperature here: at 0 the model writes the same question from
-	// every chunk that looks alike.
-	if err := g.c.ChatJSON(genCtx, g.model, msgs, examgen.QuestionSchema(forceCalc), genOptions(8192, 0.3), &out); err != nil {
-		return nil, err
-	}
-
-	// The schema cannot express "a calculation is optional but must be complete
-	// when present", so drop half-filled ones rather than let gate 4 fail on an
-	// artefact of the schema.
 	for i := range out.Questions {
 		dropEmptyCalculation(&out.Questions[i])
 	}

@@ -155,9 +155,8 @@ func renderSummary(res *examgen.ExamResult) {
 	fmt.Printf("%sgenerated%s       %d\n", bold, reset, len(res.Questions))
 	fmt.Printf("%spassed all gates%s %d\n", bold, reset, len(res.Passed))
 	fmt.Printf("%spass rate%s       %s%.0f%%%s\n", bold, reset, bold, res.PassRate()*100, reset)
-	fmt.Printf("%schunks visited%s  %d\n", bold, reset, res.ChunkVisits)
-	if len(res.ToppedUpFrom) > 0 {
-		fmt.Printf("%stopped up from%s  %s\n", bold, reset, strings.Join(res.ToppedUpFrom, ", "))
+	if res.SetCandidates > 1 {
+		fmt.Printf("%sset candidates%s  %d (best score %d)\n", bold, reset, res.SetCandidates, res.SelectedSetScore)
 	}
 	if res.Ceiling {
 		fmt.Printf("\n%sCeiling reached: this material supports %d questions, not %d.%s\n",

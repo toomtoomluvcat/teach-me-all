@@ -381,20 +381,6 @@ func isQuoteMark(r rune) bool {
 	return false
 }
 
-func nearlyEqual(a, b float64) bool {
-	if a == b {
-		return true
-	}
-	if math.Abs(a) >= 1 && math.Abs(b) >= 1 && math.Abs(a-b) <= roundedAnswerTolerance {
-		return true
-	}
-	scale := math.Max(math.Abs(a), math.Abs(b))
-	if scale == 0 {
-		return true
-	}
-	return math.Abs(a-b)/scale < arithmeticTolerance
-}
-
 // expectedNearlyEqual is the tolerance used for the model-stated
 // calculation.expected against the evaluated expression. It deliberately
 // matches the choice-text matcher (isLosslessRounding, 1e-3 relative) rather

@@ -51,7 +51,7 @@ func TestBuildCoverageContractPrefersDistinctAtomsAndForms(t *testing.T) {
 		},
 	}
 	lesson := Lesson{ID: "L01", ConceptIDs: []string{"C001", "C002", "C003", "C004", "C005"}, ChunkIDs: []string{"c1", "c2", "c3", "c4", "c5"}}
-	contract := BuildCoverageContract(lesson, graph, []Chunk{{ID: "c1"}, {ID: "c2"}, {ID: "c3"}, {ID: "c4"}, {ID: "c5"}}, 3)
+	contract := BuildCoverageContractForRun(lesson, graph, []Chunk{{ID: "c1"}, {ID: "c2"}, {ID: "c3"}, {ID: "c4"}, {ID: "c5"}}, 3, "", false)
 	if len(contract.Slots) != 3 {
 		t.Fatalf("slots = %#v", contract.Slots)
 	}
@@ -82,7 +82,7 @@ func TestBuildCoverageContractUpgradesToAnalysisAcrossChunks(t *testing.T) {
 		},
 	}
 	lesson := Lesson{ID: "L01", ChunkIDs: []string{"c1", "c2"}}
-	contract := BuildCoverageContract(lesson, graph, []Chunk{{ID: "c1"}, {ID: "c2"}}, 1)
+	contract := BuildCoverageContractForRun(lesson, graph, []Chunk{{ID: "c1"}, {ID: "c2"}}, 1, "", false)
 	if len(contract.Slots) != 1 {
 		t.Fatalf("slots = %#v", contract.Slots)
 	}
@@ -204,7 +204,7 @@ func TestShouldDowngradeCalculationRejectsSymbolicExponentRule(t *testing.T) {
 				QuestionForms: []string{"calculation", "application", "understanding"},
 			}}}
 			lesson := Lesson{ID: "L01", ConceptIDs: nil, ChunkIDs: []string{"c1"}}
-			contract := BuildCoverageContract(lesson, graph, []Chunk{{ID: "c1"}}, 1)
+			contract := BuildCoverageContractForRun(lesson, graph, []Chunk{{ID: "c1"}}, 1, "", false)
 			if len(contract.Slots) != 1 {
 				t.Fatalf("slots = %#v", contract.Slots)
 			}

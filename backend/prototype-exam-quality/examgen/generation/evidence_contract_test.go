@@ -20,7 +20,7 @@ func TestQuestionSetPromptCarriesContractAndCrossContext(t *testing.T) {
 	if strings.Contains(prompt, "unassigned unrelated claim") {
 		t.Fatalf("set prompt included an atom outside the assigned slots:\n%s", prompt)
 	}
-	if _, ok := QuestionSetSchema(false)["properties"]; !ok {
+	if _, ok := questionSetSchema(false, nil)["properties"]; !ok {
 		t.Fatal("set schema has no properties")
 	}
 }

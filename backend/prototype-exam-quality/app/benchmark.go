@@ -301,10 +301,6 @@ func runBenchmark(ctx context.Context, cfg config, outline *examgen.Outline, chu
 		opt.ForceCalc = benchmark.ForceCalc
 		opt.Scope = benchmark.Scope
 		opt.GenerationDirective = benchmark.Directive
-		opt.PerChunk = 1
-		opt.MaxChunkVisits = 16
-		opt.PlanFirst = cfg.questionPlan
-		opt.SetGeneration = cfg.setGeneration
 		opt.SetCandidates = cfg.setCandidates
 		opt.ContractPreflight = cfg.contractPreflight
 
