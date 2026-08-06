@@ -16,7 +16,7 @@ func TestCheckWellFormedRejectsTeacherGuideMetadataQuestion(t *testing.T) {
 		},
 	}
 
-	got := CheckWellFormed(q)
+	got := gateWellFormed(q)
 	if got.Pass {
 		t.Fatal("teacher-guide metadata question passed deterministic gate")
 	}
@@ -35,7 +35,7 @@ func TestCheckWellFormedAcceptsImperativeMathStem(t *testing.T) {
 			{Content: "t^23"},
 		},
 	}
-	if got := CheckWellFormed(q); !got.Pass {
+	if got := gateWellFormed(q); !got.Pass {
 		t.Fatalf("imperative math stem was rejected: %#v", got)
 	}
 }

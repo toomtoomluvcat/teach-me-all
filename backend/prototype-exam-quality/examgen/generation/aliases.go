@@ -17,10 +17,6 @@ type QualityReport = model.QualityReport
 type GateReport = model.GateReport
 type GateResult = model.GateResult
 type GateName = model.GateName
-type BlindVerdict = model.BlindVerdict
-type SourcedVerdict = model.SourcedVerdict
-type ChoiceVerdict = model.ChoiceVerdict
-type ChoiceStatus = model.ChoiceStatus
 type QualityVerdict = model.QualityVerdict
 type Arith = model.Arith
 type EvidenceGraph = evidence.EvidenceGraph
@@ -34,32 +30,15 @@ type EdgeKind = evidence.EdgeKind
 type Evaluator = gates.Evaluator
 
 const (
-	TopicContent              = model.TopicContent
-	TopicApparatus            = model.TopicApparatus
-	TopicNonContent           = model.TopicNonContent
-	KindMCQSingle             = model.KindMCQSingle
-	ChoiceSupported           = model.ChoiceSupported
-	ChoiceUnsupported         = model.ChoiceUnsupported
-	ChoiceEquivalent          = model.ChoiceEquivalent
-	ChoiceAmbiguous           = model.ChoiceAmbiguous
-	GateWellFormed            = model.GateWellFormed
-	GateQuote                 = model.GateQuote
-	GateSingleValid           = model.GateSingleValid
-	GateSourceSpecific        = model.GateSourceSpecific
-	GateBlindAnswer           = model.GateBlindAnswer
-	SourceDependencySpecific  = model.SourceDependencySpecific
-	SourceDependencyGeneric   = model.SourceDependencyGeneric
-	SourceDependencyUnclear   = model.SourceDependencyUnclear
-	DependencyNumber          = model.DependencyNumber
-	DependencyNamedStructure  = model.DependencyNamedStructure
-	DependencyOrder           = model.DependencyOrder
-	DependencyCondition       = model.DependencyCondition
-	DependencyCauseEffect     = model.DependencyCauseEffect
-	DependencyComparison      = model.DependencyComparison
-	DependencyLocalDefinition = model.DependencyLocalDefinition
-	DependencyNone            = model.DependencyNone
-	EdgeCoOccurs              = evidence.EdgeCoOccurs
-	EdgeFollows               = evidence.EdgeFollows
+	TopicContent    = model.TopicContent
+	TopicApparatus  = model.TopicApparatus
+	TopicNonContent = model.TopicNonContent
+	KindMCQSingle   = model.KindMCQSingle
+	GateWellFormed  = model.GateWellFormed
+	GateQuote       = model.GateQuote
+	GateCoverage    = model.GateCoverage
+	EdgeCoOccurs    = evidence.EdgeCoOccurs
+	EdgeFollows     = evidence.EdgeFollows
 )
 
 func ChunkByID(chunks []Chunk) map[string]Chunk { return model.ChunkByID(chunks) }

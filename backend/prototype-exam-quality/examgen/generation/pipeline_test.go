@@ -244,7 +244,7 @@ func TestRejectedDraftMemoryKeepsOnlyNewestFourAndBoundsText(t *testing.T) {
 	long := strings.Repeat("x", 400)
 	for i := 0; i < 6; i++ {
 		q := Question{Stem: string(rune('0'+i)) + long, Choices: []Choice{{Content: long}}}
-		report := &GateReport{Results: []GateResult{{Gate: GateSingleValid, Reason: long}}}
+		report := &GateReport{Results: []GateResult{{Gate: GateCoverage, Reason: long}}}
 		memory = appendRejectedDraft(memory, q, report)
 	}
 	if len(memory) != 4 || !strings.HasPrefix(memory[0].Stem, "2") || !strings.HasPrefix(memory[3].Stem, "5") {

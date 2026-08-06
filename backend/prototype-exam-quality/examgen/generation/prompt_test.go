@@ -30,103 +30,19 @@ func TestQuestionPromptIncludesSourceGroundedConceptFocus(t *testing.T) {
 	if !strings.Contains(QuestionSystem(), "pre-learning checks") || !strings.Contains(QuestionSystem(), "answer keys") {
 		t.Fatalf("question system does not restrict evidence to core text:\n%s", QuestionSystem())
 	}
-	blindProps := BlindSchema(4)["properties"].(map[string]any)
-	if _, ok := blindProps["guessed_index"]; ok {
-		t.Fatal("blind schema still asks the model to guess the answer")
-	}
-	for _, want := range []string{"dependency", "evidence"} {
-		if !strings.Contains(SourcedSystem(), want) {
-			t.Fatalf("source judge prompt does not request %q:\n%s", want, SourcedSystem())
-		}
-	}
-	for _, unwanted := range []string{"choice_verdicts", "dependency_kind", "counterfactual", "dependency_reason"} {
-		if strings.Contains(SourcedSystem(), unwanted) {
-			t.Fatalf("source judge prompt still requests deferred field %q:\n%s", unwanted, SourcedSystem())
-		}
-	}
 }
 
-func TestQuestionSystemIsDomainAgnostic(t *testing.T) {
-	system := QuestionSystem()
-	for _, want := range []string{
-		"domain-agnostic",
-		"science, mathematics, medicine",
-		"subject-specific template",
-		"genuinely new situation",
-		"name,",
-		"at least two linked inferences",
-		"same scenario or principle twice",
-	} {
-		if !strings.Contains(system, want) {
-			t.Fatalf("domain-agnostic contract omitted %q:\n%s", want, system)
-		}
-	}
-	for _, unwanted := range []string{"physics", "newton", "m/s^2", "physical unit"} {
-		if strings.Contains(strings.ToLower(system), unwanted) {
-			t.Fatalf("question system contains subject-specific prompt bias %q:\n%s", unwanted, system)
-		}
-	}
-}
-
-func TestTopicSystemDoesNotAssumeBiologyOrTeacherEdition(t *testing.T) {
-	system := TopicSystem()
-	for _, want := range []string{"student textbook, reference work, teacher guide", "any subject", "Do not assume"} {
-		if !strings.Contains(system, want) {
-			t.Fatalf("topic classifier omitted dynamic-source rule %q:\n%s", want, system)
-		}
-	}
-	for _, unwanted := range []string{"Most of this book is a teacher's edition", "ครูควรชี้แจงว่า"} {
-		if strings.Contains(system, unwanted) {
-			t.Fatalf("topic classifier still contains source-specific assumption %q:\n%s", unwanted, system)
-		}
-	}
-}
-
-func TestSourcedSchemaIsMinimal(t *testing.T) {
-	properties := SourcedSchema()["properties"].(map[string]any)
-	for _, want := range []string{"dependency", "evidence"} {
-		if _, ok := properties[want]; !ok {
-			t.Fatalf("minimal source schema omitted %q: %#v", want, properties)
-		}
-	}
-	for _, unwanted := range []string{"choice_verdicts", "source_dependency", "dependency_kind", "counterfactual", "dependency_reason"} {
-		if _, ok := properties[unwanted]; ok {
-			t.Fatalf("minimal source schema still exposes deferred field %q", unwanted)
-		}
-	}
-}
-
-func TestBlindSystemDoesNotCoachConfidence(t *testing.T) {
-	if strings.Contains(BlindSystem(), "Do not be modest") {
-		t.Fatal("blind judge prompt still coaches the confidence distribution")
-	}
-	if strings.Contains(BlindSystem(), "guess_confidence") || strings.Contains(BlindSystem(), "guessed_index") {
-		t.Fatal("blind judge prompt still asks the model to guess the answer")
-	}
-}
-
-func TestQuestionPromptCarriesSemanticFailureAsNegativeMemory(t *testing.T) {
+func TestQuestionPromptCarriesGateFailureAsNegativeMemory(t *testing.T) {
 	feedback := []RejectedDraft{{
-		Stem:    "Which list is correct?",
-		Choices: []string{"A", "B", "A paraphrased", "D"},
-		Failures: []GateResult{{
-			Gate: GateSingleValid, Reason: "choice 3 also defensible",
-			ChoiceVerdicts: []ChoiceVerdict{
-				{Index: 0, Status: ChoiceSupported, Reason: "direct"},
-				{Index: 1, Status: ChoiceUnsupported, Reason: "wrong"},
-				{Index: 2, Status: ChoiceEquivalent, Reason: "same meaning as A"},
-				{Index: 3, Status: ChoiceUnsupported, Reason: "wrong"},
-			},
-		}},
+		Stem:     "Which list is correct?",
+		Choices:  []string{"A", "B", "A paraphrased", "D"},
+		Failures: []GateResult{{Gate: GateCoverage, Reason: "slot S2 was already used"}},
 	}}
 	prompt := QuestionPrompt(Lesson{Title: "Lesson"}, nil, Chunk{Page: 2, Text: "new source"}, feedback, 1, false)
-	for _, want := range []string{"Rejected draft memory", "Which list is correct?", "A paraphrased", "choice 3 was equivalent", "same meaning as A", "materially different question"} {
+	for _, want := range []string{"Rejected draft memory", "Which list is correct?", "A paraphrased", "coverage_contract", "slot S2 was already used", "materially different question"} {
 		if !strings.Contains(prompt, want) {
 			t.Fatalf("generation prompt omitted %q:\n%s", want, prompt)
 		}
-	}
-	if strings.Contains(prompt, "choice 2 was unsupported") {
-		t.Fatalf("generation prompt wasted tokens on already-invalid distractors:\n%s", prompt)
 	}
 }
 

@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"protoexam/llm/core"
-	"protoexam/llm/providers"
 )
 
 type ModelClient = core.ModelClient
@@ -18,5 +17,3 @@ func WithLabel(ctx context.Context, label string) context.Context { return core.
 func genOptions(numCtx int, temp float64) *Options {
 	return &Options{NumCtx: numCtx, Temperature: temp, TopP: 0.9, RepeatPenalty: 1.1, Seed: 1}
 }
-
-func NewDeepSeek(apiKey string) *providers.DeepSeekClient { return providers.NewDeepSeek(apiKey) }

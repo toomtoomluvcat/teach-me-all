@@ -86,10 +86,6 @@ const (
 	duplicateCosine = 0.90
 )
 
-// CheckWellFormed exposes the structural checks on their own, so a set of
-// already-generated questions can be re-scored without spending a model call.
-func CheckWellFormed(q Question) GateResult { return gateWellFormed(q) }
-
 // gateWellFormed runs every structural check and reports the first failure,
 // because one broken question does not need five reasons.
 func gateWellFormed(q Question) GateResult {

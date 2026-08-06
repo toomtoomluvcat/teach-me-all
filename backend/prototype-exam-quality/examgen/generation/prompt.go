@@ -704,84 +704,11 @@ func rejectionMemoryBlock(feedback []RejectedDraft) string {
 		}
 		for _, failure := range draft.Failures {
 			fmt.Fprintf(&b, "   failed %s: %s\n", failure.Gate, failure.Reason)
-			for _, verdict := range failure.ChoiceVerdicts {
-				if verdict.Status == ChoiceUnsupported {
-					continue
-				}
-				fmt.Fprintf(&b, "     choice %d was %s: %s\n", verdict.Index+1, verdict.Status, verdict.Reason)
-			}
 		}
 	}
 	b.WriteString("Write a materially different question that avoids all patterns above.\n\n")
 	return b.String()
 }
-
-// --- gates 2 and 3 ----------------------------------------------------------
-
-// BlindSchema constrains the judge that sees no source.
-func BlindSchema(numChoices int) map[string]any {
-	return obj(map[string]any{
-		"interpretable": map[string]any{
-			"type":        "boolean",
-			"description": "true if it is clear what the question is asking",
-		},
-		"reason": str("at most 20 words. If not interpretable, say exactly what is missing or ambiguous. Do not restate the question and do not solve it."),
-	}, "interpretable", "reason")
-}
-
-const blindSystem = `You are checking whether an exam question is written clearly. You cannot see
-the material it came from, and that is intentional.
-
-Decide one thing: reading only the question and its choices, is it clear what is
-being asked?
-
-Mark it NOT interpretable when the question:
-- refers to something you cannot see ("the passage", "the figure above", "this
-  process", "the value given")
-- is so general that several different answers would all be reasonable
-- is missing information needed to even understand the task
-- asks about "it" or "they" without ever saying what
-
-Mark it interpretable when a knowledgeable person would understand the task,
-even if they would need to have studied the material to know the answer. Needing
-knowledge is fine. Needing context you were not given is not.
-
-Return exactly this JSON shape, with no other top-level keys:
-{"interpretable":true,"reason":"..."}`
-
-func BlindSystem() string { return blindSystem }
-
-// SourcedSchema constrains the minimal source-dependency judge. The variadic
-// argument keeps old callers source-compatible; the number of choices is no
-// longer part of this contract because semantic choice auditing is deferred.
-func SourcedSchema(_ ...int) map[string]any {
-	return obj(map[string]any{
-		"dependency": enum("whether the best answer requires a fact specific to this passage, not general subject knowledge", "specific", "generic", "unclear"),
-		"evidence":   str("one exact substring from the passage that makes the answer specific; empty for generic or unclear"),
-	}, "dependency", "evidence")
-}
-
-const sourcedSystem = `You are checking an exam question against the passage it was written from.
-
-Do not ask whether you personally knew the answer before seeing the passage.
-Ask whether a learner needs a fact or relationship that THIS passage specifically
-supplies.
-
-Use "specific" only when all of these are true:
-- the answer depends on a particular fact or relationship supplied by this passage;
-- the fact is present in the passage, not merely implied by the topic;
-- without that fact, the best choice could not be identified from general knowledge.
-
-Use "generic" when the answer follows from general subject knowledge, the
-wording of the question and choices, or a standard principle even without this
-passage. A citation that merely repeats a general fact is not enough. Use
-"unclear" when you cannot decide. For "specific", return one shortest exact
-substring from the passage. For "generic" or "unclear", return an empty string.
-
-Return exactly this JSON object and no other fields:
-{"dependency":"specific|generic|unclear","evidence":"exact passage substring or empty string"}`
-
-func SourcedSystem() string { return sourcedSystem }
 
 // QualitySchema is intentionally a compact batch schema. It is an advisory
 // semantic review, so it reports reasons and dimensions for inspection while
@@ -852,22 +779,4 @@ func QualityPrompt(lesson Lesson, chunks []Chunk, questions []Question) string {
 	}
 	b.WriteString("\nReturn one verdict for every QUESTION index. Keep reason short.")
 	return b.String()
-}
-
-// BlindPrompt renders a question with its source deliberately withheld.
-func BlindPrompt(q Question) string {
-	s := "Question: " + q.Stem + "\n\nChoices:\n"
-	for i, c := range q.Choices {
-		s += fmt.Sprintf("%d. %s\n", i, c.Content)
-	}
-	return s
-}
-
-// SourcedPrompt renders a question together with the chunk it came from.
-func SourcedPrompt(q Question, source string) string {
-	s := "Passage:\n\n" + source + "\n\nQuestion: " + q.Stem + "\n\nChoices:\n"
-	for i, c := range q.Choices {
-		s += fmt.Sprintf("%d. %s\n", i, c.Content)
-	}
-	return s
 }

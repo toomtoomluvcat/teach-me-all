@@ -27,12 +27,6 @@ type Question = model.Question
 type GateName = model.GateName
 type GateResult = model.GateResult
 type GateReport = model.GateReport
-type ChoiceStatus = model.ChoiceStatus
-type ChoiceVerdict = model.ChoiceVerdict
-type BlindVerdict = model.BlindVerdict
-type SourceDependency = model.SourceDependency
-type DependencyKind = model.DependencyKind
-type SourcedVerdict = model.SourcedVerdict
 type QualityGrader = model.QualityGrader
 type QualityVerdict = model.QualityVerdict
 type QualityReport = model.QualityReport
@@ -71,34 +65,14 @@ const (
 	TopicNonContent            = model.TopicNonContent
 	KindMCQSingle              = model.KindMCQSingle
 
-	GateWellFormed     = model.GateWellFormed
-	GateSourceRole     = model.GateSourceRole
-	GateQuote          = model.GateQuote
-	GateBlindAnswer    = model.GateBlindAnswer
-	GateSourceSpecific = model.GateSourceSpecific
-	GateSingleValid    = model.GateSingleValid
-	GateArithmetic     = model.GateArithmetic
-	GateUnit           = model.GateUnit
-	GateDistinct       = model.GateDistinct
-	GateCoverage       = model.GateCoverage
-	GateDemand         = model.GateDemand
-
-	ChoiceSupported   = model.ChoiceSupported
-	ChoiceUnsupported = model.ChoiceUnsupported
-	ChoiceEquivalent  = model.ChoiceEquivalent
-	ChoiceAmbiguous   = model.ChoiceAmbiguous
-
-	SourceDependencySpecific  = model.SourceDependencySpecific
-	SourceDependencyGeneric   = model.SourceDependencyGeneric
-	SourceDependencyUnclear   = model.SourceDependencyUnclear
-	DependencyNumber          = model.DependencyNumber
-	DependencyNamedStructure  = model.DependencyNamedStructure
-	DependencyOrder           = model.DependencyOrder
-	DependencyCondition       = model.DependencyCondition
-	DependencyCauseEffect     = model.DependencyCauseEffect
-	DependencyComparison      = model.DependencyComparison
-	DependencyLocalDefinition = model.DependencyLocalDefinition
-	DependencyNone            = model.DependencyNone
+	GateWellFormed = model.GateWellFormed
+	GateSourceRole = model.GateSourceRole
+	GateQuote      = model.GateQuote
+	GateArithmetic = model.GateArithmetic
+	GateUnit       = model.GateUnit
+	GateDistinct   = model.GateDistinct
+	GateCoverage   = model.GateCoverage
+	GateDemand     = model.GateDemand
 
 	EdgeCoOccurs = model.EdgeCoOccurs
 	EdgeFollows  = model.EdgeFollows
@@ -109,37 +83,11 @@ func DefaultChunkOptions() ChunkOptions                 { return model.DefaultCh
 func NewChunkTopics(kind string, topics []string) ChunkTopics {
 	return model.NewChunkTopics(kind, topics)
 }
-func RuneLen(s string) int                          { return model.RuneLen(s) }
-func ChunkByID(chunks []Chunk) map[string]Chunk     { return model.ChunkByID(chunks) }
-func ChoiceMentionsNumber(s string, v float64) bool { return model.ChoiceMentionsNumber(s, v) }
+func RuneLen(s string) int                      { return model.RuneLen(s) }
+func ChunkByID(chunks []Chunk) map[string]Chunk { return model.ChunkByID(chunks) }
 
-func BuildEvidenceGraph(chunks []Chunk, topics []ChunkTopics) EvidenceGraph {
-	return evidence.BuildEvidenceGraph(chunks, topics)
-}
 func NormalizeEvidenceGraph(graph EvidenceGraph, chunks []Chunk, atoms []EvidenceAtom) (EvidenceGraph, error) {
 	return evidence.NormalizeEvidenceGraph(graph, chunks, atoms)
-}
-func LessonContext(lesson Lesson, graph *EvidenceGraph, chunks []Chunk) []Chunk {
-	return evidence.LessonContext(lesson, graph, chunks)
-}
-func RankContextChunks(chunks []Chunk, contract CoverageContract) []Chunk {
-	return evidence.RankContextChunks(chunks, contract)
-}
-
-func SlotLocalContextChunks(chunks []Chunk, graph *EvidenceGraph, contract CoverageContract) []Chunk {
-	return evidence.SlotLocalContextChunks(chunks, graph, contract)
-}
-func BuildCoverageContract(lesson Lesson, graph *EvidenceGraph, chunks []Chunk, budget int) CoverageContract {
-	return evidence.BuildCoverageContract(lesson, graph, chunks, budget)
-}
-func BuildCoverageContractForRun(lesson Lesson, graph *EvidenceGraph, chunks []Chunk, budget int, directive string, forceCalc bool) CoverageContract {
-	return evidence.BuildCoverageContractForRun(lesson, graph, chunks, budget, directive, forceCalc)
-}
-func PreflightCoverageContract(contract CoverageContract, graph *EvidenceGraph, chunks []Chunk) CoverageContract {
-	return evidence.PreflightCoverageContract(contract, graph, chunks)
-}
-func RepairQuestionProvenance(q Question, contract CoverageContract, graph *EvidenceGraph, chunks []Chunk) Question {
-	return evidence.RepairQuestionProvenance(q, contract, graph, chunks)
 }
 
 func BuildOutline(ctx context.Context, chunks []Chunk, d Deps) (*Outline, []Chunk, error) {
@@ -182,19 +130,12 @@ func QuestionSchema(forceCalc bool) map[string]any { return generation.QuestionS
 func QuestionPrompt(lesson Lesson, graph *EvidenceGraph, c Chunk, feedback []RejectedDraft, want int, forceCalc bool) string {
 	return generation.QuestionPrompt(lesson, graph, c, feedback, want, forceCalc)
 }
-func BlindSystem() string                            { return generation.BlindSystem() }
-func BlindSchema(numChoices int) map[string]any      { return generation.BlindSchema(numChoices) }
-func BlindPrompt(q Question) string                  { return generation.BlindPrompt(q) }
-func SourcedSystem() string                          { return generation.SourcedSystem() }
-func SourcedSchema(numChoices ...int) map[string]any { return generation.SourcedSchema(numChoices...) }
-func SourcedPrompt(q Question, source string) string { return generation.SourcedPrompt(q, source) }
-func QualitySystem() string                          { return generation.QualitySystem() }
-func QualitySchema() map[string]any                  { return generation.QualitySchema() }
+func QualitySystem() string         { return generation.QualitySystem() }
+func QualitySchema() map[string]any { return generation.QualitySchema() }
 func QualityPrompt(lesson Lesson, chunks []Chunk, questions []Question) string {
 	return generation.QualityPrompt(lesson, chunks, questions)
 }
 
-func CheckWellFormed(q Question) GateResult { return gates.CheckWellFormed(q) }
 func RunCheapGates(q Question, chunk Chunk, ev Evaluator) *GateReport {
 	return gates.RunCheapGates(q, chunk, ev)
 }

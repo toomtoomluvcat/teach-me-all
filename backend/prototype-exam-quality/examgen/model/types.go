@@ -416,17 +416,14 @@ func (q Question) CorrectIndex() int {
 type GateName string
 
 const (
-	GateWellFormed     GateName = "well_formed"
-	GateSourceRole     GateName = "source_role"
-	GateQuote          GateName = "quote_verbatim"
-	GateBlindAnswer    GateName = "answerable_blind"
-	GateSourceSpecific GateName = "source_specific"
-	GateSingleValid    GateName = "single_defensible"
-	GateArithmetic     GateName = "arithmetic"
-	GateUnit           GateName = "unit_check"
-	GateDistinct       GateName = "not_a_duplicate"
-	GateCoverage       GateName = "coverage_contract"
-	GateDemand         GateName = "demand_contract"
+	GateWellFormed GateName = "well_formed"
+	GateSourceRole GateName = "source_role"
+	GateQuote      GateName = "quote_verbatim"
+	GateArithmetic GateName = "arithmetic"
+	GateUnit       GateName = "unit_check"
+	GateDistinct   GateName = "not_a_duplicate"
+	GateCoverage   GateName = "coverage_contract"
+	GateDemand     GateName = "demand_contract"
 )
 
 // GateResult is the outcome of one check.
@@ -438,8 +435,6 @@ type GateResult struct {
 	Reason string
 	// Deterministic marks gates that Go decided without asking a model.
 	Deterministic bool
-	// ChoiceVerdicts is populated by the deferred single_defensible audit.
-	ChoiceVerdicts []ChoiceVerdict `json:"choice_verdicts,omitempty"`
 }
 
 // GateReport collects every check run against one question.

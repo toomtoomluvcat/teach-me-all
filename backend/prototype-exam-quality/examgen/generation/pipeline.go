@@ -535,10 +535,6 @@ func appendRejectedDraft(memory []RejectedDraft, q Question, report *GateReport)
 	failures := report.Failures()
 	for i := range failures {
 		failures[i].Reason = excerpt(failures[i].Reason, 239)
-		failures[i].ChoiceVerdicts = append([]ChoiceVerdict(nil), failures[i].ChoiceVerdicts...)
-		for j := range failures[i].ChoiceVerdicts {
-			failures[i].ChoiceVerdicts[j].Reason = excerpt(failures[i].ChoiceVerdicts[j].Reason, 159)
-		}
 	}
 	memory = append(memory, RejectedDraft{Stem: excerpt(q.Stem, 239), Choices: choices, Failures: failures})
 	if len(memory) > maxRejectedDrafts {

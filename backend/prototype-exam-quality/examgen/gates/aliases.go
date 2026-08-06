@@ -10,44 +10,18 @@ type Kind = model.Kind
 type GateName = model.GateName
 type GateResult = model.GateResult
 type GateReport = model.GateReport
-type ChoiceVerdict = model.ChoiceVerdict
-type ChoiceStatus = model.ChoiceStatus
-type BlindVerdict = model.BlindVerdict
-type SourceDependency = model.SourceDependency
-type DependencyKind = model.DependencyKind
-type SourcedVerdict = model.SourcedVerdict
 
 const (
 	KindMCQSingle = model.KindMCQSingle
 
-	GateWellFormed     = model.GateWellFormed
-	GateSourceRole     = model.GateSourceRole
-	GateQuote          = model.GateQuote
-	GateBlindAnswer    = model.GateBlindAnswer
-	GateSourceSpecific = model.GateSourceSpecific
-	GateSingleValid    = model.GateSingleValid
-	GateArithmetic     = model.GateArithmetic
-	GateUnit           = model.GateUnit
-	GateDistinct       = model.GateDistinct
-	GateCoverage       = model.GateCoverage
-	GateDemand         = model.GateDemand
-
-	ChoiceSupported   = model.ChoiceSupported
-	ChoiceUnsupported = model.ChoiceUnsupported
-	ChoiceEquivalent  = model.ChoiceEquivalent
-	ChoiceAmbiguous   = model.ChoiceAmbiguous
-
-	SourceDependencySpecific  = model.SourceDependencySpecific
-	SourceDependencyGeneric   = model.SourceDependencyGeneric
-	SourceDependencyUnclear   = model.SourceDependencyUnclear
-	DependencyNumber          = model.DependencyNumber
-	DependencyNamedStructure  = model.DependencyNamedStructure
-	DependencyOrder           = model.DependencyOrder
-	DependencyCondition       = model.DependencyCondition
-	DependencyCauseEffect     = model.DependencyCauseEffect
-	DependencyComparison      = model.DependencyComparison
-	DependencyLocalDefinition = model.DependencyLocalDefinition
-	DependencyNone            = model.DependencyNone
+	GateWellFormed = model.GateWellFormed
+	GateSourceRole = model.GateSourceRole
+	GateQuote      = model.GateQuote
+	GateArithmetic = model.GateArithmetic
+	GateUnit       = model.GateUnit
+	GateDistinct   = model.GateDistinct
+	GateCoverage   = model.GateCoverage
+	GateDemand     = model.GateDemand
 
 	SourceRoleUnknown          = model.SourceRoleUnknown
 	SourceRoleCore             = model.SourceRoleCore
