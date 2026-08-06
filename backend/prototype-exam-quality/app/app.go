@@ -222,6 +222,7 @@ func interactiveGeneration(ctx context.Context, in *bufio.Scanner, cfg config, o
 		opt.Budget = cfg.budget
 		opt.SetCandidates = cfg.setCandidates
 		opt.ContractPreflight = cfg.contractPreflight
+		opt.StopOnFullSet = cfg.stopOnFullSet
 
 		clear()
 		header("STEP 3 — generating and gating: " + lesson.Title)

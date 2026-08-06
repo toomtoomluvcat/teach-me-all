@@ -303,6 +303,7 @@ func runBenchmark(ctx context.Context, cfg config, outline *examgen.Outline, chu
 		opt.GenerationDirective = benchmark.Directive
 		opt.SetCandidates = cfg.setCandidates
 		opt.ContractPreflight = cfg.contractPreflight
+		opt.StopOnFullSet = cfg.stopOnFullSet
 
 		fmt.Printf("\n%sBENCHMARK %s — %s%s\n", bold, benchmark.Name, lesson.Title, reset)
 		res, err := examgen.GenerateExam(ctx, outline, lesson, chunks, deps, opt)

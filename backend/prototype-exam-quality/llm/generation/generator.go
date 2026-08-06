@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"sync"
 
 	"protoexam/examgen"
 )
@@ -77,16 +78,52 @@ func splitListish(value string) []string {
 	return out
 }
 
-// Generator adapts the Ollama client to examgen.Generator.
+// Generator adapts a provider client to examgen.Generator.
 type Generator struct {
 	c     ModelClient
 	model string
 	// UseCalcTool runs the calculator tool loop before generating, so the model
 	// never has to do arithmetic in its head.
 	UseCalcTool bool
+
+	// factsCache memoises the calculator tool loop. Every candidate set and
+	// every bounded repair for one lesson runs it over the same slot chunks
+	// with the same flag, so without this a run pays for an identical
+	// multi-round tool conversation once per candidate.
+	factsMu    sync.Mutex
+	factsCache map[string][]Fact
 }
 
 func NewGenerator(c ModelClient, model string) *Generator { return &Generator{c: c, model: model} }
+
+// cachedFacts runs ComputeFacts once per distinct (chunk set, flag) key. The
+// key is built from chunk IDs rather than their text: IDs are short, and two
+// chunk sets with the same IDs always carry the same text within a run.
+//
+// A failed tool loop is deliberately not cached. It is usually a transport
+// error rather than a property of the input, and the next candidate may
+// succeed where this one did not.
+func (g *Generator) cachedFacts(ctx context.Context, key, text string, requiresCalculation bool) []Fact {
+	g.factsMu.Lock()
+	if facts, ok := g.factsCache[key]; ok {
+		g.factsMu.Unlock()
+		return facts
+	}
+	g.factsMu.Unlock()
+
+	facts, err := g.ComputeFacts(ctx, examgen.Chunk{Page: 0, Text: text}, requiresCalculation)
+	if err != nil {
+		return nil
+	}
+
+	g.factsMu.Lock()
+	defer g.factsMu.Unlock()
+	if g.factsCache == nil {
+		g.factsCache = map[string][]Fact{}
+	}
+	g.factsCache[key] = facts
+	return facts
+}
 
 // genOptions keeps generation close to deterministic. A prototype whose output
 // changes every run cannot be compared against itself between prompt edits.
@@ -301,7 +338,7 @@ func (g *Generator) QuestionsSet(ctx context.Context, lesson examgen.Lesson, gra
 	}
 	user := examgen.QuestionSetPrompt(lesson, graph, chunks, contract, feedback, forceCalc)
 	if g.UseCalcTool {
-		var selected []string
+		var selected, selectedIDs []string
 		seen := map[string]bool{}
 		requiresCalculation := forceCalc
 		for _, slot := range contract.Slots {
@@ -318,6 +355,7 @@ func (g *Generator) QuestionsSet(ctx context.Context, lesson examgen.Lesson, gra
 				for _, chunk := range chunks {
 					if chunk.ID == id {
 						selected = append(selected, chunk.Text)
+						selectedIDs = append(selectedIDs, chunk.ID)
 						seen[id] = true
 						break
 					}
@@ -325,10 +363,8 @@ func (g *Generator) QuestionsSet(ctx context.Context, lesson examgen.Lesson, gra
 			}
 		}
 		if len(selected) > 0 {
-			facts, err := g.ComputeFacts(ctx, examgen.Chunk{Page: 0, Text: strings.Join(selected, "\n\n")}, requiresCalculation)
-			if err == nil {
-				user += FactsBlock(facts)
-			}
+			key := fmt.Sprintf("%t|%s", requiresCalculation, strings.Join(selectedIDs, ","))
+			user += FactsBlock(g.cachedFacts(ctx, key, strings.Join(selected, "\n\n"), requiresCalculation))
 		}
 	}
 	msgs := []Message{

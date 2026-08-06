@@ -44,6 +44,7 @@ type config struct {
 	budget             int
 	setCandidates      int
 	contractPreflight  bool
+	stopOnFullSet      bool
 	fresh              bool
 	extractOnly        bool
 	calcTool           bool
@@ -94,6 +95,7 @@ func parseConfig() config {
 	flag.IntVar(&cfg.budget, "budget", 0, "override the model's own question budget")
 	flag.IntVar(&cfg.setCandidates, "set-candidates", 3, "independent set candidates to generate and score when --set-generation is enabled")
 	flag.BoolVar(&cfg.contractPreflight, "contract-preflight", true, "normalize/drop deterministic coverage-slot defects before generation")
+	flag.BoolVar(&cfg.stopOnFullSet, "stop-on-full-set", false, "stop generating candidates once one covers every contract slot; trades set variety for calls")
 	flag.BoolVar(&cfg.fresh, "fresh", false, "ignore the cache")
 	flag.BoolVar(&cfg.extractOnly, "extract-only", false, "stop after extraction; needs no models and no Ollama")
 	flag.BoolVar(&cfg.filterTopics, "filter-topics", true, "drop chunks pass 1 classified as teacher-guide apparatus or page furniture; set false for a source that really is mostly exercises")

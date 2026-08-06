@@ -158,6 +158,7 @@ Flags:
 | `--budget` | *(model decides)* | override how many questions the lesson should have |
 | `--set-candidates` | `3` | generate independent set candidates and keep the highest deterministic QC/diversity score |
 | `--contract-preflight` | `true` | repair/drop deterministic slot defects before generation; no model call |
+| `--stop-on-full-set` | `false` | stop generating candidates once one covers every contract slot; saves calls, costs set variety |
 
 **Run `--extract-only` first.** It makes no LLM API calls and tells you whether
 the rest of the pipeline has a chance:

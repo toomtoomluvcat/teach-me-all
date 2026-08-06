@@ -102,6 +102,11 @@ type ExamOptions struct {
 	// ContractPreflight repairs/drops deterministic slot defects before asking
 	// the model to write the set. It costs no model call.
 	ContractPreflight bool
+	// StopOnFullSet stops generating candidates as soon as one covers every
+	// contract slot. Acceptance dominates candidate selection, so such a set is
+	// already unbeatable on that axis; what the remaining candidates could still
+	// add is variety, which is why this is off by default.
+	StopOnFullSet bool
 }
 
 // DefaultExamOptions is sized so a run finishes in minutes, not hours.
@@ -176,8 +181,7 @@ func generateExamSet(ctx context.Context, outline *Outline, lesson Lesson, chunk
 		candidates = 1
 	}
 
-	var best *ExamResult
-	bestScore := -1
+	var drafted []*ExamResult
 	var firstErr error
 	for i := 1; i <= candidates; i++ {
 		candidateContract := contract
@@ -208,34 +212,78 @@ func generateExamSet(ctx context.Context, outline *Outline, lesson Lesson, chunk
 				candidate.SetContractRetries = 1
 			}
 		}
-		if d.Quality != nil && len(candidate.Passed) > 0 {
-			quality, qualityErr := d.Quality.GradeSet(ctx, lesson, contextChunks, candidate.Passed)
-			if qualityErr != nil {
-				d.Log.report("quality", 0, 0, fmt.Sprintf("advisory grader unavailable: %v", qualityErr))
-			} else if quality != nil && quality.CompleteFor(len(candidate.Passed)) {
-				candidate.Quality = quality
-				d.Log.report("quality", quality.TotalScore, quality.MaxScore, "advisory semantic review")
-			} else {
-				d.Log.report("quality", 0, 0, "advisory grader returned incomplete output")
-			}
-		}
-		score := setCandidateScore(candidate, outline.EvidenceGraph)
-		d.Log.report("set-candidate", i, candidates, fmt.Sprintf("%d/%d accepted, score=%d", len(candidate.Passed), len(candidate.Questions), score))
-		if best == nil || score > bestScore {
-			best = candidate
-			bestScore = score
+		drafted = append(drafted, candidate)
+		d.Log.report("set-candidate", i, candidates, fmt.Sprintf("%d/%d accepted", len(candidate.Passed), len(candidate.Questions)))
+
+		// A candidate that filled every slot cannot be beaten on acceptance, and
+		// acceptance dominates the score. Generating the remaining candidates can
+		// still find a more varied set, so this is opt-in rather than the default.
+		if opt.StopOnFullSet && len(candidate.Passed) >= len(contract.Slots) {
+			d.Log.report("set-candidate", i, candidates, "contract fully covered; skipping the remaining candidates")
+			break
 		}
 	}
-	if best == nil {
+	if len(drafted) == 0 {
 		if firstErr != nil {
 			return nil, firstErr
 		}
 		return nil, fmt.Errorf("set generation returned no candidate")
 	}
+
+	best := selectSetCandidate(ctx, lesson, outline.EvidenceGraph, contextChunks, drafted, d)
 	best.Contract = &contract
 	best.SetCandidates = candidates
-	best.SelectedSetScore = bestScore
+	best.SelectedSetScore = setCandidateScore(best, outline.EvidenceGraph)
 	return best, nil
+}
+
+// selectSetCandidate picks the set to ship and grades only the candidates that
+// can still win.
+//
+// Semantic review is a tie-break below acceptance, so a candidate that already
+// accepted fewer slots than another cannot overtake it no matter how it grades.
+// Grading it anyway is one full review call spent on an answer that is already
+// decided, once per losing candidate. The winner is still graded, so the run
+// report carries the same advisory review it always did.
+func selectSetCandidate(ctx context.Context, lesson Lesson, graph *EvidenceGraph, contextChunks []Chunk, drafted []*ExamResult, d Deps) *ExamResult {
+	contenders := drafted[:1]
+	for _, candidate := range drafted[1:] {
+		switch {
+		case len(candidate.Passed) > len(contenders[0].Passed):
+			contenders = []*ExamResult{candidate}
+		case len(candidate.Passed) == len(contenders[0].Passed):
+			contenders = append(contenders, candidate)
+		}
+	}
+	if len(contenders) > 1 {
+		d.Log.report("quality", len(contenders), len(drafted), "grading only the candidates tied on acceptance")
+	}
+
+	best := contenders[0]
+	bestScore := -1
+	for _, candidate := range contenders {
+		gradeSetCandidate(ctx, lesson, contextChunks, candidate, d)
+		if score := setCandidateScore(candidate, graph); score > bestScore {
+			best, bestScore = candidate, score
+		}
+	}
+	return best
+}
+
+func gradeSetCandidate(ctx context.Context, lesson Lesson, contextChunks []Chunk, candidate *ExamResult, d Deps) {
+	if d.Quality == nil || len(candidate.Passed) == 0 {
+		return
+	}
+	quality, err := d.Quality.GradeSet(ctx, lesson, contextChunks, candidate.Passed)
+	switch {
+	case err != nil:
+		d.Log.report("quality", 0, 0, fmt.Sprintf("advisory grader unavailable: %v", err))
+	case quality != nil && quality.CompleteFor(len(candidate.Passed)):
+		candidate.Quality = quality
+		d.Log.report("quality", quality.TotalScore, quality.MaxScore, "advisory semantic review")
+	default:
+		d.Log.report("quality", 0, 0, "advisory grader returned incomplete output")
+	}
 }
 
 const maxSetContractRetries = 1
@@ -353,7 +401,12 @@ func setCandidateScore(res *ExamResult, graph *EvidenceGraph) int {
 	if res.Quality != nil && res.Quality.CompleteFor(len(res.Passed)) {
 		semantic = res.Quality.TotalScore * 1000 / res.Quality.MaxScore
 	}
-	return len(res.Passed)*1_000_000 + semantic*1_000 + len(seenAtoms)*500 + len(seenSkills)*100 + len(seenRelations)*75 + len(seenChunks)*25 - len(res.FailuresByGate())*10
+	// The acceptance weight is an order of magnitude above the semantic band on
+	// purpose. semantic maxes out at 1000, so at the old 1_000_000 weight a
+	// perfectly-graded set could tie a set that accepted one more question —
+	// which contradicts "acceptance-first" and would make the selector's answer
+	// depend on which candidates happened to be graded.
+	return len(res.Passed)*10_000_000 + semantic*1_000 + len(seenAtoms)*500 + len(seenSkills)*100 + len(seenRelations)*75 + len(seenChunks)*25 - len(res.FailuresByGate())*10
 }
 
 const maxRejectedDrafts = 4
