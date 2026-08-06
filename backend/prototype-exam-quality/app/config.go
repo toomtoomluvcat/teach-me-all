@@ -71,7 +71,7 @@ func parseConfig() config {
 	flag.StringVar(&cfg.doclingOCRMode, "docling-ocr", "auto", "Docling OCR mode: auto | on | off; auto detects native PDF text")
 	flag.StringVar(&cfg.doclingFormulaMode, "docling-formulas", "auto", "Docling formula enrichment: auto | on | off")
 	flag.BoolVar(&cfg.doclingOCRFullPage, "docling-ocr-full-page", false, "force OCR over complete pages instead of only detected regions")
-	flag.StringVar(&cfg.model, "model", "", "generation and judge model (provider default when empty)")
+	flag.StringVar(&cfg.model, "model", "", "generation and advisory-review model (provider default when empty)")
 	// bge-m3, not nomic-embed-text. Measured on Thai question pairs,
 	// nomic returns cosine 1.0000 for every pair in the same chapter whether
 	// they are the same question or not — no threshold separates them, and

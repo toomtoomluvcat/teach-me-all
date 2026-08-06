@@ -40,7 +40,7 @@ chunks ──pass 1 (map-reduce)──> evidence graph ──> course outline (l
 | 2 | Cited chunk is not an explicit pre-learning check / answer-key section | **Go** — no model involved |
 | 3 | `source_quote` is a verbatim substring of the cited chunk | **Go** — no model involved |
 | 4 | `calculation.expression` evaluates to the answer the model marked correct | **Go** — no model involved |
-| 5 | Question is not a duplicate of an accepted question | **Go + embedder** — no judge involved |
+| 5 | Question is not a duplicate of an accepted question | **Go + embedder** — no model judgement involved |
 
 The QC gates are deliberately a backstop, not a complete educational-quality
 grader. Before generating, the model
@@ -50,8 +50,11 @@ database can be re-verified years later and a tool call that already happened
 cannot. Tools and a `format` schema are mutually exclusive in Ollama, so
 generation runs as two turns — see VERDICT.md.
 
-The source-dependency and per-choice semantic judges remain available for
-advisory evaluation, but they are not hard gates in the core path. This keeps
+The blind and source-dependency judges have been removed: they stopped running
+once the deterministic gates covered the same ground, and unreachable code that
+looks like a quality control is worse than none. The one model-backed review
+left is `QualityGrader`, which scores an already-accepted set to break ties
+between candidates and is never an acceptance gate. This keeps
 the acceptance rule focused on catching malformed, fabricated, duplicated, or
 arithmetically wrong generations rather than asking the generator to grade its
 own educational quality.
@@ -64,7 +67,7 @@ choice verdicts) and attached to the next normal generation call. This adds no
 provider request: top-up was already needed to fill the budget. The model is
 told to ask a materially different question rather than paraphrase the rejected
 one. The generation contract also excludes learning objectives, assessment
-guidance, and classroom activities; a deterministic pre-judge gate catches
+guidance, and classroom activities; a deterministic gate catches
 known Thai and English teacher-guide phrases if the model ignores that rule.
 
 Pass 1 always ends with a compile step that splits the
@@ -217,8 +220,9 @@ prints a cumulative call report. With a hosted provider, `TOTAL` is the exact
 number of provider HTTP requests attempted by the process, including retries and
 429/5xx responses. The `embed` row counts batch embedding requests, not
 individual texts; the other rows identify the pipeline stage (`outline/map`,
-`outline/reduce`, `generate`, `judge/*`, and `calc-tool`). Rejection memory is
-part of the next `generate` prompt, not a separate API call.
+`outline/reduce`, `outline/compile`, `generate-set`, `quality/set`, and
+`calc-tool`). Rejection memory is part of the next `generate-set` prompt, not a
+separate API call.
 
 ## Finish line
 
@@ -261,13 +265,11 @@ extraction failure, not permission to silently return a lower-quality document.
 1. **Thai camera/flatbed scans.** The official ม.5 benchmark is a digital PDF.
    Pages 60-62 prove Thai text, tables, page boundaries, OCR labels, and figure
    crops, but not skew, shadows, blur, or paper texture from a genuine scan.
-2. **A 4B model judging gates 2 and 3.** If it rejects good questions we will
-   misread the pipeline as broken. Cross-check by hand on the first run.
-3. **4B Thai output quality** is a separate failure mode from (1). Do not conflate
+2. **4B Thai output quality** is a separate failure mode from (1). Do not conflate
    them — read the extracted text before blaming the model.
-4. **The judge is the same model as the generator.** A model grades its own work
-   softly. Two models do not fit in 6 GB and swapping per question would make a
-   run take hours. This is why gates 1 and 4 are deterministic.
+3. **The advisory grader is the same model as the generator.** A model scores its
+   own work softly, which is exactly why it only breaks ties between candidates
+   that already passed the deterministic gates, and never decides acceptance.
 
 ## Notes for production, not for here
 
