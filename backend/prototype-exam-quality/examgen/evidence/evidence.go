@@ -486,6 +486,12 @@ func buildCoverageContract(lesson Lesson, graph *EvidenceGraph, contextChunks []
 	preferred := []string{"understanding", "application", "recall"}
 	for len(contract.Slots) < budget {
 		wantedSkill := requiredSkill
+		if wantedSkill == "analysis" {
+			// The anchor atom is picked as an application-supporting atom;
+			// analysis is an upgrade layered on top once a genuinely distinct
+			// second atom to combine it with is confirmed, below.
+			wantedSkill = "application"
+		}
 		if wantedSkill == "" {
 			wantedSkill = preferred[len(contract.Slots)%len(preferred)]
 		}
@@ -512,6 +518,26 @@ func buildCoverageContract(lesson Lesson, graph *EvidenceGraph, contextChunks []
 				}
 			}
 		}
+		var supportIDs []string
+		if requiredSkill == "analysis" {
+			supportIDs = analysisSupportAtomIDs(atom, atoms, usedAtoms)
+			if len(supportIDs) == 0 {
+				// This atom has no genuinely distinct second idea (different
+				// chunk, different relation) to combine it with -- try the
+				// next atom rather than emit an ungrounded analysis slot.
+				continue
+			}
+			skill = "analysis"
+		} else if requiredSkill == "" && !usedSkills["analysis"] && (skill == "application" || skill == "understanding") {
+			// The rotation can land on "understanding" before "application"
+			// depending on how many slots already exist; analysis is a valid
+			// upgrade from either, so this checks both rather than only
+			// firing when the rotation happens to pick "application" first.
+			if ids := analysisSupportAtomIDs(atom, atoms, usedAtoms); len(ids) > 0 {
+				skill = "analysis"
+				supportIDs = ids
+			}
+		}
 		usedSkills[skill] = true
 		slotRequiresCalculation := requiredCalculation
 		if !slotRequiresCalculation && requiredSkill == "" && !numericAssigned && supportsForm(atom, "calculation") {
@@ -519,7 +545,7 @@ func buildCoverageContract(lesson Lesson, graph *EvidenceGraph, contextChunks []
 			numericAssigned = true
 		}
 		difficulty := requiredDifficulty
-		if difficulty == "" {
+		if difficulty == "" && skill != "analysis" {
 			if requiredSkill == "" && !requiredCalculation {
 				difficulty = "easy"
 				if skill == "application" {
@@ -527,7 +553,16 @@ func buildCoverageContract(lesson Lesson, graph *EvidenceGraph, contextChunks []
 				}
 			}
 		}
-		supportIDs := []string(nil)
+		// analysis is deliberately left with difficulty == "" (genuinely
+		// unpinned, not defaulted to "easy") here: combining two distinct
+		// source ideas doesn't by itself make a question hard -- two
+		// directly-stated, closely-linked facts can be an easy analysis item,
+		// same as Bloom's "analyze" is a kind of cognitive operation, not a
+		// difficulty tier. Pinning the slot to any one difficulty would let
+		// the coverage gate reject a truthfully-harder or truthfully-easier
+		// question the writer actually produced. The writer reports the real
+		// difficulty; gateDemandContract scales the reasoning_steps floor to
+		// match (2 for easy/medium, 3 for hard).
 		if requiredSkill == "application" && requiredDifficulty == "hard" {
 			supportIDs = supportingAtomIDs(atom, atoms, usedAtoms)
 		}
@@ -560,6 +595,60 @@ func buildCoverageContract(lesson Lesson, graph *EvidenceGraph, contextChunks []
 		})
 	}
 	return contract
+}
+
+// analysisSupportAtomIDs picks a genuinely distinct second idea to combine
+// with the primary atom for an analysis-tier question. Unlike
+// supportingAtomIDs (which prefers same-chunk elaboration for hard
+// application), analysis requires the opposite: a different chunk and a
+// different relation type, so the question needs two separate pieces of the
+// source rather than one fact restated. concept_id overlap is only a soft
+// bonus, never a requirement -- compiled graphs across subjects were checked
+// empirically and concept_ids go unpopulated anywhere from ~40% (physics) to
+// 100% (a Thai biology source) of atoms, so requiring concept overlap would
+// silently starve most subjects of analysis slots.
+func analysisSupportAtomIDs(primary EvidenceAtom, atoms []EvidenceAtom, used map[string]bool) []string {
+	type candidate struct {
+		id    string
+		score int
+	}
+	candidates := make([]candidate, 0, len(atoms))
+	for i, atom := range atoms {
+		if atom.ID == primary.ID || (used != nil && used[atom.ID]) {
+			continue
+		}
+		if atom.ChunkID == primary.ChunkID {
+			continue
+		}
+		if strings.EqualFold(atom.Relation, primary.Relation) {
+			continue
+		}
+		if supportsForm(atom, "calculation") {
+			// Leave calculation-eligible atoms alone so the (budget-wide, one
+			// per contract) numeric-slot assignment still gets a turn at
+			// picking this atom as its own primary -- an analysis slot only
+			// needs it as supporting evidence, not as its main subject.
+			continue
+		}
+		score := 0
+		if sharesConcept(primary.ConceptIDs, atom.ConceptIDs) {
+			score += 30
+		}
+		if supportsForm(atom, "application") || supportsForm(atom, "understanding") {
+			score += 10
+		}
+		candidates = append(candidates, candidate{id: atom.ID, score: score + (len(atoms) - i)})
+	}
+	sort.SliceStable(candidates, func(i, j int) bool { return candidates[i].score > candidates[j].score })
+	limit := 2
+	if len(candidates) < limit {
+		limit = len(candidates)
+	}
+	ids := make([]string, 0, limit)
+	for _, c := range candidates[:limit] {
+		ids = append(ids, c.id)
+	}
+	return ids
 }
 
 func supportingAtomIDs(primary EvidenceAtom, atoms []EvidenceAtom, used map[string]bool) []string {
@@ -645,12 +734,20 @@ func coverageDirectiveTargets(directive string, forceCalc bool) (skill, difficul
 	switch {
 	case forceCalc || strings.Contains(lower, "skill to calculation") || strings.Contains(lower, "calculation questions only") || strings.Contains(lower, "requires_calculation"):
 		requiresCalculation = true
+	case strings.Contains(lower, "skill to analysis") || strings.Contains(lower, "analysis questions"):
+		skill = "analysis"
 	case strings.Contains(lower, "skill to application") || strings.Contains(lower, "application questions"):
 		skill = "application"
+	case strings.Contains(lower, "skill to recall") || strings.Contains(lower, "recall questions"):
+		skill = "recall"
+	case strings.Contains(lower, "skill to understanding") || strings.Contains(lower, "understanding questions"):
+		skill = "understanding"
 	}
 	switch {
 	case strings.Contains(lower, "difficulty to hard") || strings.Contains(lower, "at hard level"):
 		difficulty = "hard"
+	case strings.Contains(lower, "difficulty to medium") || strings.Contains(lower, "at medium level"):
+		difficulty = "medium"
 	case strings.Contains(lower, "difficulty to easy") || strings.Contains(lower, "at easy level"):
 		difficulty = "easy"
 	}
@@ -917,6 +1014,20 @@ func gateSetCoverage(q Question, contract CoverageContract, byChunk map[string]C
 		}
 		if !validReasoningSteps(q.ReasoningSteps) {
 			res.Reason = fmt.Sprintf("hard application slot %s needs two distinct reasoning steps", slot.ID)
+			return res
+		}
+	}
+	if strings.EqualFold(slot.Skill, "analysis") {
+		if !sameIDs(q.SupportingAtomIDs, slot.SupportAtomIDs) {
+			res.Reason = fmt.Sprintf("analysis slot %s requires supporting atoms %v, got %v", slot.ID, slot.SupportAtomIDs, q.SupportingAtomIDs)
+			return res
+		}
+		// The atom-selection step already guaranteed SourceChunkIDs spans more
+		// than one chunk for an analysis slot (analysisSupportAtomIDs refuses a
+		// same-chunk candidate), so this is really re-checking that the slot
+		// itself was built correctly rather than trusting it blindly.
+		if len(slot.SourceChunkIDs) < 2 {
+			res.Reason = fmt.Sprintf("analysis slot %s does not span two distinct source chunks", slot.ID)
 			return res
 		}
 	}

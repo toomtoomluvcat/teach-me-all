@@ -73,6 +73,47 @@ func TestChoiceMentionsNumberAllowsOrdinaryThreeDecimalRounding(t *testing.T) {
 	}
 }
 
+func TestChoiceMentionsNumberAllowsThreeSigFigRoundingAtAnyMagnitude(t *testing.T) {
+	// Titration/percentage-scale answers routinely round to 3 significant
+	// figures without an "approximately" marker — this is the real shape that
+	// exposed an absolute (not relative) tolerance being wrong at this scale.
+	if !choiceMentionsNumber("69.9%", 69.914778) {
+		t.Fatal("69.9% should match a computed 69.914778 (3 sig figs, ~0.02% relative)")
+	}
+	if !choiceMentionsNumber("22.9%", 22.887473) {
+		t.Fatal("22.9% should match a computed 22.887473 (3 sig figs, ~0.05% relative)")
+	}
+	if choiceMentionsNumber("77.1%", 22.887473) {
+		t.Fatal("77.1% is a completely different value and must not match")
+	}
+}
+
+func TestParseExponentHandlesEverySuperscriptDigit(t *testing.T) {
+	// ¹²³ live in a different Unicode block than ⁰⁴⁵⁶⁷⁸⁹ — this must not
+	// silently produce a garbage value for any of them.
+	for _, tc := range []struct {
+		s    string
+		want int
+	}{
+		{"⁻³", -3}, {"⁻²", -2}, {"⁻¹", -1}, {"²", 2}, {"³", 3},
+		{"¹²", 12}, {"⁻¹³", -13}, {"⁴", 4}, {"⁻⁵", -5},
+	} {
+		got, ok := parseExponent(tc.s)
+		if !ok || got != tc.want {
+			t.Fatalf("parseExponent(%q) = %d, %v; want %d, true", tc.s, got, ok, tc.want)
+		}
+	}
+}
+
+func TestChoiceMentionsNumberMatchesNegativeSuperscriptExponent(t *testing.T) {
+	if !choiceMentionsNumber("9.6 × 10⁻³ M", 0.009636) {
+		t.Fatal("9.6 × 10⁻³ should match 0.009636 — this is a real titration-answer shape")
+	}
+	if !choiceMentionsNumber("2.9 × 10² g", 290.0) {
+		t.Fatal("2.9 × 10² should match 290 — superscript 2 must not be misparsed")
+	}
+}
+
 func TestChoiceMentionsNumberUsesNumericBoundaries(t *testing.T) {
 	for _, choice := range []string{"14 N", "40 m/s", "0.4 kg"} {
 		if choiceMentionsNumber(choice, 4) {

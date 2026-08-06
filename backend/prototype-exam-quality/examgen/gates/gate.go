@@ -66,13 +66,25 @@ func RunCheapGates(q Question, chunk Chunk, ev Evaluator) *GateReport {
 
 // gateDemandContract is a compact deterministic check for the claimed
 // cognitive load. It does not prove the item is good; it blocks the cheaper
-// failure where a hard/application label has no explicit changed condition,
-// support steps, or distractor rationale at all.
+// failure where a hard/application (or analysis) label has no explicit
+// changed condition, support steps, or distractor rationale at all.
+//
+// analysis is not pinned to hard: combining two source ideas is a kind of
+// reasoning (Bloom's "analyze"), not a difficulty tier by itself -- two
+// directly-stated, closely-linked facts can be an easy analysis item, same as
+// a genuinely competing pair of facts can be a hard one. What scales with
+// difficulty is the reasoning_steps floor: 2 for easy/medium (the minimum to
+// show both ideas were actually used), 3 for hard. Separately, in the
+// coverage gate where the slot's resolved chunk list is available, analysis
+// always requires supporting evidence from a genuinely different part of the
+// source — that part is not optional at any difficulty, only the step count
+// scales.
 func gateDemandContract(q Question) GateResult {
 	res := GateResult{Gate: GateDemand, Deterministic: true}
 	difficulty := strings.ToLower(strings.TrimSpace(q.Difficulty))
 	skill := strings.ToLower(strings.TrimSpace(q.Skill))
-	if skill != "application" || (difficulty != "medium" && difficulty != "hard") {
+	isAnalysis := skill == "analysis"
+	if !isAnalysis && (skill != "application" || (difficulty != "medium" && difficulty != "hard")) {
 		res.Pass = true
 		res.Reason = "no medium/hard application demand contract required"
 		return res
@@ -82,7 +94,7 @@ func gateDemandContract(q Question) GateResult {
 		return res
 	}
 	if len(q.DistractorReasons) != len(q.Choices)-1 {
-		res.Reason = fmt.Sprintf("application %s needs one distractor_reason per wrong choice, got %d for %d choices", difficulty, len(q.DistractorReasons), len(q.Choices)-1)
+		res.Reason = fmt.Sprintf("%s needs one distractor_reason per wrong choice, got %d for %d choices", skill, len(q.DistractorReasons), len(q.Choices)-1)
 		return res
 	}
 	for i, reason := range q.DistractorReasons {
@@ -91,17 +103,31 @@ func gateDemandContract(q Question) GateResult {
 			return res
 		}
 	}
-	if difficulty == "hard" && !validDemandSteps(q.ReasoningSteps) {
+	if isAnalysis {
+		minSteps := 2
+		if difficulty == "hard" {
+			minSteps = 3
+		}
+		if !validDemandStepsMin(q.ReasoningSteps, minSteps) {
+			res.Reason = fmt.Sprintf("%s analysis needs at least %d distinct concrete reasoning_steps", difficulty, minSteps)
+			return res
+		}
+	}
+	if !isAnalysis && difficulty == "hard" && !validDemandSteps(q.ReasoningSteps) {
 		res.Reason = "hard application needs at least two distinct concrete reasoning_steps"
 		return res
 	}
 	res.Pass = true
-	res.Reason = fmt.Sprintf("%s application demand contract is present", difficulty)
+	res.Reason = fmt.Sprintf("%s demand contract is present", skill)
 	return res
 }
 
 func validDemandSteps(steps []string) bool {
-	if len(steps) < 2 {
+	return validDemandStepsMin(steps, 2)
+}
+
+func validDemandStepsMin(steps []string, min int) bool {
+	if len(steps) < min {
 		return false
 	}
 	seen := map[string]bool{}

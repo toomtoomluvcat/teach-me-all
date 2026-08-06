@@ -66,10 +66,15 @@ func choiceMentionsNumber(choice string, v float64) bool {
 
 // isLosslessRounding reports whether formatting v as text and parsing it back
 // reproduces v closely enough that no meaningful precision was discarded.
-// The absolute allowance for values >= 1 mirrors gates.roundedAnswerTolerance
-// (5e-4): ordinary three-decimal rounding is normal and needs no
-// "approximately" marker. A jump like 1.67 -> "1.7" (0.03 away) is well
-// outside that and only matches when the choice marks itself approximate.
+// The tolerance is relative, not absolute, matching ordinary three-significant-
+// figure rounding at any magnitude: "69.9" for a computed 69.914778 (0.02%
+// off) is normal scientific convention, same as "35.348" for 35.34795918...
+// (0.001% off). An absolute epsilon calibrated near magnitude ~1-10 (an
+// earlier version of this check used 5e-4 absolute) silently stops working at
+// different scales — it wrongly rejected legitimate percentage-scale rounding
+// like "69.9%" while a jump like 1.67 -> "1.7" (1.8% relative, only 2 sig
+// figs) is well outside 3-sig-fig tolerance at any scale and correctly still
+// requires the choice to mark itself approximate.
 func isLosslessRounding(v float64, text string) bool {
 	parsed, err := strconv.ParseFloat(text, 64)
 	if err != nil {
@@ -78,11 +83,10 @@ func isLosslessRounding(v float64, text string) bool {
 	if parsed == v {
 		return true
 	}
-	if math.Abs(v) >= 1 && math.Abs(parsed) >= 1 && math.Abs(parsed-v) <= 5e-4 {
-		return true
+	if v == 0 {
+		return math.Abs(parsed) < 1e-3
 	}
-	scale := math.Max(math.Abs(v), 1)
-	return math.Abs(parsed-v)/scale < 1e-6
+	return math.Abs(parsed-v)/math.Abs(v) < 1e-3
 }
 
 func hasApproxMarker(choice string) bool {
@@ -179,6 +183,18 @@ func normalizeScientificLiteral(s string) string {
 	return parts[0] + "e" + strconv.Itoa(exponent)
 }
 
+// superscriptDigits maps each superscript digit to its ASCII value by direct
+// lookup rather than arithmetic offset from '⁰'. Superscript 1/2/3 live in
+// the Latin-1 Supplement block (U+00B9/B2/B3) while 0 and 4-9 live in the
+// Superscripts and Subscripts block (U+2070, U+2074-2079) — a uniform '⁰'
+// offset silently produces nonsense for 1/2/3 (e.g. '²' - '⁰' computes to
+// -8126, not 2) instead of failing loudly, so a wrong exponent parsed clean
+// as if it were valid.
+var superscriptDigits = map[rune]byte{
+	'⁰': '0', '¹': '1', '²': '2', '³': '3', '⁴': '4',
+	'⁵': '5', '⁶': '6', '⁷': '7', '⁸': '8', '⁹': '9',
+}
+
 func parseExponent(s string) (int, bool) {
 	if exponent, err := strconv.Atoi(s); err == nil {
 		return exponent, true
@@ -190,10 +206,12 @@ func parseExponent(s string) (int, bool) {
 			b.WriteRune('+')
 		case '⁻':
 			b.WriteRune('-')
-		case '⁰', '¹', '²', '³', '⁴', '⁵', '⁶', '⁷', '⁸', '⁹':
-			b.WriteString(strconv.Itoa(int(r - '⁰')))
 		default:
-			return 0, false
+			digit, ok := superscriptDigits[r]
+			if !ok {
+				return 0, false
+			}
+			b.WriteByte(digit)
 		}
 	}
 	exponent, err := strconv.Atoi(b.String())

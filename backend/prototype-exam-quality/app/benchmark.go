@@ -58,10 +58,18 @@ func benchmarkCases(selection string, lessonHint string, scopeHint string) ([]be
 		ForceCalc:           true,
 		RequiresCalculation: true,
 	}
+	analysis := benchmarkCase{
+		Name:             "analysis",
+		LessonContains:   "newton",
+		Scope:            "force friction motion two linked relationships combined",
+		Directive:        "Generate analysis questions. Each question must combine two distinct physics relationships or facts from two different, clearly separate parts of the passage -- not the same relationship applied twice to two numbers, and not one relationship restated. The answer must genuinely need both supporting facts; a student who only had one could not reach it. Set difficulty to hard and skill to analysis.",
+		TargetSkill:      "analysis",
+		TargetDifficulty: "hard",
+	}
 
 	switch strings.ToLower(strings.TrimSpace(selection)) {
 	case "all":
-		return []benchmarkCase{applicationEasy, applicationMedium, applicationHard, calculation}, nil
+		return []benchmarkCase{applicationEasy, applicationMedium, applicationHard, calculation, analysis}, nil
 	case "application-easy", "application_easy":
 		return []benchmarkCase{applicationEasy}, nil
 	case "application-hard", "application_hard":
@@ -70,8 +78,10 @@ func benchmarkCases(selection string, lessonHint string, scopeHint string) ([]be
 		return []benchmarkCase{applicationMedium}, nil
 	case "calculation", "calc":
 		return []benchmarkCase{calculation}, nil
+	case "analysis":
+		return []benchmarkCase{analysis}, nil
 	default:
-		return nil, fmt.Errorf("--benchmark must be all, application-easy, application-hard, or calculation; got %q", selection)
+		return nil, fmt.Errorf("--benchmark must be all, application-easy, application-hard, calculation, or analysis; got %q", selection)
 	}
 }
 
@@ -112,10 +122,52 @@ func genericBenchmarkCases(selection, lessonHint, scopeHint string) ([]benchmark
 		ForceCalc:           true,
 		RequiresCalculation: true,
 	}
+	analysisEasy := benchmarkCase{
+		Name:             "analysis-easy",
+		LessonContains:   lessonHint,
+		Scope:            focus + " two directly-stated closely-linked facts combined from different parts of the source",
+		Directive:        "Generate analysis questions at easy level. Each question must combine two distinct source-stated relationships, mechanisms, or facts from two different, clearly separate parts of the passage -- not the same relationship applied twice, and not one relationship restated. Pick two facts that are directly stated and closely linked, so combining them is straightforward once both are known. The answer must genuinely need both supporting facts; a student who only had one could not reach it. Set difficulty to easy and skill to analysis.",
+		TargetSkill:      "analysis",
+		TargetDifficulty: "easy",
+	}
+	analysisMedium := benchmarkCase{
+		Name:             "analysis-medium",
+		LessonContains:   lessonHint,
+		Scope:            focus + " two related facts combined with one meaningful distinction from different parts of the source",
+		Directive:        "Generate analysis questions at medium level. Each question must combine two distinct source-stated relationships, mechanisms, or facts from two different, clearly separate parts of the passage -- not the same relationship applied twice, and not one relationship restated. The combination should require noticing one meaningful distinction between the two facts, not just concatenating them. The answer must genuinely need both supporting facts; a student who only had one could not reach it. Set difficulty to medium and skill to analysis.",
+		TargetSkill:      "analysis",
+		TargetDifficulty: "medium",
+	}
+	analysisHard := benchmarkCase{
+		Name:             "analysis-hard",
+		LessonContains:   lessonHint,
+		Scope:            focus + " two distinct relationships or facts combined from different parts of the source",
+		Directive:        "Generate analysis questions. Each question must combine two distinct source-stated relationships, mechanisms, or facts from two different, clearly separate parts of the passage -- not the same relationship applied twice, and not one relationship restated. The answer must genuinely need both supporting facts; a student who only had one could not reach it. Set difficulty to hard and skill to analysis.",
+		TargetSkill:      "analysis",
+		TargetDifficulty: "hard",
+	}
+	recall := benchmarkCase{
+		Name:             "recall",
+		LessonContains:   lessonHint,
+		Scope:            focus + " named facts definitions values stated directly in the source",
+		Directive:        "Generate recall questions. Each question must ask for one fact, name, value, or definition stated directly in the passage. Do not ask the student to apply, compare, or combine anything. Set skill to recall.",
+		TargetSkill:      "recall",
+	}
+	understanding := benchmarkCase{
+		Name:             "understanding",
+		LessonContains:   lessonHint,
+		Scope:            focus + " interpret explain classify compare or predict from a source relationship",
+		Directive:        "Generate understanding questions. Each question must ask the student to interpret, explain, classify, compare, or predict from a relationship stated in the source -- not merely name a fact (that is recall), and not apply the relationship to a new/changed scenario (that is application). Set skill to understanding.",
+		TargetSkill:      "understanding",
+	}
 
 	switch strings.ToLower(strings.TrimSpace(selection)) {
 	case "all":
-		return []benchmarkCase{applicationEasy, applicationMedium, applicationHard, calculation}, nil
+		return []benchmarkCase{recall, understanding, applicationEasy, applicationMedium, applicationHard, calculation, analysisEasy, analysisMedium, analysisHard}, nil
+	case "recall":
+		return []benchmarkCase{recall}, nil
+	case "understanding":
+		return []benchmarkCase{understanding}, nil
 	case "application-easy", "application_easy":
 		return []benchmarkCase{applicationEasy}, nil
 	case "application-hard", "application_hard":
@@ -124,8 +176,14 @@ func genericBenchmarkCases(selection, lessonHint, scopeHint string) ([]benchmark
 		return []benchmarkCase{applicationMedium}, nil
 	case "calculation", "calc":
 		return []benchmarkCase{calculation}, nil
+	case "analysis", "analysis-hard", "analysis_hard":
+		return []benchmarkCase{analysisHard}, nil
+	case "analysis-easy", "analysis_easy":
+		return []benchmarkCase{analysisEasy}, nil
+	case "analysis-medium", "analysis_medium":
+		return []benchmarkCase{analysisMedium}, nil
 	default:
-		return nil, fmt.Errorf("--benchmark must be all, application-easy, application-hard, or calculation; got %q", selection)
+		return nil, fmt.Errorf("--benchmark must be all, recall, understanding, application-easy, application-medium, application-hard, calculation, analysis-easy, analysis-medium, or analysis-hard; got %q", selection)
 	}
 }
 
@@ -264,7 +322,8 @@ func makeBenchmarkCaseResult(benchmark benchmarkCase, res *examgen.ExamResult) b
 				out.CalculationAccepted++
 			}
 		}
-		isDemandTarget := strings.EqualFold(strings.TrimSpace(q.Skill), "application") && (strings.EqualFold(strings.TrimSpace(q.Difficulty), "medium") || strings.EqualFold(strings.TrimSpace(q.Difficulty), "hard"))
+		isDemandTarget := strings.EqualFold(strings.TrimSpace(q.Skill), "analysis") ||
+			(strings.EqualFold(strings.TrimSpace(q.Skill), "application") && (strings.EqualFold(strings.TrimSpace(q.Difficulty), "medium") || strings.EqualFold(strings.TrimSpace(q.Difficulty), "hard")))
 		if isDemandTarget && gatePassed(q.Report, examgen.GateDemand) {
 			out.DemandPassed++
 		}

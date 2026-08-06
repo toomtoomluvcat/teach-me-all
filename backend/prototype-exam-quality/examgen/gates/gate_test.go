@@ -252,6 +252,36 @@ func TestGateDemandContractRejectsOverclaimedHardApplication(t *testing.T) {
 	}
 }
 
+func TestGateDemandContractScalesAnalysisReasoningStepsByDifficulty(t *testing.T) {
+	base := Question{
+		Skill:             "analysis",
+		Choices:           []Choice{{Content: "correct", IsCorrect: true}, {Content: "wrong one"}, {Content: "wrong two"}, {Content: "wrong three"}},
+		ChangedCondition:  "the sled's mass doubles while friction stays fixed",
+		DistractorReasons: []string{"forgets to double the mass term", "uses the old net force", "mixes up thrust and friction"},
+	}
+
+	easy := base
+	easy.Difficulty = "easy"
+	easy.ReasoningSteps = []string{"read the first fact from the source", "read the second, distinct fact from the source"}
+	if got := gateDemandContract(easy); !got.Pass {
+		t.Fatalf("easy analysis with two distinct reasoning_steps should pass: %#v", got)
+	}
+
+	hardTooFew := base
+	hardTooFew.Difficulty = "hard"
+	hardTooFew.ReasoningSteps = []string{"read the first fact from the source", "read the second, distinct fact from the source"}
+	if got := gateDemandContract(hardTooFew); got.Pass {
+		t.Fatalf("hard analysis with only two reasoning_steps should need a third: %#v", got)
+	}
+
+	hardEnough := base
+	hardEnough.Difficulty = "hard"
+	hardEnough.ReasoningSteps = []string{"read the first fact from the source", "read the second, distinct fact from the source", "combine both to reach the conclusion"}
+	if got := gateDemandContract(hardEnough); !got.Pass {
+		t.Fatalf("hard analysis with three distinct reasoning_steps should pass: %#v", got)
+	}
+}
+
 func TestRunCheapGatesIncludesUnitCheck(t *testing.T) {
 	q := Question{Calculation: &Calculation{Expression: "2+2", Expected: 4, Unit: "N"}, Choices: []Choice{{Content: "4", IsCorrect: true}}}
 	report := RunCheapGates(q, Chunk{}, Arith{})

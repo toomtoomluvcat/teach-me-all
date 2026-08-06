@@ -384,6 +384,9 @@ func contractNeedsDemand(contract *CoverageContract) bool {
 		return false
 	}
 	for _, slot := range contract.Slots {
+		if strings.EqualFold(slot.Skill, "analysis") {
+			return true
+		}
 		if strings.EqualFold(slot.Skill, "application") && (strings.EqualFold(slot.Difficulty, "medium") || strings.EqualFold(slot.Difficulty, "hard")) {
 			return true
 		}
@@ -396,6 +399,9 @@ func contractNeedsHardSupport(contract *CoverageContract) bool {
 		return false
 	}
 	for _, slot := range contract.Slots {
+		if strings.EqualFold(slot.Skill, "analysis") && len(slot.SupportAtomIDs) > 0 {
+			return true
+		}
 		if strings.EqualFold(slot.Skill, "application") && strings.EqualFold(slot.Difficulty, "hard") && len(slot.SupportAtomIDs) > 0 {
 			return true
 		}
@@ -490,8 +496,8 @@ func QuestionSchema(forceCalc bool) map[string]any {
 		"stem":                 str("the question itself, understandable on its own without seeing the passage"),
 		"explanation":          str("why the correct choice is correct, in the source language"),
 		"source_quote":         str("an exact contiguous substring copied CHARACTER FOR CHARACTER from the passage that makes the correct answer true; prefer a complete sentence, but a shorter exact span is allowed. Must appear exactly."),
-		"difficulty":           enum("honest reasoning load: easy=one direct inference or operation, medium=one relationship with a meaningful distinction, hard=two linked inferences or competing constraints", "easy", "medium", "hard"),
-		"skill":                enum("honest reasoning mode: recall=fact, understanding=interpretation, application=new situation using a source relationship", "recall", "understanding", "application"),
+		"difficulty":           enum("honest reasoning load: easy=one direct inference or operation, medium=one relationship with a meaningful distinction, hard=two linked inferences or competing constraints, or (for analysis) two distinct source ideas combined", "easy", "medium", "hard"),
+		"skill":                enum("honest reasoning mode: recall=fact, understanding=interpretation, application=new situation using a source relationship, analysis=combine two distinct facts or relationships from different parts of the source that neither part answers alone", "recall", "understanding", "application", "analysis"),
 		"requires_calculation": map[string]any{"type": "boolean", "description": "true when arithmetic is necessary to answer; false otherwise"},
 		"reasoning_steps": map[string]any{
 			"type": "array", "maxItems": 4,
@@ -556,28 +562,51 @@ definition, named part, label, or unchanged property is recall or
   understanding, not application. A stem that only asks "what is", "which is",
   or repeats a source example is not application unless the student must use the
   relationship to decide something new.
+- analysis: combine two distinct facts, relationships, or mechanisms drawn
+  from two different, clearly separate parts of the source -- not the same
+  relationship restated, not one formula applied twice to two numbers. The
+  answer must depend on genuinely needing both; a student who only had one of
+  the two supporting_atom_id facts could not reach it. This is a kind of
+  reasoning, not a difficulty tier by itself: combining two directly-stated,
+  closely-linked facts can be easy or medium; combining facts that conflict or
+  need real resolution to reconcile is hard. Report the difficulty honestly
+  either way -- do not default to hard just because two facts are involved.
+  It is a stricter bar than hard application at the same difficulty: hard
+  application can be satisfied by one relationship used twice, analysis
+  cannot.
 - requires_calculation: set true only when arithmetic is necessary to answer;
-  keep skill as recall, understanding, or application according to the
-  cognitive demand. Set false when the item can be answered without arithmetic.
+  keep skill as recall, understanding, application, or analysis according to
+  the cognitive demand. Set false when the item can be answered without
+  arithmetic.
 - easy: one direct inference or operation; medium: one relationship plus a
   meaningful distinction; hard: at least two linked inferences, constraints,
   or transformations. For easy application, change a condition or value from
   the source and ask for an outcome, not a named fact. For hard application,
   use at least two given inputs or conditions and make the student carry out at
   least two linked transformations or decisions. If one sentence of the source
-  or one unchanged relationship answers it, it is not hard.
+  or one unchanged relationship answers it, it is not hard. For analysis,
+  easy/medium needs at least two distinct reasoning_steps showing both facts
+  were used; hard needs at least three, same as the linked-inference bar
+  above.
 
 Compact assessment contract:
 - For application medium or hard, changed_condition must name the exact
   material condition changed from the cited source (value, entity, constraint,
   exception, or context). Do not call wording changes a changed condition.
-- For medium and hard, include one concise distractor_reason for each wrong
-  choice. Each reason must name a plausible but wrong assumption, not merely
-  say "incorrect".
+  Analysis also requires changed_condition, naming what makes the combination
+  of the two ideas necessary rather than generic.
+- For medium, hard, and analysis, include one concise distractor_reason for
+  each wrong choice. Each reason must name a plausible but wrong assumption,
+  not merely say "incorrect".
 - For hard application, include at least two distinct reasoning_steps in order
   and copy every supporting_atom_id assigned to the slot. The steps must be
   necessary to reach the keyed answer; adding connective words to a one-step
   explanation does not count.
+- For analysis, include at least two distinct reasoning_steps (three if you
+  report hard) and copy every supporting_atom_id assigned to the slot. The
+  assigned supporting atoms come from a different part of the source than the
+  primary evidence on purpose -- use both; do not write a question that
+  quietly only needs one of them.
 
 Hard requirements for every question:
 - The stem stands alone. Never point at invisible material with phrases such as

@@ -43,10 +43,15 @@ func TestBuildCoverageContractPrefersDistinctAtomsAndForms(t *testing.T) {
 			{ID: "A001", ChunkID: "c1", ConceptIDs: []string{"C001"}, Claim: "a equals v squared over r with v=10 and r=2", Relation: "equation", QuestionForms: []string{"calculation", "application"}},
 			{ID: "A002", ChunkID: "c2", ConceptIDs: []string{"C002"}, Claim: "acceleration points inward", Relation: "direction", QuestionForms: []string{"understanding"}},
 			{ID: "A003", ChunkID: "c3", ConceptIDs: []string{"C003"}, Claim: "friction supplies the force", Relation: "causal", QuestionForms: []string{"recall", "understanding"}},
+			// Two extra atoms so an opportunistic analysis upgrade (which
+			// consumes a second atom as support) still leaves enough material
+			// for three slots -- this test is about diversity, not analysis.
+			{ID: "A004", ChunkID: "c4", ConceptIDs: []string{"C004"}, Claim: "mass resists acceleration", Relation: "observation", QuestionForms: []string{"understanding"}},
+			{ID: "A005", ChunkID: "c5", ConceptIDs: []string{"C005"}, Claim: "net force determines motion", Relation: "definition", QuestionForms: []string{"recall"}},
 		},
 	}
-	lesson := Lesson{ID: "L01", ConceptIDs: []string{"C001", "C002", "C003"}, ChunkIDs: []string{"c1", "c2", "c3"}}
-	contract := BuildCoverageContract(lesson, graph, []Chunk{{ID: "c1"}, {ID: "c2"}, {ID: "c3"}}, 3)
+	lesson := Lesson{ID: "L01", ConceptIDs: []string{"C001", "C002", "C003", "C004", "C005"}, ChunkIDs: []string{"c1", "c2", "c3", "c4", "c5"}}
+	contract := BuildCoverageContract(lesson, graph, []Chunk{{ID: "c1"}, {ID: "c2"}, {ID: "c3"}, {ID: "c4"}, {ID: "c5"}}, 3)
 	if len(contract.Slots) != 3 {
 		t.Fatalf("slots = %#v", contract.Slots)
 	}
@@ -66,6 +71,59 @@ func TestBuildCoverageContractPrefersDistinctAtomsAndForms(t *testing.T) {
 	}
 	if calculationFlags != 1 {
 		t.Fatalf("default contract calculation flags = %d, want one numeric slot: %#v", calculationFlags, contract.Slots)
+	}
+}
+
+func TestBuildCoverageContractUpgradesToAnalysisAcrossChunks(t *testing.T) {
+	graph := &EvidenceGraph{
+		Atoms: []EvidenceAtom{
+			{ID: "A001", ChunkID: "c1", ConceptIDs: []string{"C001"}, Claim: "friction opposes relative motion", Relation: "causal", QuestionForms: []string{"application", "understanding"}},
+			{ID: "A002", ChunkID: "c2", ConceptIDs: []string{"C002"}, Claim: "normal force balances weight on a flat surface", Relation: "condition", QuestionForms: []string{"application", "understanding"}},
+		},
+	}
+	lesson := Lesson{ID: "L01", ChunkIDs: []string{"c1", "c2"}}
+	contract := BuildCoverageContract(lesson, graph, []Chunk{{ID: "c1"}, {ID: "c2"}}, 1)
+	if len(contract.Slots) != 1 {
+		t.Fatalf("slots = %#v", contract.Slots)
+	}
+	slot := contract.Slots[0]
+	// Difficulty is deliberately left for the writer to report honestly --
+	// combining two ideas doesn't by itself make a question hard.
+	if slot.Skill != "analysis" {
+		t.Fatalf("expected an opportunistic analysis upgrade, got skill=%s: %#v", slot.Skill, slot)
+	}
+	if slot.Difficulty != "" {
+		t.Fatalf("analysis difficulty should be left unpinned in the natural path, got %q: %#v", slot.Difficulty, slot)
+	}
+	if len(slot.SupportAtomIDs) == 0 {
+		t.Fatalf("analysis slot must carry a supporting atom: %#v", slot)
+	}
+	if len(slot.SourceChunkIDs) < 2 {
+		t.Fatalf("analysis slot must span two distinct chunks, got %v", slot.SourceChunkIDs)
+	}
+}
+
+func TestBuildCoverageContractForRunForcesAnalysisSkill(t *testing.T) {
+	graph := &EvidenceGraph{
+		Atoms: []EvidenceAtom{
+			{ID: "A001", ChunkID: "c1", ConceptIDs: []string{"C001"}, Claim: "friction opposes relative motion", Relation: "causal", QuestionForms: []string{"application", "understanding"}},
+			{ID: "A002", ChunkID: "c2", ConceptIDs: []string{"C002"}, Claim: "normal force balances weight on a flat surface", Relation: "condition", QuestionForms: []string{"application", "understanding"}},
+			{ID: "A003", ChunkID: "c1", ConceptIDs: []string{"C001"}, Claim: "kinetic friction is weaker than static friction", Relation: "comparison", QuestionForms: []string{"understanding"}},
+		},
+	}
+	lesson := Lesson{ID: "L01", ChunkIDs: []string{"c1", "c2"}}
+	contract := BuildCoverageContractForRun(lesson, graph, []Chunk{{ID: "c1"}, {ID: "c2"}}, 2,
+		"Set difficulty to hard and skill to analysis.", false)
+	if len(contract.Slots) == 0 {
+		t.Fatal("expected at least one forced analysis slot")
+	}
+	for _, slot := range contract.Slots {
+		if slot.Skill != "analysis" {
+			t.Fatalf("forced analysis directive produced slot with skill=%s: %#v", slot.Skill, slot)
+		}
+		if len(slot.SourceChunkIDs) < 2 {
+			t.Fatalf("forced analysis slot must span two distinct chunks, got %v", slot.SourceChunkIDs)
+		}
 	}
 }
 
