@@ -110,7 +110,19 @@ duplicate ระดับ operation ที่ gate ปัจจุบันม�
 
 **ยังไม่ได้ verify สด** (โค้ด compile + unit test ผ่าน แต่ยังไม่มี live run):
 
-- full matrix 5 วิชา × 9 case บนโค้ดใหม่
+- อีก 4 วิชา (เคมี/เศรษฐศาสตร์/US history/ชีววิทยา) — session นี้ผู้ใช้เลือกรัน
+  physics อย่างเดียวก่อน physics รันครบทั้ง 5-case suite และ generic 9-case
+- **ผลของ commit `b547be9` ยังไม่เคยถูกวัด** — prompt reorder (ให้ prefix
+  เสถียรข้าม candidate) กับ facts cache key ใหม่ ผ่าน unit test แต่ยังไม่มี run
+  ไหนแสดงตัวเลข: รอบ apples-to-apples เก็บ cache-hit token ไว้แล้วทิ้งตอนพิมพ์
+  เพราะ format string ยังไม่ได้แก้ (แก้ทีหลังใน `7fe201c`) ตัวเลขประหยัดของ
+  commit นั้นจึงเป็น **คาดว่า ไม่ใช่วัดได้**
+- คำสั่งพิสูจน์ทั้งสองอย่างในรอบเดียว (~8 calls):
+  `protoexam.exe --provider deepseek --pdf ../../samples/openstax-physics.pdf --pages 140-220 --benchmark calculation --set-candidates 3 --parallel 1`
+  ดู `cached in` ของ `generate-set` ต้องไม่เป็น 0 (แปลว่า prefix cache ติด) และ
+  `calc-tool` ต้องค้างที่ 1 แม้มี retry (แปลว่า key ใหม่ทำงาน) ถ้า `cached in`
+  ออกมา 0 นั่นก็เป็น finding ที่ต้องบันทึก ไม่ใช่ความล้มเหลว — DeepSeek cache
+  ทำงานเป็นบล็อก 64 token ขอบอาจไม่ตรง
 - interactive path (`renderSummary`, `writeRun`) — session นี้รันแต่ทาง
   `--benchmark`
 - `--provider ollama` ซึ่งเป็น default — ตอนนี้ต้อง compile evidence เสมอ
@@ -118,6 +130,27 @@ duplicate ระดับ operation ที่ gate ปัจจุบันม�
 - `ExamResult.SetCandidates` ที่แก้ให้รายงานจำนวนจริง — ยืนยันจาก log
   (`contract fully covered; skipping the remaining candidates`) แต่ field
   เพิ่งถูกใส่ลง benchmark JSON รอบนี้ ยังไม่มี artifact ที่มีค่านี้
+
+## ที่ยังไม่ได้ทำ แต่มีหลักฐานว่าคุ้ม (seed ของ session ถัดไป)
+
+**1. ย้าย source context ขึ้นก่อน coverage contract ใน `QuestionSetPrompt`**
+
+ตอนนี้เรียง contract slots → evidence packet → source context. `contract.Slots`
+ต่างกันทุก case ดังนั้น source context ที่อยู่ใต้มัน cache ข้าม case ไม่ได้
+ทั้งที่เนื้อหาเดียวกันเป๊ะ รอบ 9-case: `generate-set` 37 calls บน lesson เดียว
+input รวม 217,092 token (~5,868/call) source context = 10 chunk × ~868 rune
+≈ 45-50% ของ prompt **จ่ายซ้ำ 37 รอบ**
+
+ย้ายขึ้นบนสุดแล้ว prefix จะแชร์ข้ามทั้ง candidate และ case และเป็น layout ที่ดี
+ต่อ long-context attention ด้วย (คำสั่งอยู่ใกล้ท้าย) ต้อง verify ด้วย benchmark
+ก่อน ไม่ใช่เดา
+
+**2. `gateDistinct` มองไม่เห็น duplicate ระดับ operation**
+
+เจอจากการอ่านผลรอบล่าสุด: calculation Q3 `5*0.225` กับ Q4 `2*0.225` เป็นการ
+แปลงหน่วย N→lb แบบเดียวกันสองข้อ gate ปล่อยผ่านเพราะเทียบ stem/vector ซึ่ง
+ต่างกันจริง แนวทางที่น่าจะได้ผลคือเทียบ `calculation.expression` แบบ normalize
+รูปแบบ (ตัวเลขต่างได้ แต่โครงสร้าง operator เดียวกัน = ซ้ำ)
 
 ## สถานะสั้น ๆ
 
