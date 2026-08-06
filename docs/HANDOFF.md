@@ -60,6 +60,21 @@ prompt/schema text), `examgen/model/calc.go` (+`calc_test.go`)
   เดิมของ physics analysis (เคยได้ 4/9 มาก่อน) — ตัวที่ตกคือ `demand_contract`
   ซึ่งเป็น gate ที่ไม่มีอะไรในงาน optimize นี้ไปแตะ
 
+### physics suite เต็มบนโค้ดใหม่ (`--benchmark all`, 5 case, candidate 3)
+
+| case | ผล | baseline HANDOFF เดิม |
+|---|---:|---:|
+| application-easy | 5/5 | 5/5 |
+| application-medium | 5/5 | 5/5 |
+| application-hard | 5/5 | 5/7 |
+| calculation | 5/5 | 5/5 |
+| analysis | 5/5 | 5/5 |
+
+44 calls รวม (`generate-set` 21, `quality/set` 10, `calc-tool` 13), 5m19s
+
+รอบ subset ก่อนหน้าที่ analysis ได้ 4/10 คือ variance ของโมเดลจริง ๆ ไม่ใช่
+regression — เนื้อหา/prompt/contract เดิมทุกอย่าง รอบนี้ได้ 5/5
+
 **ยังไม่ได้ verify สด** (โค้ด compile + unit test ผ่าน แต่ยังไม่มี live run):
 
 - full matrix 5 วิชา × 9 case บนโค้ดใหม่
