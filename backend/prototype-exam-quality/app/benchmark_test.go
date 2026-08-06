@@ -35,6 +35,39 @@ func TestCalculationBenchmarkTargetsFlagNotSkill(t *testing.T) {
 	}
 }
 
+func TestBenchmarkCasesAcceptCommaSeparatedSelection(t *testing.T) {
+	cases, err := benchmarkCases("recall, understanding, application-hard", "eigenvalues", "linear algebra")
+	if err != nil {
+		t.Fatal(err)
+	}
+	names := []string{}
+	for _, c := range cases {
+		names = append(names, c.Name)
+	}
+	want := []string{"recall", "understanding", "application-hard"}
+	if len(names) != len(want) {
+		t.Fatalf("comma selection = %v, want %v", names, want)
+	}
+	for i := range want {
+		if names[i] != want[i] {
+			t.Fatalf("comma selection order = %v, want %v", names, want)
+		}
+	}
+
+	// A repeated name must be dropped, not run twice.
+	cases, err = benchmarkCases("all, recall", "eigenvalues", "linear algebra")
+	if err != nil {
+		t.Fatal(err)
+	}
+	seen := map[string]bool{}
+	for _, c := range cases {
+		if seen[c.Name] {
+			t.Fatalf("duplicate case %q in comma selection", c.Name)
+		}
+		seen[c.Name] = true
+	}
+}
+
 func TestLengthBiasRatioFlagsOnlyDisproportionateKey(t *testing.T) {
 	balanced := examgen.Question{Choices: []examgen.Choice{
 		{Content: "Because gravity varies slightly over the surface of Earth", IsCorrect: true},

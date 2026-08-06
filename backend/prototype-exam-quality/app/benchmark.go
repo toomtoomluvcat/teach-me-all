@@ -24,6 +24,33 @@ type benchmarkCase struct {
 }
 
 func benchmarkCases(selection string, lessonHint string, scopeHint string) ([]benchmarkCase, error) {
+	// Accept a comma-separated list ("recall,understanding,application-hard")
+	// so a benchmark can skip cases that are slow or unsupported for a given
+	// source (for example calculation on a non-numeric humanities chapter).
+	// Each part is resolved through the same single-selection logic below and
+	// the results are merged in order, dropping duplicates.
+	if strings.Contains(selection, ",") {
+		var merged []benchmarkCase
+		seen := map[string]bool{}
+		for _, part := range strings.Split(selection, ",") {
+			part = strings.TrimSpace(part)
+			if part == "" {
+				continue
+			}
+			resolved, err := benchmarkCases(part, lessonHint, scopeHint)
+			if err != nil {
+				return nil, err
+			}
+			for _, c := range resolved {
+				if seen[c.Name] {
+					continue
+				}
+				seen[c.Name] = true
+				merged = append(merged, c)
+			}
+		}
+		return merged, nil
+	}
 	if strings.TrimSpace(lessonHint) != "" {
 		return genericBenchmarkCases(selection, lessonHint, scopeHint)
 	}
@@ -148,18 +175,18 @@ func genericBenchmarkCases(selection, lessonHint, scopeHint string) ([]benchmark
 		TargetDifficulty: "hard",
 	}
 	recall := benchmarkCase{
-		Name:             "recall",
-		LessonContains:   lessonHint,
-		Scope:            focus + " named facts definitions values stated directly in the source",
-		Directive:        "Generate recall questions. Each question must ask for one fact, name, value, or definition stated directly in the passage. Do not ask the student to apply, compare, or combine anything. Set skill to recall.",
-		TargetSkill:      "recall",
+		Name:           "recall",
+		LessonContains: lessonHint,
+		Scope:          focus + " named facts definitions values stated directly in the source",
+		Directive:      "Generate recall questions. Each question must ask for one fact, name, value, or definition stated directly in the passage. Do not ask the student to apply, compare, or combine anything. Set skill to recall.",
+		TargetSkill:    "recall",
 	}
 	understanding := benchmarkCase{
-		Name:             "understanding",
-		LessonContains:   lessonHint,
-		Scope:            focus + " interpret explain classify compare or predict from a source relationship",
-		Directive:        "Generate understanding questions. Each question must ask the student to interpret, explain, classify, compare, or predict from a relationship stated in the source -- not merely name a fact (that is recall), and not apply the relationship to a new/changed scenario (that is application). Set skill to understanding.",
-		TargetSkill:      "understanding",
+		Name:           "understanding",
+		LessonContains: lessonHint,
+		Scope:          focus + " interpret explain classify compare or predict from a source relationship",
+		Directive:      "Generate understanding questions. Each question must ask the student to interpret, explain, classify, compare, or predict from a relationship stated in the source -- not merely name a fact (that is recall), and not apply the relationship to a new/changed scenario (that is application). Set skill to understanding.",
+		TargetSkill:    "understanding",
 	}
 
 	switch strings.ToLower(strings.TrimSpace(selection)) {
@@ -250,7 +277,19 @@ func runBenchmark(ctx context.Context, cfg config, outline *examgen.Outline, chu
 	if budget <= 0 {
 		budget = 5
 	}
-	report := benchmarkReport{Source: cfg.pdfPath, Pages: cfg.pages, Suite: strings.ToLower(strings.TrimSpace(cfg.benchmark))}
+	// A comma-separated selection produces an unreadable suite name if it is
+	// used verbatim (sanitise truncates it mid-word). Use "first,second" or
+	// "first-et-al" so report filenames stay readable.
+	suite := strings.ToLower(strings.TrimSpace(cfg.benchmark))
+	if strings.Contains(suite, ",") {
+		parts := strings.Split(suite, ",")
+		if len(parts) > 2 {
+			suite = strings.TrimSpace(parts[0]) + "-et-al"
+		} else {
+			suite = strings.TrimSpace(parts[0]) + "," + strings.TrimSpace(parts[1])
+		}
+	}
+	report := benchmarkReport{Source: cfg.pdfPath, Pages: cfg.pages, Suite: suite}
 
 	for _, benchmark := range cases {
 		lesson, err := findBenchmarkLesson(outline.Lessons, benchmark.LessonContains)
