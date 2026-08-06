@@ -168,7 +168,6 @@ Flags:
 | `--pages` | all | page range, e.g. `10-40` |
 | `--fresh` | `false` | ignore the cache and redo extraction/embedding |
 | `--extract-only` | `false` | stop after extraction and dump the full text — needs no Ollama at all |
-| `--scope` | *(none)* | free-text focus; chunks are ranked against this instead of the lesson title |
 | `--budget` | *(model decides)* | override how many questions the lesson should have |
 | `--set-candidates` | `3` | generate independent set candidates and keep the highest deterministic QC/diversity score |
 | `--contract-preflight` | `true` | repair/drop deterministic slot defects before generation; no model call |

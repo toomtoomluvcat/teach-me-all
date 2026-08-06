@@ -90,9 +90,6 @@ type ExamOptions struct {
 	// ForceCalc requires arithmetic on every generated question. It does not
 	// change the cognitive Skill label.
 	ForceCalc bool
-	// Scope is an optional free-text focus. When set, chunks are ranked by
-	// similarity to it instead of to the lesson title.
-	Scope string
 	// GenerationDirective is an optional benchmark-only instruction appended to
 	// the question prompt. Normal production generation leaves it empty.
 	GenerationDirective string

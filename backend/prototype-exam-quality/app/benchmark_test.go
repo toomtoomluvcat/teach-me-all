@@ -8,7 +8,7 @@ import (
 )
 
 func TestGenericBenchmarkCasesAreSubjectNeutral(t *testing.T) {
-	cases, err := benchmarkCases("all", "eigenvalues", "linear algebra eigenvalues transformations")
+	cases, err := benchmarkCases("all", "eigenvalues")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -16,7 +16,7 @@ func TestGenericBenchmarkCasesAreSubjectNeutral(t *testing.T) {
 		t.Fatalf("generic benchmark cases = %#v", cases)
 	}
 	for _, benchmark := range cases {
-		lower := strings.ToLower(benchmark.Scope + " " + benchmark.Directive)
+		lower := strings.ToLower(benchmark.Directive)
 		for _, unwanted := range []string{"physics", "newton", "projectile", "force", "mass", "acceleration"} {
 			if strings.Contains(lower, unwanted) {
 				t.Fatalf("generic benchmark %s contains physics-specific term %q: %s", benchmark.Name, unwanted, lower)
@@ -26,7 +26,7 @@ func TestGenericBenchmarkCasesAreSubjectNeutral(t *testing.T) {
 }
 
 func TestCalculationBenchmarkTargetsFlagNotSkill(t *testing.T) {
-	cases, err := benchmarkCases("calculation", "eigenvalues", "linear algebra eigenvalues")
+	cases, err := benchmarkCases("calculation", "eigenvalues")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -36,7 +36,7 @@ func TestCalculationBenchmarkTargetsFlagNotSkill(t *testing.T) {
 }
 
 func TestBenchmarkCasesAcceptCommaSeparatedSelection(t *testing.T) {
-	cases, err := benchmarkCases("recall, understanding, application-hard", "eigenvalues", "linear algebra")
+	cases, err := benchmarkCases("recall, understanding, application-hard", "eigenvalues")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -55,7 +55,7 @@ func TestBenchmarkCasesAcceptCommaSeparatedSelection(t *testing.T) {
 	}
 
 	// A repeated name must be dropped, not run twice.
-	cases, err = benchmarkCases("all, recall", "eigenvalues", "linear algebra")
+	cases, err = benchmarkCases("all, recall", "eigenvalues")
 	if err != nil {
 		t.Fatal(err)
 	}

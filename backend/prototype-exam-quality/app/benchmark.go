@@ -15,7 +15,6 @@ import (
 type benchmarkCase struct {
 	Name                string
 	LessonContains      string
-	Scope               string
 	Directive           string
 	ForceCalc           bool
 	TargetSkill         string
@@ -23,7 +22,7 @@ type benchmarkCase struct {
 	RequiresCalculation bool
 }
 
-func benchmarkCases(selection string, lessonHint string, scopeHint string) ([]benchmarkCase, error) {
+func benchmarkCases(selection string, lessonHint string) ([]benchmarkCase, error) {
 	// Accept a comma-separated list ("recall,understanding,application-hard")
 	// so a benchmark can skip cases that are slow or unsupported for a given
 	// source (for example calculation on a non-numeric humanities chapter).
@@ -37,7 +36,7 @@ func benchmarkCases(selection string, lessonHint string, scopeHint string) ([]be
 			if part == "" {
 				continue
 			}
-			resolved, err := benchmarkCases(part, lessonHint, scopeHint)
+			resolved, err := benchmarkCases(part, lessonHint)
 			if err != nil {
 				return nil, err
 			}
@@ -52,12 +51,11 @@ func benchmarkCases(selection string, lessonHint string, scopeHint string) ([]be
 		return merged, nil
 	}
 	if strings.TrimSpace(lessonHint) != "" {
-		return genericBenchmarkCases(selection, lessonHint, scopeHint)
+		return genericBenchmarkCases(selection, lessonHint)
 	}
 	applicationEasy := benchmarkCase{
 		Name:             "application-easy",
 		LessonContains:   "projectile",
-		Scope:            "projectile motion worked example simple scenario",
 		Directive:        "Generate application questions at easy level. Each question must apply one stated physics relationship to a simple new scenario with a changed value or condition and require a prediction, comparison, or outcome decision. Vary the relationship/target across questions. Do not ask for a name, definition, direct fact, force/component label, or unchanged property; do not copy a sentence. Set difficulty to easy and skill to application.",
 		TargetSkill:      "application",
 		TargetDifficulty: "easy",
@@ -65,7 +63,6 @@ func benchmarkCases(selection string, lessonHint string, scopeHint string) ([]be
 	applicationHard := benchmarkCase{
 		Name:             "application-hard",
 		LessonContains:   "projectile",
-		Scope:            "projectile motion multi-step worked example nontrivial scenario",
 		Directive:        "Generate application questions at hard level. Each question must use at least two given physics inputs or conditions and require at least two linked calculations/inferences before the answer; a one-step component/force fact is invalid. Vary the relationship/target across questions. Do not ask for a definition or direct recall, and do not repeat the same scenario/principle with different wording. Set difficulty to hard and skill to application.",
 		TargetSkill:      "application",
 		TargetDifficulty: "hard",
@@ -73,7 +70,6 @@ func benchmarkCases(selection string, lessonHint string, scopeHint string) ([]be
 	applicationMedium := benchmarkCase{
 		Name:             "application-medium",
 		LessonContains:   "projectile",
-		Scope:            "projectile motion relationship applied comparison changed condition",
 		Directive:        "Generate application questions at medium level. Each question must apply one stated physics relationship to a new scenario with one meaningful changed condition and require a comparison, prediction, or outcome decision. Do not ask for a definition, direct fact, or unchanged example. Set difficulty to medium and skill to application.",
 		TargetSkill:      "application",
 		TargetDifficulty: "medium",
@@ -81,7 +77,6 @@ func benchmarkCases(selection string, lessonHint string, scopeHint string) ([]be
 	calculation := benchmarkCase{
 		Name:                "calculation",
 		LessonContains:      "newton",
-		Scope:               "net force mass acceleration weight worked calculation",
 		Directive:           "Generate questions that require arithmetic. Use explicit numerical values that appear in the passage or stem and show a solvable expression in calculation.expression. Set requires_calculation=true and keep skill honest as understanding or application; never use calculation as a skill. The correct choice must be a decimal/integer numeric answer, never a radical, variable, or symbolic identity. Prefer applied physics scenarios over definition questions.",
 		ForceCalc:           true,
 		RequiresCalculation: true,
@@ -89,7 +84,6 @@ func benchmarkCases(selection string, lessonHint string, scopeHint string) ([]be
 	analysis := benchmarkCase{
 		Name:             "analysis",
 		LessonContains:   "newton",
-		Scope:            "force friction motion two linked relationships combined",
 		Directive:        "Generate analysis questions. Each question must combine two distinct physics relationships or facts from two different, clearly separate parts of the passage -- not the same relationship applied twice to two numbers, and not one relationship restated. The answer must genuinely need both supporting facts; a student who only had one could not reach it. Set difficulty to hard and skill to analysis.",
 		TargetSkill:      "analysis",
 		TargetDifficulty: "hard",
@@ -113,15 +107,10 @@ func benchmarkCases(selection string, lessonHint string, scopeHint string) ([]be
 	}
 }
 
-func genericBenchmarkCases(selection, lessonHint, scopeHint string) ([]benchmarkCase, error) {
-	focus := strings.TrimSpace(scopeHint)
-	if focus == "" {
-		focus = strings.TrimSpace(lessonHint)
-	}
+func genericBenchmarkCases(selection, lessonHint string) ([]benchmarkCase, error) {
 	applicationEasy := benchmarkCase{
 		Name:             "application-easy",
 		LessonContains:   lessonHint,
-		Scope:            focus + " source relationships examples simple new scenario",
 		Directive:        "Generate application questions at easy level. Each question must apply one source-stated relationship, rule, mechanism, sequence, or condition to a genuinely new scenario with a changed value, entity, or condition and require a prediction, comparison, explanation, or outcome decision. Vary the target across questions. Do not ask for a name, definition, direct fact, unchanged property, or copied sentence. Set difficulty to easy and skill to application.",
 		TargetSkill:      "application",
 		TargetDifficulty: "easy",
@@ -129,7 +118,6 @@ func genericBenchmarkCases(selection, lessonHint, scopeHint string) ([]benchmark
 	applicationHard := benchmarkCase{
 		Name:             "application-hard",
 		LessonContains:   lessonHint,
-		Scope:            focus + " source relationships multi-step nontrivial scenario",
 		Directive:        "Generate application questions at hard level. Each question must use at least two given source-supported inputs, conditions, entities, or constraints and require at least two linked inferences, transformations, or decisions before the answer. A one-step fact, definition, label, or unchanged example is invalid. Vary the relationship and target across questions. Set difficulty to hard and skill to application.",
 		TargetSkill:      "application",
 		TargetDifficulty: "hard",
@@ -137,7 +125,6 @@ func genericBenchmarkCases(selection, lessonHint, scopeHint string) ([]benchmark
 	applicationMedium := benchmarkCase{
 		Name:             "application-medium",
 		LessonContains:   lessonHint,
-		Scope:            focus + " source relationships applied comparison meaningful changed condition",
 		Directive:        "Generate application questions at medium level. Each question must apply one source-stated relationship, rule, mechanism, sequence, or condition to a new scenario with one meaningful changed condition and require a comparison, prediction, explanation, or outcome decision. A one-step direct fact or unchanged example is invalid. Set difficulty to medium and skill to application.",
 		TargetSkill:      "application",
 		TargetDifficulty: "medium",
@@ -145,7 +132,6 @@ func genericBenchmarkCases(selection, lessonHint, scopeHint string) ([]benchmark
 	calculation := benchmarkCase{
 		Name:                "calculation",
 		LessonContains:      lessonHint,
-		Scope:               focus + " numerical rule equation worked example",
 		Directive:           "Generate questions that require arithmetic. Use explicit numerical values that appear in the passage or stem and show a solvable expression in calculation.expression. Set requires_calculation=true and keep skill honest as understanding or application; never use calculation as a skill. The correct choice must be a decimal/integer numeric answer, never a radical, variable, or symbolic identity. Prefer an applied scenario over a definition question.",
 		ForceCalc:           true,
 		RequiresCalculation: true,
@@ -153,7 +139,6 @@ func genericBenchmarkCases(selection, lessonHint, scopeHint string) ([]benchmark
 	analysisEasy := benchmarkCase{
 		Name:             "analysis-easy",
 		LessonContains:   lessonHint,
-		Scope:            focus + " two directly-stated closely-linked facts combined from different parts of the source",
 		Directive:        "Generate analysis questions at easy level. Each question must combine two distinct source-stated relationships, mechanisms, or facts from two different, clearly separate parts of the passage -- not the same relationship applied twice, and not one relationship restated. Pick two facts that are directly stated and closely linked, so combining them is straightforward once both are known. The answer must genuinely need both supporting facts; a student who only had one could not reach it. Set difficulty to easy and skill to analysis.",
 		TargetSkill:      "analysis",
 		TargetDifficulty: "easy",
@@ -161,7 +146,6 @@ func genericBenchmarkCases(selection, lessonHint, scopeHint string) ([]benchmark
 	analysisMedium := benchmarkCase{
 		Name:             "analysis-medium",
 		LessonContains:   lessonHint,
-		Scope:            focus + " two related facts combined with one meaningful distinction from different parts of the source",
 		Directive:        "Generate analysis questions at medium level. Each question must combine two distinct source-stated relationships, mechanisms, or facts from two different, clearly separate parts of the passage -- not the same relationship applied twice, and not one relationship restated. The combination should require noticing one meaningful distinction between the two facts, not just concatenating them. The answer must genuinely need both supporting facts; a student who only had one could not reach it. Set difficulty to medium and skill to analysis.",
 		TargetSkill:      "analysis",
 		TargetDifficulty: "medium",
@@ -169,7 +153,6 @@ func genericBenchmarkCases(selection, lessonHint, scopeHint string) ([]benchmark
 	analysisHard := benchmarkCase{
 		Name:             "analysis-hard",
 		LessonContains:   lessonHint,
-		Scope:            focus + " two distinct relationships or facts combined from different parts of the source",
 		Directive:        "Generate analysis questions. Each question must combine two distinct source-stated relationships, mechanisms, or facts from two different, clearly separate parts of the passage -- not the same relationship applied twice, and not one relationship restated. The answer must genuinely need both supporting facts; a student who only had one could not reach it. Set difficulty to hard and skill to analysis.",
 		TargetSkill:      "analysis",
 		TargetDifficulty: "hard",
@@ -177,14 +160,12 @@ func genericBenchmarkCases(selection, lessonHint, scopeHint string) ([]benchmark
 	recall := benchmarkCase{
 		Name:           "recall",
 		LessonContains: lessonHint,
-		Scope:          focus + " named facts definitions values stated directly in the source",
 		Directive:      "Generate recall questions. Each question must ask for one fact, name, value, or definition stated directly in the passage. Do not ask the student to apply, compare, or combine anything. Set skill to recall.",
 		TargetSkill:    "recall",
 	}
 	understanding := benchmarkCase{
 		Name:           "understanding",
 		LessonContains: lessonHint,
-		Scope:          focus + " interpret explain classify compare or predict from a source relationship",
 		Directive:      "Generate understanding questions. Each question must ask the student to interpret, explain, classify, compare, or predict from a relationship stated in the source -- not merely name a fact (that is recall), and not apply the relationship to a new/changed scenario (that is application). Set skill to understanding.",
 		TargetSkill:    "understanding",
 	}
@@ -270,7 +251,7 @@ type benchmarkReport struct {
 }
 
 func runBenchmark(ctx context.Context, cfg config, outline *examgen.Outline, chunks []examgen.Chunk, deps examgen.Deps) error {
-	cases, err := benchmarkCases(cfg.benchmark, cfg.benchmarkLesson, cfg.benchmarkScope)
+	cases, err := benchmarkCases(cfg.benchmark, cfg.benchmarkLesson)
 	if err != nil {
 		return err
 	}
@@ -300,7 +281,6 @@ func runBenchmark(ctx context.Context, cfg config, outline *examgen.Outline, chu
 		opt := examgen.DefaultExamOptions()
 		opt.Budget = budget
 		opt.ForceCalc = benchmark.ForceCalc
-		opt.Scope = benchmark.Scope
 		opt.GenerationDirective = benchmark.Directive
 		opt.SetCandidates = cfg.setCandidates
 		opt.ContractPreflight = cfg.contractPreflight

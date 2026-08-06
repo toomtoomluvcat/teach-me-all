@@ -38,8 +38,6 @@ type config struct {
 	forceCalc          bool
 	benchmark          string
 	benchmarkLesson    string
-	benchmarkScope     string
-	scope              string
 	pages              string
 	budget             int
 	setCandidates      int
@@ -89,8 +87,6 @@ func parseConfig() config {
 	flag.BoolVar(&cfg.forceCalc, "force-calc", false, "require arithmetic on every generated question (skill remains cognitive demand)")
 	flag.StringVar(&cfg.benchmark, "benchmark", "", "run benchmark suite: all | application-easy | application-medium | application-hard | calculation")
 	flag.StringVar(&cfg.benchmarkLesson, "benchmark-lesson", "", "lesson title fragment for a generic benchmark; enables subject-neutral directives")
-	flag.StringVar(&cfg.benchmarkScope, "benchmark-scope", "", "subject-neutral benchmark focus; defaults to the selected lesson title")
-	flag.StringVar(&cfg.scope, "scope", "", "free-text focus; chunks are ranked against this instead of the lesson title")
 	flag.StringVar(&cfg.pages, "pages", "", "page range, e.g. 10-40")
 	flag.IntVar(&cfg.budget, "budget", 0, "override the model's own question budget")
 	flag.IntVar(&cfg.setCandidates, "set-candidates", 3, "independent set candidates to generate and score when --set-generation is enabled")

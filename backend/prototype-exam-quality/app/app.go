@@ -221,7 +221,6 @@ func interactiveGeneration(ctx context.Context, in *bufio.Scanner, cfg config, o
 
 		opt := examgen.DefaultExamOptions()
 		opt.ForceCalc = cfg.forceCalc
-		opt.Scope = cfg.scope
 		opt.Budget = cfg.budget
 		opt.SetCandidates = cfg.setCandidates
 		opt.ContractPreflight = cfg.contractPreflight
