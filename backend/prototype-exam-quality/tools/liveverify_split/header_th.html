@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ตรวจสอบสด · คำถามข้ามวิชา</title>
+<style>
+:root { color-scheme: light dark; }
+body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; margin: 1.5rem; line-height: 1.45; }
+h1 { font-size: 1.35rem; margin-bottom: .25rem; }
+.sub { color: #888; margin-bottom: 1.2rem; font-size: .9rem; }
+.tabs { display: flex; gap: .4rem; flex-wrap: wrap; margin-bottom: 1rem; position: sticky; top: 0; background: inherit; padding: .3rem 0; z-index: 5; }
+.tabbtn { padding: .45rem .9rem; border: 1px solid #4444; border-radius: 8px; background: #0000000d; cursor: pointer; font-weight: 600; font-size: .9rem; }
+.tabbtn.active { background: #1976d2; color: #fff; border-color: #1976d2; }
+.tabpanel { display: none; }
+.tabpanel.active { display: block; }
+.tab-meta { color: #888; font-size: .85rem; margin-bottom: .8rem; }
+.strip { display: flex; gap: .6rem; margin-bottom: 1.1rem; flex-wrap: wrap; }
+.strip-cell { border: 1px solid #4444; border-radius: 8px; padding: .4rem .8rem; min-width: 6rem; text-align: center; }
+.strip-label { font-size: .7rem; text-transform: uppercase; letter-spacing: .06em; color: #888; }
+.strip-score { font-size: 1.05rem; font-weight: 700; }
+.strip-cell.good .strip-score { color: #2e7d32; }
+.strip-cell.warn .strip-score { color: #c62828; }
+.strip-cell.empty { opacity: .5; }
+.bucket-head { font-size: .78rem; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; margin: 1.2rem 0 .4rem; color: #666; border-bottom: 1px solid #4444; padding-bottom: .25rem; }
+.cat { margin-bottom: .9rem; }
+.cat-head { font-weight: 600; font-size: .9rem; margin-bottom: .35rem; }
+.cat-score { font-size: .75rem; font-weight: 700; color: #888; margin-left: .4rem; }
+.qrow { display: flex; gap: .7rem; border: 1px solid #4444; border-radius: 6px; padding: .45rem .6rem; margin-bottom: .4rem; }
+.qrow.passed { border-left: 4px solid #2e7d32; }
+.qrow.failed { border-left: 4px solid #c62828; opacity: .85; }
+.qnum { font-size: .75rem; color: #888; min-width: 1.4rem; text-align: right; padding-top: .15rem; }
+.qmain { flex: 1; }
+.qhead { display: flex; gap: .4rem; align-items: center; margin-bottom: .25rem; }
+.ok { color: #2e7d32; font-weight: 700; font-size: .72rem; }
+.nok { color: #c62828; font-weight: 700; font-size: .72rem; }
+.stem { font-weight: 500; margin-bottom: .3rem; }
+.choice { font-size: .87rem; padding: .06rem .25rem; }
+.choice-correct { font-size: .87rem; padding: .06rem .25rem; background: #2e7d321f; border-radius: 3px; font-weight: 600; }
+.calc { font-size: .78rem; color: #777; margin-top: .25rem; }
+.fail { font-size: .74rem; color: #c62828; margin-top: .25rem; }
+.badge { font-size: .66rem; padding: .05rem .4rem; border-radius: 99px; border: 1px solid #4444; }
+.skill { background: #44444422; }
+.qtable-wrap { overflow-x: auto; margin-bottom: 1rem; }
+.qtable { border-collapse: collapse; width: 100%; min-width: 1000px; table-layout: fixed; }
+.qtable th, .qtable td { border: 1px solid #4444; vertical-align: top; padding: .5rem; width: 23%; }
+.qtable thead th { background: #0000000d; text-align: left; font-size: .78rem; text-transform: uppercase; letter-spacing: .08em; color: #666; }
+.qtable tbody th { text-align: left; white-space: nowrap; width: 7rem; font-size: .85rem; }
+.qtable td.empty { text-align: center; color: #aaa; font-style: italic; }
+.cell-score { font-size: .72rem; font-weight: 700; color: #888; margin-bottom: .4rem; }
+.failed-q { margin-top: .2rem; }
+.failed-q summary { cursor: pointer; font-size: .75rem; color: #c62828; }
+@media (prefers-color-scheme: dark) {
+  body { background: #111; }
+  .tabs { background: #111; }
+  .ok { color: #81c784; } .nok, .fail { color: #ef9a9a; }
+  .strip-cell.good .strip-score { color: #81c784; } .strip-cell.warn .strip-score { color: #ef9a9a; }
+  .choice-correct { background: #2e7d3255; }
+  .tabbtn.active { background: #90caf9; color: #000; }
+  .qtable thead th { background: #ffffff14; }
+}
+</style>
+</head>
+<body>
+<h1>ตรวจสอบสด · คำถามข้อสอบข้ามวิชา</h1>
+<div class="sub">
+DeepSeek · candidate 3 · parallel 1 · set-generation (แปลไทยเพื่อตรวจสอบคุณภาพ)
+แต่ละแท็บคือหนึ่งวิชา ภายในแต่ละแท็บ ตารางเรียงระดับความยาก (ง่าย → ยาก →
+การคำนวณ) เป็นคอลัมน์ เทียบกับทักษะ (จำ/เข้าใจ/ประยุกต์ใช้/วิเคราะห์/การคำนวณ)
+เป็นแถว เพื่อเปรียบเทียบว่าทักษะเดียวกันเปลี่ยนไปอย่างไรตามระดับความยาก
+</div>
+<div class="tabs"><button class="tabbtn active" data-tab="tab-physics">ฟิสิกส์</button><button data-tab="tab-chemistry">เคมี</button><button data-tab="tab-economics">เศรษฐศาสตร์</button><button data-tab="tab-us-history">ประวัติศาสตร์สหรัฐฯ</button><button data-tab="tab-biology">ชีววิทยา</button></div>

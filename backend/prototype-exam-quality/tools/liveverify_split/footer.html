@@ -1,0 +1,26 @@
+
+<script>
+(function () {
+  var tabs = document.querySelector('.tabs');
+  if (!tabs) return;
+  function activate(id) {
+    document.querySelectorAll('.tabbtn').forEach(function (b) { b.classList.remove('active'); });
+    document.querySelectorAll('.tabpanel').forEach(function (p) { p.classList.remove('active'); });
+    var btn = tabs.querySelector('[data-tab="' + id + '"]');
+    if (btn) btn.classList.add('active');
+    var panel = document.getElementById(id);
+    if (panel) panel.classList.add('active');
+  }
+  // Event delegation: one listener on the container catches clicks on any
+  // button, so it keeps working even if individual buttons are re-created.
+  tabs.addEventListener('click', function (e) {
+    var btn = e.target.closest('[data-tab]');
+    if (btn) activate(btn.getAttribute('data-tab'));
+  });
+  // Default to the first panel.
+  var first = tabs.querySelector('.tabbtn');
+  if (first) activate(first.getAttribute('data-tab'));
+})();
+</script>
+</body>
+</html>

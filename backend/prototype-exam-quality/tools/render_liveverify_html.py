@@ -10,10 +10,130 @@ tables, never inside them.
 import html
 import json
 import os
+import re
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, ".."))  # backend/prototype-exam-quality
+
+# Translated (th) per-difficulty fragments, split out of the old .th.html so
+# the new skill-matrix layout can reuse the already-translated question text
+# instead of re-translating ~300KB. EN fragments are the positional index of
+# truth (which skill category each block maps to); TH fragments carry the
+# actual Thai question html.
+SPLIT_DIR = os.path.join(HERE, "liveverify_split")
+
+# (subject_key, bucket, row_label_en) -> {"passed": [...html], "failed": [...]}
+# built by build_thai_qrows() when lang == "th"; empty dict otherwise.
+THAI_QROWS = {}
+
+_BUCKET_HEAD_RE = re.compile(r'<div class="bucket-head">(.*?)</div>')
+_CAT_START = '<div class="cat">'
+_CAT_HEAD_RE = re.compile(r'<div class="cat-head">.*?</span></div>', re.S)
+_QROW_START_RE = re.compile(r'<div class="qrow (passed|failed)">')
+
+
+def _split_subject_segments(html_text):
+    """(subject_label_text, segment_html) pairs using bucket-head markers."""
+    heads = list(_BUCKET_HEAD_RE.finditer(html_text))
+    segs = []
+    for i, m in enumerate(heads):
+        start = m.end()
+        end = heads[i + 1].start() if i + 1 < len(heads) else len(html_text)
+        segs.append((m.group(1).strip(), html_text[start:end]))
+    return segs
+
+
+def _split_cat_blocks(segment_html):
+    """Split on <div class="cat"> boundaries, strip each cat-head div."""
+    starts = [mm.start() for mm in re.finditer(re.escape(_CAT_START), segment_html)]
+    blocks = []
+    for i, s in enumerate(starts):
+        e = starts[i + 1] if i + 1 < len(starts) else len(segment_html)
+        block = segment_html[s:e]
+        head_m = _CAT_HEAD_RE.search(block)
+        qrows = block[head_m.end():] if head_m else block
+        qrows = qrows.rstrip()
+        if qrows.endswith("</div>"):
+            qrows = qrows[:-len("</div>")]
+        blocks.append(qrows)
+    return blocks
+
+
+def _cat_head_label(segment_html_en, index):
+    starts = [mm.start() for mm in re.finditer(re.escape(_CAT_START), segment_html_en)]
+    s = starts[index]
+    e = starts[index + 1] if index + 1 < len(starts) else len(segment_html_en)
+    block = segment_html_en[s:e]
+    m = re.search(r'<div class="cat-head">(.*?)\s*<span', block, re.S)
+    return m.group(1).strip() if m else None
+
+
+def _parse_qrow_blocks(qrows_html):
+    """Return list of (passed_bool, html) for each top-level .qrow div."""
+    out = []
+    i = 0
+    n = len(qrows_html)
+    while i < n:
+        m = _QROW_START_RE.match(qrows_html, i)
+        if not m:
+            i += 1
+            continue
+        start = i
+        passed = m.group(1) == "passed"
+        depth = 1
+        j = m.end()
+        while j < n and depth > 0:
+            nd = qrows_html.find("<div", j)
+            nc = qrows_html.find("</div>", j)
+            if nd == -1 and nc == -1:
+                break
+            if nc != -1 and (nd == -1 or nc < nd):
+                depth -= 1
+                j = nc + len("</div>")
+            else:
+                depth += 1
+                j = nd + len("<div")
+        out.append((passed, qrows_html[start:j]))
+        i = j
+    return out
+
+
+def build_thai_qrows():
+    """Reuse the translated per-difficulty fragments to build a lookup of
+    (subject_key, bucket, row_label_en) -> {passed/failed qrow html lists}."""
+    lookup = {}
+    key_by_label = {label: key for key, label, _p, _path in SUBJECTS}
+    for bucket in ("easy", "medium", "hard", "calc"):
+        en_path = os.path.join(SPLIT_DIR, f"panel_tab-{bucket}.html")
+        th_path = os.path.join(SPLIT_DIR, f"panel_tab-{bucket}_th.html")
+        if not (os.path.exists(en_path) and os.path.exists(th_path)):
+            print(f"  [warn] missing fragment pair for {bucket}", file=sys.stderr)
+            continue
+        with open(en_path, encoding="utf-8") as f:
+            en = f.read()
+        with open(th_path, encoding="utf-8") as f:
+            th = f.read()
+        en_segs = _split_subject_segments(en)
+        th_segs = _split_subject_segments(th)
+        for idx, (en_label, en_seg) in enumerate(en_segs):
+            subject_key = key_by_label.get(en_label)
+            if subject_key is None:
+                continue
+            th_seg = th_segs[idx][1] if idx < len(th_segs) else ""
+            th_blocks = _split_cat_blocks(th_seg)
+            n_cats = len(re.findall(re.escape(_CAT_START), en_seg))
+            for i in range(min(n_cats, len(th_blocks))):
+                row_label = _cat_head_label(en_seg, i)
+                if row_label is None:
+                    continue
+                passed, failed = [], []
+                for ok, qhtml in _parse_qrow_blocks(th_blocks[i]):
+                    (passed if ok else failed).append(qhtml)
+                lookup[(subject_key, bucket, row_label)] = {
+                    "passed": passed, "failed": failed,
+                }
+    return lookup
 
 # subject -> (id, label, pages, report paths). Later paths win for the same category.
 SUBJECTS = [
@@ -257,8 +377,13 @@ def render_question_row(q, passed, fail_reasons, qno):
     )
 
 
-def render_difficulty_column(bucket_label, cat_keys, data):
-    """One difficulty column holds every question of that level, any skill."""
+def render_difficulty_column(bucket_label, cat_keys, data, subject_key=None):
+    """One difficulty column holds every question of that level, any skill.
+
+    Used for the standalone Calculation section. With a subject_key and a Thai
+    lookup available, the pre-translated qrow html (bucket "calc") is spliced
+    in instead of re-rendering from the English data.
+    """
     questions = []
     for cat_key in cat_keys:
         info = data.get(cat_key)
@@ -271,19 +396,33 @@ def render_difficulty_column(bucket_label, cat_keys, data):
     failed = [(q, p, r) for q, p, r in questions if not p]
     accepted = len(passed)
     drafts = len(questions)
+    # Thai lookup for the calculation bucket (single cat key -> "Calculation").
+    thai = None
+    if THAI_QROWS and subject_key:
+        for cat_key in cat_keys:
+            en_label = CATEGORY_LABELS[full_category_key(cat_key)][0]
+            thai = THAI_QROWS.get((subject_key, "calc", en_label))
+            if thai:
+                break
     rows = ""
-    qno = 0
-    for q, p, r in passed:
-        qno += 1
-        rows += render_question_row(q, p, r, qno)
-    if failed:
-        summary = L["failed_summary"].format(n=len(failed), d=drafts)
-        rows += f'<details class="failed-q"><summary>{esc(summary)}</summary>'
-        fqno = 0
-        for q, p, r in failed:
-            fqno += 1
-            rows += render_question_row(q, p, r, fqno)
-        rows += "</details>"
+    if thai and thai["passed"]:
+        rows = "".join(thai["passed"])
+        if thai["failed"]:
+            summary = L["failed_summary"].format(n=len(failed), d=drafts)
+            rows += f'<details class="failed-q"><summary>{esc(summary)}</summary>{"".join(thai["failed"])}</details>'
+    else:
+        qno = 0
+        for q, p, r in passed:
+            qno += 1
+            rows += render_question_row(q, p, r, qno)
+        if failed:
+            summary = L["failed_summary"].format(n=len(failed), d=drafts)
+            rows += f'<details class="failed-q"><summary>{esc(summary)}</summary>'
+            fqno = 0
+            for q, p, r in failed:
+                fqno += 1
+                rows += render_question_row(q, p, r, fqno)
+            rows += "</details>"
     cls = "good" if drafts > 0 and accepted == drafts else "warn"
     return (
         f'<div class="diff-col {cls}">'
@@ -293,11 +432,13 @@ def render_difficulty_column(bucket_label, cat_keys, data):
     )
 
 
-def render_skill_matrix(skill_label, data):
+def render_skill_matrix(skill_label, data, subject_key=None):
     """One table per skill: rows = question index, columns = difficulty.
 
     Questions that passed sit in the row for their index; failed drafts are
-    collapsed under the whole table so the grid stays aligned.
+    collapsed under the whole table so the grid stays aligned. When a Thai
+    translation is available (subject_key + THAI_QROWS), the pre-translated
+    qrow html is spliced in instead of rendering from the English data.
     """
     diff_buckets = [b for b in BUCKETS if b[0] != "calc"]
     # cat_key for this skill at each difficulty
@@ -310,11 +451,17 @@ def render_skill_matrix(skill_label, data):
         failed = [(q, p, r) for q, p, r in info["questions"] if not p] if info else []
         accepted = len(passed)
         drafts = len(passed) + len(failed)
+        # Thai fragment lookup for this (subject, difficulty, skill).
+        en_label = None
+        if THAI_QROWS and subject_key and cat_key:
+            en_label = CATEGORY_LABELS[full_category_key(cat_key)][0]
+        thai = THAI_QROWS.get((subject_key, bucket, en_label)) if en_label else None
         per_bucket[bucket] = {
             "passed": passed,
             "failed": failed,
             "accepted": accepted,
             "drafts": drafts,
+            "thai": thai,
         }
         max_passed = max(max_passed, len(passed))
 
@@ -331,7 +478,10 @@ def render_skill_matrix(skill_label, data):
         for bucket, _bl in diff_buckets:
             pb = per_bucket[bucket]
             if i < len(pb["passed"]):
-                cells.append(f'<td>{render_question_row(*pb["passed"][i], i + 1)}</td>')
+                if pb["thai"] and i < len(pb["thai"]["passed"]):
+                    cells.append(f'<td>{pb["thai"]["passed"][i]}</td>')
+                else:
+                    cells.append(f'<td>{render_question_row(*pb["passed"][i], i + 1)}</td>')
             else:
                 cells.append('<td class="empty">—</td>')
         rows_html.append(f"<tr><th>{i + 1}</th>{''.join(cells)}</tr>")
@@ -340,9 +490,12 @@ def render_skill_matrix(skill_label, data):
     for bucket, _bl in diff_buckets:
         pb = per_bucket[bucket]
         if pb["failed"]:
-            body = "".join(
-                render_question_row(q, p, r, i + 1) for i, (q, p, r) in enumerate(pb["failed"])
-            )
+            if pb["thai"] and pb["thai"]["failed"]:
+                body = "".join(pb["thai"]["failed"])
+            else:
+                body = "".join(
+                    render_question_row(q, p, r, i + 1) for i, (q, p, r) in enumerate(pb["failed"])
+                )
             summary = L["failed_summary"].format(n=len(pb["failed"]), d=pb["drafts"])
             failed_row.append(
                 f'<td><details class="failed-q"><summary>{esc(summary)}</summary>{body}</details></td>'
@@ -384,7 +537,7 @@ def render_subject_tab(key, label, pages, data):
     for skill_label in L["rows"]:
         if skill_label == L["category"]["calculation"]:
             continue  # calculation gets its own separate section
-        table = render_skill_matrix(skill_label, data)
+        table = render_skill_matrix(skill_label, data, subject_key=key)
         if table:
             body.append(table)
 
@@ -392,7 +545,7 @@ def render_subject_tab(key, label, pages, data):
     calc_cat_key = CELL_CAT.get((L["category"]["calculation"], "calc"))
     calc_info = data.get(calc_cat_key) if calc_cat_key else None
     if calc_info:
-        col = render_difficulty_column(L["calc_section"], [calc_cat_key], data)
+        col = render_difficulty_column(L["calc_section"], [calc_cat_key], data, subject_key=key)
         body.append(f'<h2 class="calc-section">{esc(L["calc_section"])}</h2>')
         body.append(f'<div class="diff-grid">{"".join([col])}</div>')
 
@@ -408,12 +561,19 @@ def render_subject_tab(key, label, pages, data):
 
 def build(lang="en"):
     set_lang(lang)
+    global THAI_QROWS
     data = {}
     print(f"Loading reports ({lang})...")
     for key, en_label, pages, paths in SUBJECTS:
         label = L["subject_label"][key]
         print(f"  {label}")
         data[key] = load_subject(paths)
+    if lang == "th":
+        print("  building thai qrows lookup from split fragments...")
+        THAI_QROWS = build_thai_qrows()
+        print(f"  {len(THAI_QROWS)} (subject,bucket,row) cells recovered")
+    else:
+        THAI_QROWS = {}
 
     tab_buttons = []
     tab_panels = []
