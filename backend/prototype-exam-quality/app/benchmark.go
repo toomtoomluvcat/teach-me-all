@@ -255,6 +255,7 @@ type benchmarkCaseResult struct {
 	NumericVerified     int                    `json:"numeric_verified"`
 	WellFormedPassed    int                    `json:"well_formed_passed"`
 	ContractRetries     int                    `json:"contract_retries"`
+	SetCandidates       int                    `json:"set_candidates"`
 	LengthBiasPassed    int                    `json:"length_bias_passed"`
 	LengthBiasTotal     int                    `json:"length_bias_total"`
 	Quality             *examgen.QualityReport `json:"quality,omitempty"`
@@ -356,6 +357,10 @@ func makeBenchmarkCaseResult(benchmark benchmarkCase, res *examgen.ExamResult) b
 		Quality:         res.Quality,
 		Drafts:          len(res.Questions),
 		ContractRetries: res.SetContractRetries,
+		// How many candidate sets the run actually generated, which
+		// --stop-on-full-set and a failed candidate both make differ from the
+		// requested count. Without it a benchmark JSON cannot say what a case cost.
+		SetCandidates: res.SetCandidates,
 	}
 	for _, q := range res.Questions {
 		passed := q.Report != nil && q.Report.Passed()

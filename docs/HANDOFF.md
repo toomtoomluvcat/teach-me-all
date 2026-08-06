@@ -60,7 +60,16 @@ prompt/schema text), `examgen/model/calc.go` (+`calc_test.go`)
   เดิมของ physics analysis (เคยได้ 4/9 มาก่อน) — ตัวที่ตกคือ `demand_contract`
   ซึ่งเป็น gate ที่ไม่มีอะไรในงาน optimize นี้ไปแตะ
 
-**ยังไม่ได้รัน**: full matrix 5 วิชา × 9 case บนโค้ดใหม่
+**ยังไม่ได้ verify สด** (โค้ด compile + unit test ผ่าน แต่ยังไม่มี live run):
+
+- full matrix 5 วิชา × 9 case บนโค้ดใหม่
+- interactive path (`renderSummary`, `writeRun`) — session นี้รันแต่ทาง
+  `--benchmark`
+- `--provider ollama` ซึ่งเป็น default — ตอนนี้ต้อง compile evidence เสมอ
+  (เดิมเป็น opt-in ผ่าน `--graph-compile`) ยังไม่ได้รันสดหลังแก้
+- `ExamResult.SetCandidates` ที่แก้ให้รายงานจำนวนจริง — ยืนยันจาก log
+  (`contract fully covered; skipping the remaining candidates`) แต่ field
+  เพิ่งถูกใส่ลง benchmark JSON รอบนี้ ยังไม่มี artifact ที่มีค่านี้
 
 ## สถานะสั้น ๆ
 
