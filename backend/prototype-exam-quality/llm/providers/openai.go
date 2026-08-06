@@ -98,6 +98,15 @@ type chatResponse struct {
 	Usage struct {
 		PromptTokens     int `json:"prompt_tokens"`
 		CompletionTokens int `json:"completion_tokens"`
+		// Providers that cache on an exact prompt prefix report how much of the
+		// input they served from that cache. DeepSeek names the fields at the top
+		// level; the OpenAI shape nests an equivalent under prompt_tokens_details.
+		// Whichever arrives, cached input is what a prefix-stable prompt buys, and
+		// without reading it a reordering that helps or hurts looks identical.
+		PromptCacheHitTokens int `json:"prompt_cache_hit_tokens"`
+		PromptTokensDetails  *struct {
+			CachedTokens int `json:"cached_tokens"`
+		} `json:"prompt_tokens_details"`
 	} `json:"usage"`
 }
 
@@ -170,7 +179,12 @@ func (c *OpenAIClient) generate(ctx context.Context, model string, msgs []Messag
 	if err := c.post(ctx, labelOf(ctx), req, &resp); err != nil {
 		return Message{}, err
 	}
+	cached := resp.Usage.PromptCacheHitTokens
+	if cached == 0 && resp.Usage.PromptTokensDetails != nil {
+		cached = resp.Usage.PromptTokensDetails.CachedTokens
+	}
 	c.Stats.AddTokens(labelOf(ctx), resp.Usage.PromptTokens, resp.Usage.CompletionTokens)
+	c.Stats.AddCachedInput(labelOf(ctx), cached)
 	if resp.Error != nil && resp.Error.Message != "" {
 		return Message{}, fmt.Errorf("provider error: %s", resp.Error.Message)
 	}

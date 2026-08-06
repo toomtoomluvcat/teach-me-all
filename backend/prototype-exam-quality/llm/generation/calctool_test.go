@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"testing"
+
+	"protoexam/examgen"
 )
 
 // countingToolClient answers the calculator loop with one tool call on the
@@ -45,7 +47,7 @@ func TestCachedFactsRunsTheToolLoopOncePerChunkSet(t *testing.T) {
 	passage := "The sample mass is 12.5 g and there are 4 replicates."
 
 	for i := 0; i < 3; i++ {
-		facts := gen.cachedFacts(context.Background(), "true|c1,c2", passage, true)
+		facts := gen.cachedFacts(context.Background(), "L01|c1,c2", passage, true)
 		if len(facts) != 1 || facts[0].Value != 50 {
 			t.Fatalf("candidate %d facts = %#v, want 12.5*4 = 50", i+1, facts)
 		}
@@ -54,11 +56,31 @@ func TestCachedFactsRunsTheToolLoopOncePerChunkSet(t *testing.T) {
 		t.Fatalf("tool loops = %d, want 1 shared across the three candidates", client.loops)
 	}
 
-	// A different slot chunk set is a different question, so it pays again.
-	if facts := gen.cachedFacts(context.Background(), "true|c3", passage, true); len(facts) != 1 {
-		t.Fatalf("second chunk set facts = %#v, want one computed fact", facts)
+	// A different evidence packet is a different question, so it pays again.
+	if facts := gen.cachedFacts(context.Background(), "L01|c3", passage, true); len(facts) != 1 {
+		t.Fatalf("second packet facts = %#v, want one computed fact", facts)
 	}
 	if client.loops != 2 {
-		t.Fatalf("tool loops = %d, want 2 after a new chunk set", client.loops)
+		t.Fatalf("tool loops = %d, want 2 after a new evidence packet", client.loops)
+	}
+}
+
+func TestFactsKeyIgnoresWhichSlotsFailed(t *testing.T) {
+	lesson := examgen.Lesson{ID: "L01", Title: "Newton's Laws"}
+	// The context packet is built once per run and handed to every candidate and
+	// every bounded repair unchanged; only the contract's slot list shrinks on a
+	// repair. Keying on the packet is what makes the repair reuse the arithmetic
+	// the first candidate already paid for.
+	packet := []examgen.Chunk{{ID: "c2"}, {ID: "c1"}, {ID: "c3"}}
+	repairPacket := []examgen.Chunk{{ID: "c1"}, {ID: "c3"}, {ID: "c2"}}
+
+	if factsKey(lesson, packet) != factsKey(lesson, repairPacket) {
+		t.Fatalf("repair got a different key:\n %s\n %s", factsKey(lesson, packet), factsKey(lesson, repairPacket))
+	}
+	if factsKey(lesson, packet) == factsKey(lesson, []examgen.Chunk{{ID: "c1"}}) {
+		t.Fatal("a genuinely narrower packet reused arithmetic computed from chunks it was not given")
+	}
+	if factsKey(lesson, packet) == factsKey(examgen.Lesson{ID: "L02"}, packet) {
+		t.Fatal("two lessons collided on one key")
 	}
 }

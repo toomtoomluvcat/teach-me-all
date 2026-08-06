@@ -33,6 +33,11 @@ type Bucket struct {
 	// providers fill Total from measured HTTP request time.
 	Total, Load, Prompt, Eval time.Duration
 	PromptTokens, EvalTokens  int
+	// CachedInputTokens is the part of PromptTokens the provider served from its
+	// prompt-prefix cache. It is the number that says whether a prompt is
+	// ordered so repeated calls can reuse a prefix; providers that do not report
+	// it leave this zero.
+	CachedInputTokens int
 }
 
 func NewStats() *Stats { return &Stats{by: map[string]*Bucket{}, now: time.Now} }
@@ -56,6 +61,21 @@ func (s *Stats) End()                                           { s.end() }
 func (s *Stats) AddElapsed(label string, elapsed time.Duration) { s.addElapsed(label, elapsed) }
 func (s *Stats) AddTokens(label string, prompt, completion int) {
 	s.addTokens(label, prompt, completion)
+}
+func (s *Stats) AddCachedInput(label string, cached int) { s.addCachedInput(label, cached) }
+
+func (s *Stats) addCachedInput(label string, cached int) {
+	if s == nil || cached == 0 {
+		return
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	b := s.by[label]
+	if b == nil {
+		b = &Bucket{}
+		s.by[label] = b
+	}
+	b.CachedInputTokens += cached
 }
 
 func (s *Stats) clock() time.Time {

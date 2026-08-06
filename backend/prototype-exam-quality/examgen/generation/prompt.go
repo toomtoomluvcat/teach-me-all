@@ -411,9 +411,6 @@ func QuestionSetPrompt(lesson Lesson, graph *EvidenceGraph, chunks []Chunk, cont
 	if strings.TrimSpace(contract.GenerationDirective) != "" {
 		fmt.Fprintf(&b, "Benchmark/Run directive (must be obeyed while staying source-grounded): %s\n\n", strings.TrimSpace(contract.GenerationDirective))
 	}
-	if contract.Variant > 0 {
-		fmt.Fprintf(&b, "This is candidate set %d. Explore a different valid question angle where the evidence supports it; do not mention candidate selection in the questions.\n\n", contract.Variant)
-	}
 	b.WriteString("Coverage contract (one slot per distinct question):\n")
 	for _, slot := range contract.Slots {
 		fmt.Fprintf(&b, "- %s atom=%s support_atoms=%s chunk=%s skill=%s requires_calculation=%t difficulty=%s operation=%s target=%s evidence_quote=%q\n",
@@ -431,6 +428,14 @@ func QuestionSetPrompt(lesson Lesson, graph *EvidenceGraph, chunks []Chunk, cont
 	}
 	if len(feedback) > 0 {
 		b.WriteString(rejectionMemoryBlock(feedback))
+	}
+	// The candidate marker goes here, after every block that is identical
+	// between candidates, rather than near the top where it used to sit.
+	// Providers cache on an exact prompt prefix, and one differing line early on
+	// makes the whole evidence packet and source context uncacheable — which is
+	// most of the input tokens, paid again for every candidate.
+	if contract.Variant > 0 {
+		fmt.Fprintf(&b, "This is candidate set %d. Explore a different valid question angle where the evidence supports it; do not mention candidate selection in the questions.\n\n", contract.Variant)
 	}
 	b.WriteString("Slot execution protocol:\n")
 	b.WriteString("1. Work through the slots in order; use one output object for one slot.\n")

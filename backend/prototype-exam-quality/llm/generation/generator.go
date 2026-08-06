@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strings"
 	"sync"
 
@@ -96,9 +97,29 @@ type Generator struct {
 
 func NewGenerator(c ModelClient, model string) *Generator { return &Generator{c: c, model: model} }
 
-// cachedFacts runs ComputeFacts once per distinct (chunk set, flag) key. The
-// key is built from chunk IDs rather than their text: IDs are short, and two
-// chunk sets with the same IDs always carry the same text within a run.
+// factsKey identifies the arithmetic scope of one generation run: the lesson
+// and the evidence packet it was given.
+//
+// It deliberately ignores the coverage slots. A bounded repair carries only
+// the slots that failed, so keying on slot chunks gave every repair a fresh
+// key and made it recompute arithmetic the first candidate had already
+// verified. The context packet is fixed once per run, before any candidate, so
+// it is stable across candidates and repairs and still distinct between two
+// runs over the same lesson with different contracts.
+//
+// Reusing the wider fact set on a repair is safe: the chunks are the same list
+// either way, and every returned fact is arithmetic Go evaluated from that
+// packet. The repair simply sees the values its predecessor already paid for.
+func factsKey(lesson examgen.Lesson, chunks []examgen.Chunk) string {
+	ids := make([]string, 0, len(chunks))
+	for _, chunk := range chunks {
+		ids = append(ids, chunk.ID)
+	}
+	sort.Strings(ids)
+	return lesson.ID + "|" + strings.Join(ids, ",")
+}
+
+// cachedFacts runs ComputeFacts once per distinct key.
 //
 // A failed tool loop is deliberately not cached. It is usually a transport
 // error rather than a property of the input, and the next candidate may
@@ -338,7 +359,7 @@ func (g *Generator) QuestionsSet(ctx context.Context, lesson examgen.Lesson, gra
 	}
 	user := examgen.QuestionSetPrompt(lesson, graph, chunks, contract, feedback, forceCalc)
 	if g.UseCalcTool {
-		var selected, selectedIDs []string
+		var selected []string
 		seen := map[string]bool{}
 		requiresCalculation := forceCalc
 		for _, slot := range contract.Slots {
@@ -355,7 +376,6 @@ func (g *Generator) QuestionsSet(ctx context.Context, lesson examgen.Lesson, gra
 				for _, chunk := range chunks {
 					if chunk.ID == id {
 						selected = append(selected, chunk.Text)
-						selectedIDs = append(selectedIDs, chunk.ID)
 						seen[id] = true
 						break
 					}
@@ -363,8 +383,7 @@ func (g *Generator) QuestionsSet(ctx context.Context, lesson examgen.Lesson, gra
 			}
 		}
 		if len(selected) > 0 {
-			key := fmt.Sprintf("%t|%s", requiresCalculation, strings.Join(selectedIDs, ","))
-			user += FactsBlock(g.cachedFacts(ctx, key, strings.Join(selected, "\n\n"), requiresCalculation))
+			user += FactsBlock(g.cachedFacts(ctx, factsKey(lesson, chunks), strings.Join(selected, "\n\n"), requiresCalculation))
 		}
 	}
 	msgs := []Message{
