@@ -132,6 +132,27 @@ func TestHardApplicationRequiresDemandContract(t *testing.T) {
 	}
 }
 
+func TestHardApplicationAllowsExtraSupportingAtomsButNotMissing(t *testing.T) {
+	contract := CoverageContract{Slots: []CoverageSlot{{ID: "S01", AtomID: "A001", SupportAtomIDs: []string{"A002"}, SourceChunkIDs: []string{"c1", "c2"}, Skill: "application", Difficulty: "hard", Operation: "causal", EvidenceQuote: "source claim"}}}
+	base := Question{CoverageSlotID: "S01", EvidenceAtomID: "A001", EvidenceChunkID: "c1", Skill: "application", Difficulty: "hard", Operation: "causal", SourceQuote: "source claim", ChangedCondition: "the input value changes from the source case", ReasoningSteps: []string{"apply the source condition to the changed value", "compare the resulting outcome with the constraint"}}
+
+	// A draft that volunteers an extra supporting atom is still fully checkable:
+	// every required atom is present, so it must not be punished for being more
+	// cautious than the slot asked (same principle as the calculation flag fix).
+	base.SupportingAtomIDs = []string{"A003", "A002"}
+	got := gateSetCoverage(base, contract, map[string]Chunk{"c1": {ID: "c1", Text: "source claim"}}, map[string]bool{}, map[string]bool{})
+	if !got.Pass {
+		t.Fatalf("hard application with extra supporting atom was rejected: %#v", got)
+	}
+
+	// But a draft that omits a required atom hides needed evidence and must fail.
+	base.SupportingAtomIDs = []string{"A003"}
+	got = gateSetCoverage(base, contract, map[string]Chunk{"c1": {ID: "c1", Text: "source claim"}}, map[string]bool{}, map[string]bool{})
+	if got.Pass || !strings.Contains(got.Reason, "requires supporting atoms") {
+		t.Fatalf("hard application missing a required atom passed: %#v", got)
+	}
+}
+
 func TestCalculationFlagLeavesSkillHonestAndDifficultyOpenWhenUnspecified(t *testing.T) {
 	graph := &EvidenceGraph{Atoms: []EvidenceAtom{{ID: "A001", ChunkID: "c1", Claim: "force equals mass times acceleration: 10 = 2 * 5", Quote: "force equals mass times acceleration: 10 = 2 * 5", Relation: "equation", QuestionForms: []string{"calculation"}}}}
 	got := BuildCoverageContractForRun(Lesson{ChunkIDs: []string{"c1"}}, graph, []Chunk{{ID: "c1"}}, 1, "Generate questions that require arithmetic. Set requires_calculation=true.", true)

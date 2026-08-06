@@ -45,9 +45,12 @@ func quoteFloor(quote string) int {
 	return minQuoteRunes
 }
 
-// arithmeticTolerance is relative. A small absolute allowance below accepts
-// ordinary three-decimal rounding for results >= 1 without making tiny
-// scientific-notation answers effectively uncheckable.
+// arithmeticTolerance is the tight relative tolerance used when the evaluated
+// expression must match a literal value exactly (for example comparing two
+// independently computed numbers). It is deliberately not used for the
+// model-stated calculation.expected, which is a rounded human-readable value
+// and is checked with the looser 1e-3 relative tolerance via
+// expectedNearlyEqual — the same tolerance the choice-text matcher uses.
 const arithmeticTolerance = 1e-6
 const roundedAnswerTolerance = 5e-4
 
@@ -231,7 +234,7 @@ func gateArithmetic(q Question, ev Evaluator) GateResult {
 		res.Reason = fmt.Sprintf("expression %q did not evaluate: %v", q.Calculation.Expression, err)
 		return res
 	}
-	if !nearlyEqual(got, q.Calculation.Expected) {
+	if !expectedNearlyEqual(got, q.Calculation.Expected) {
 		res.Reason = fmt.Sprintf("expression %q evaluates to %g but the model stated %g",
 			q.Calculation.Expression, got, q.Calculation.Expected)
 		return res
@@ -506,6 +509,29 @@ func nearlyEqual(a, b float64) bool {
 		return true
 	}
 	return math.Abs(a-b)/scale < arithmeticTolerance
+}
+
+// expectedNearlyEqual is the tolerance used for the model-stated
+// calculation.expected against the evaluated expression. It deliberately
+// matches the choice-text matcher (isLosslessRounding, 1e-3 relative) rather
+// than nearlyEqual's much tighter arithmeticTolerance: expected is the rounded
+// value the model also put in the correct choice, so it must tolerate the same
+// ordinary rounding the choice text is allowed. A tighter check here made
+// legitimate rounded answers like "0.2648" for 0.26473265 fail even though the
+// keyed choice passed, because expected was held to 1e-6 while the choice was
+// held to 1e-3.
+func expectedNearlyEqual(a, b float64) bool {
+	if a == b {
+		return true
+	}
+	if math.Abs(a) >= 1 && math.Abs(b) >= 1 && math.Abs(a-b) <= roundedAnswerTolerance {
+		return true
+	}
+	scale := math.Max(math.Abs(a), math.Abs(b))
+	if scale == 0 {
+		return true
+	}
+	return math.Abs(a-b)/scale < 1e-3
 }
 
 // choiceMentionsNumber checks the correct choice actually contains the computed

@@ -114,6 +114,18 @@ func TestChoiceMentionsNumberMatchesNegativeSuperscriptExponent(t *testing.T) {
 	}
 }
 
+func TestChoiceMentionsNumberMatchesWritersOwnRounding(t *testing.T) {
+	// A writer may round 0.26473265 to four significant figures as "0.2648"
+	// (up) even though Sprintf's %.4f would emit 0.2647. That is still lossless
+	// at 1e-3 relative and must match; a genuinely wrong value must not.
+	if !choiceMentionsNumber("0.2648", 0.26473265) {
+		t.Fatal("writer's four-sig-fig rounding 0.2648 should match 0.26473265")
+	}
+	if choiceMentionsNumber("0.2650", 0.26473265) {
+		t.Fatal("0.2650 is outside 1e-3 relative tolerance and must not match")
+	}
+}
+
 func TestChoiceMentionsNumberUsesNumericBoundaries(t *testing.T) {
 	for _, choice := range []string{"14 N", "40 m/s", "0.4 kg"} {
 		if choiceMentionsNumber(choice, 4) {

@@ -1008,7 +1008,7 @@ func gateSetCoverage(q Question, contract CoverageContract, byChunk map[string]C
 		}
 	}
 	if strings.EqualFold(slot.Skill, "application") && strings.EqualFold(slot.Difficulty, "hard") {
-		if !sameIDs(q.SupportingAtomIDs, slot.SupportAtomIDs) {
+		if !coversAll(q.SupportingAtomIDs, slot.SupportAtomIDs) {
 			res.Reason = fmt.Sprintf("hard application slot %s requires supporting atoms %v, got %v", slot.ID, slot.SupportAtomIDs, q.SupportingAtomIDs)
 			return res
 		}
@@ -1018,7 +1018,7 @@ func gateSetCoverage(q Question, contract CoverageContract, byChunk map[string]C
 		}
 	}
 	if strings.EqualFold(slot.Skill, "analysis") {
-		if !sameIDs(q.SupportingAtomIDs, slot.SupportAtomIDs) {
+		if !coversAll(q.SupportingAtomIDs, slot.SupportAtomIDs) {
 			res.Reason = fmt.Sprintf("analysis slot %s requires supporting atoms %v, got %v", slot.ID, slot.SupportAtomIDs, q.SupportingAtomIDs)
 			return res
 		}
@@ -1044,15 +1044,20 @@ func gateSetCoverage(q Question, contract CoverageContract, byChunk map[string]C
 	return res
 }
 
-func sameIDs(left, right []string) bool {
-	if len(left) != len(right) {
+// coversAll reports whether have contains every id in required. It deliberately
+// allows extras: a draft that volunteers an additional supporting atom is still
+// fully checkable (every required atom is present), so rejecting it punishes
+// the draft for being more cautious than the slot asked. Only the direction
+// that hides required evidence — a missing required atom — is rejected.
+func coversAll(have, required []string) bool {
+	if len(have) < len(required) {
 		return false
 	}
-	seen := make(map[string]bool, len(left))
-	for _, id := range left {
+	seen := make(map[string]bool, len(have))
+	for _, id := range have {
 		seen[id] = true
 	}
-	for _, id := range right {
+	for _, id := range required {
 		if !seen[id] {
 			return false
 		}

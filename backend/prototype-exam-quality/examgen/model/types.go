@@ -326,19 +326,70 @@ func decodeDemandStringList(raw json.RawMessage) ([]string, error) {
 		return list, nil
 	}
 	var keyed map[string]json.RawMessage
-	if err := json.Unmarshal(raw, &keyed); err != nil {
+	if err := json.Unmarshal(raw, &keyed); err == nil {
+		keys := make([]string, 0, len(keyed))
+		for key := range keyed {
+			keys = append(keys, key)
+		}
+		sort.Strings(keys)
+		list = make([]string, 0, len(keys))
+		for _, key := range keys {
+			var value string
+			if err := json.Unmarshal(keyed[key], &value); err != nil {
+				return nil, fmt.Errorf("value %q is not a string", key)
+			}
+			list = append(list, value)
+		}
+		return list, nil
+	}
+	// Some JSON-mode providers return an array of objects where the schema asked
+	// for an array of strings. Two shapes appear in live DeepSeek output:
+	//   [{"A":"reason"},{"B":"reason"}]                single-key per object
+	//   [{"choice":"distractor text","reason":"why"}]  keyed label + reason
+	// Each object must contribute exactly one reason so the demand gate still
+	// sees one reason per distractor instead of one per field. A reason-named
+	// key wins when present; otherwise a single-key object yields its value.
+	var objects []map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &objects); err != nil {
 		return nil, fmt.Errorf("expected array or keyed object: %w", err)
 	}
-	keys := make([]string, 0, len(keyed))
-	for key := range keyed {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
-	list = make([]string, 0, len(keys))
-	for _, key := range keys {
+	// The failed []string attempt above may have left zero-value entries in
+	// list (encoding/json fills elements before reporting the type error), so
+	// start from a fresh slice instead of appending to the polluted one.
+	list = make([]string, 0, len(objects))
+	for _, obj := range objects {
+		keys := make([]string, 0, len(obj))
+		for key := range obj {
+			keys = append(keys, key)
+		}
+		sort.Strings(keys)
+		chosen := ""
+		// Prefer an explicit reason/rationale key so a keyed label next to it
+		// (for example the distractor text) is not counted as a reason too.
+		for _, key := range keys {
+			switch strings.ToLower(strings.TrimSpace(key)) {
+			case "reason", "rationale", "why", "explanation", "rationale_text":
+				chosen = key
+			}
+		}
+		if chosen == "" && len(keys) == 1 {
+			chosen = keys[0]
+		}
+		if chosen == "" {
+			// Ambiguous multi-key object with no reason key: fall back to all
+			// values rather than silently dropping evidence.
+			for _, key := range keys {
+				var value string
+				if err := json.Unmarshal(obj[key], &value); err != nil {
+					return nil, fmt.Errorf("value %q is not a string", key)
+				}
+				list = append(list, value)
+			}
+			continue
+		}
 		var value string
-		if err := json.Unmarshal(keyed[key], &value); err != nil {
-			return nil, fmt.Errorf("value %q is not a string", key)
+		if err := json.Unmarshal(obj[chosen], &value); err != nil {
+			return nil, fmt.Errorf("value %q is not a string", chosen)
 		}
 		list = append(list, value)
 	}

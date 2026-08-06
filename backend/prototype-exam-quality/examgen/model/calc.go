@@ -36,6 +36,19 @@ func choiceMentionsNumber(choice string, v float64) bool {
 			return true
 		}
 	}
+	// Sprintf cannot produce every rounding a writer may use (for example
+	// "0.2648" for a computed 0.26473265 rounds up at four significant figures,
+	// while %.4f produces 0.2647 and %.3f produces 0.265). A fixed candidate
+	// list therefore misses valid answers that are still within the relative
+	// tolerance. Fall back to scanning the choice's own numeric tokens and
+	// accepting any that round to the computed value losslessly. A coarse
+	// rounding like "1.7" for 1.67 is not lossless, so it still needs the
+	// approximate marker; the 1e-3 relative check decides that, not the format.
+	for _, token := range decimalTokens(haystack) {
+		if isLosslessRounding(v, token) {
+			return true
+		}
+	}
 	if approx {
 		for _, text := range decimalCandidates {
 			if text != "" && containsNumericToken(haystack, text) {
@@ -97,6 +110,23 @@ func hasApproxMarker(choice string) bool {
 		}
 	}
 	return false
+}
+
+var decimalTokenPattern = regexp.MustCompile(`\d+(?:\.\d+)?`)
+
+// decimalTokens returns the distinct decimal-number tokens appearing in text.
+// It is used to match a writer's own rounding against the computed value when
+// the fixed Sprintf candidate list cannot reproduce that rounding exactly.
+func decimalTokens(text string) []string {
+	seen := map[string]bool{}
+	var out []string
+	for _, match := range decimalTokenPattern.FindAllString(text, -1) {
+		if !seen[match] {
+			seen[match] = true
+			out = append(out, match)
+		}
+	}
+	return out
 }
 
 func containsNumericToken(text, candidate string) bool {

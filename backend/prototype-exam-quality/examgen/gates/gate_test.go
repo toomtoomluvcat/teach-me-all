@@ -233,9 +233,39 @@ func TestGateArithmeticAllowsNormalThreeDecimalRounding(t *testing.T) {
 	if got := gateArithmetic(q, Arith{}); !got.Pass {
 		t.Fatalf("normal rounded numeric answer was rejected: %#v", got)
 	}
+	// expected tolerates the same ordinary rounding as the choice text. A
+	// wrong expected alone must not fail a question whose keyed choice is the
+	// correct rounded value (the gate's job is to catch a wrong answer key,
+	// which the choice check below does).
 	q.Calculation.Expected = 35.346
+	if got := gateArithmetic(q, Arith{}); !got.Pass {
+		t.Fatalf("expected-only mismatch rejected a question with a correct keyed choice: %#v", got)
+	}
+	// But a correct expected with a wrong keyed choice must still fail.
+	q.Calculation.Expected = 35.348
+	q.Choices[0] = Choice{Content: "35.3", IsCorrect: true}
 	if got := gateArithmetic(q, Arith{}); got.Pass {
-		t.Fatalf("wrong rounded numeric answer passed: %#v", got)
+		t.Fatalf("wrong keyed choice passed: %#v", got)
+	}
+}
+
+func TestGateArithmeticAllowsRoundedExpectedBelowOne(t *testing.T) {
+	// expected is a rounded human-readable value (the same number the model
+	// put in the correct choice), so it must tolerate the same ordinary 1e-3
+	// rounding as the choice-text matcher. A tighter check used to reject
+	// "0.2648" for 0.26473265 even though the keyed choice passed.
+	q := Question{
+		Skill:               "application",
+		RequiresCalculation: true,
+		Calculation:         &Calculation{Expression: "0.09113*23.24/1000*5/2/0.02000", Expected: 0.2648},
+		Choices:             []Choice{{Content: "0.2648", IsCorrect: true}, {Content: "0.2650"}},
+	}
+	if got := gateArithmetic(q, Arith{}); !got.Pass {
+		t.Fatalf("rounded expected below one was rejected: %#v", got)
+	}
+	q.Calculation.Expected = 0.2650
+	if got := gateArithmetic(q, Arith{}); got.Pass {
+		t.Fatalf("wrong rounded expected passed: %#v", got)
 	}
 }
 
