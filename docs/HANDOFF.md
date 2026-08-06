@@ -75,6 +75,39 @@ prompt/schema text), `examgen/model/calc.go` (+`calc_test.go`)
 รอบ subset ก่อนหน้าที่ analysis ได้ 4/10 คือ variance ของโมเดลจริง ๆ ไม่ใช่
 regression — เนื้อหา/prompt/contract เดิมทุกอย่าง รอบนี้ได้ 5/5
 
+### อ่านเทียบข้อสอบ ก่อน/หลัง refactor (apples-to-apples)
+
+รันซ้ำ 3 case เดิม (`application-easy,application-hard,calculation`) บน physics
+140-220 ด้วย directive และ lesson ชุดเดียวกับ artifact ที่ commit ไว้
+(`comparisons/benchmark-all.json`) เพื่อให้ต่างกันแค่ตัวโค้ด
+
+**acceptance เท่ากันเป๊ะ**: 5/5 ทั้งสามเคส ทั้งก่อนและหลัง
+
+**stem ไม่ซ้ำกันเลยสักข้อ** (0/5 ทุกเคส) — โมเดลเจนใหม่หมดทุกรอบที่ temp 0.35
+เทียบด้วย diff ไม่ได้ ต้องอ่าน
+
+**ผลอ่าน application-hard:**
+
+- เดิม 2 ใน 5 ข้อเป็น one-step ทั้งที่ติดป้าย hard ("2.0 kg ตกอิสระ แรงลัพธ์?"
+  = W=mg ขั้นเดียว, "F=12N m=3kg a=?" = ขั้นเดียว)
+- ใหม่ 5 ใน 5 ข้อต้องใช้สองอินพุตขึ้นไปหรือสองความคิดรวบยอด และตัวลวงแต่ละตัว
+  เข้ารหัส misconception ที่มีชื่อจริง ("friction always determines direction",
+  "weight same because mass doesn't change", "friction < applied force เพราะมันกำลังเคลื่อนที่")
+
+**แต่เครดิตไม่ใช่ของ refactor**: `comparisons/benchmark-all.json` commit วันที่
+2026-08-06 ซึ่ง**ก่อน** prompt length-bias fix (`b76c51e`) ที่อยู่ใน HEAD
+ตั้งแต่ก่อนเริ่ม session นี้ งาน optimize/refactor ไม่ได้แก้ถ้อยคำ prompt เลย
+(`questionSystem`/`questionSchema` เหมือนเดิมทุก byte) ข้อสรุปที่ยืนยันได้คือ
+**คุณภาพไม่ตก** ส่วนที่ดีขึ้นน่าจะมาจาก prompt fix รอบก่อน
+
+**arithmetic ตรวจแล้วถูกทุกข้อ**: 19.6/2=9.8, 3.0×1.67=5.01, 5×0.225=1.125,
+2×0.225=0.45, 2000×20+5000=45000
+
+**จุดอ่อนที่เจอจากการอ่าน (ยังไม่แก้)**: calculation Q3 กับ Q4 เป็นการแปลงหน่วย
+N→lb แบบเดียวกันสองข้อ (5×0.225 กับ 2×0.225) `gateDistinct` ปล่อยผ่านเพราะ
+เทียบ stem ที่ต่างกันจริง แต่ในเชิงการวัดผลมันคือข้อเดียวกันคนละตัวเลข —
+duplicate ระดับ operation ที่ gate ปัจจุบันมองไม่เห็น
+
 **ยังไม่ได้ verify สด** (โค้ด compile + unit test ผ่าน แต่ยังไม่มี live run):
 
 - full matrix 5 วิชา × 9 case บนโค้ดใหม่
