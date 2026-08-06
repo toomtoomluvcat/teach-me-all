@@ -207,6 +207,89 @@ humanities ตัวเดียวที่ session นี้หาไว้ �
 `.scratch/university-sources/sociology-3e.pdf`) ก็ไม่ได้รันเช่นกัน ทั้งสองไม่มี
 หลักฐานอะไรเลย ไม่ใช่ "ผ่านแล้วลืมบันทึก"
 
+### Live-verify ข้ามวิชา (session 2026-08-06 ต่อเนื่อง 2, หลัง commit `97e6587`)
+
+ผู้ใช้สั่ง live-verify ทุกวิชา (pending #10) — รัน `--benchmark all` แบบเดียวกับ
+Thai biology รอบก่อน (DeepSeek, candidate 3, parallel 1, `--set-generation`).
+เจอ findings ใหม่ 4 ตัวที่แก้แล้ว (commit `623018c`) แล้ว rerun:
+physics application-hard 0/6 → 5/5, chemistry calc 50% → 66.7% → 80%.
+จากนั้นรันวิชาที่เหลือครบทุกวิชา
+
+**ผลสุดท้าย (หลัง commit `623018c`, ทุกวิชา DeepSeek candidate 3 parallel 1)**:
+
+| วิชา (pages) | recall | under. | app-e | app-m | app-h | calc | ana-e | ana-m | ana-h |
+|---|---|---|---|---|---|---|---|---|---|
+| ฟิสิกส์ (140-220, Newton) | 5/5 | 5/5 | 5/5 | 5/5 | 5/5 | 5/5 | 5/5 | 4/9 | 4/9 |
+| เคมี (200-280, Titration) | — | — | — | — | — | 4/5 (80%) | — | — | — |
+| เศรษฐศาสตร์ (60-150, Elasticity) | 5/5 | 5/5 | 5/5 | 5/5 | 5/8 | 5/5 | 5/5 | 5/5 | 5/5 |
+| US History (460-489, Westward) | 5/5 | 5/5 | 5/5 | 5/5 | 5/5 | 2/4 | 4/9 | 3/10 | 5/6 |
+| ชีววิทยา (210-237, Cell Resp) | 5/5 | 5/5 | 5/6 | 5/5 | 5/5 | skip | 4/7 | 5/5 | 3/7 |
+
+ข้อสังเกตข้ามวิชา:
+
+- **application ผ่านเกือบหมดทุกวิชา** (ยกเว้น economics app-hard 5/8 และ biology
+  app-easy 5/6) — gate + superset fix ทำให้ draft ไม่อาสาเกินถูกทิ้ง
+- **economics เป็นวิชาเดียวที่ analysis ผ่านครบทุก level (5/5,5/5,5/5)** —
+  เนื้อหามี causal/quantitative structure ชัดจึงหา "สองความจริงคนละ chunk คนละ
+  relation" ได้
+- **analysis มี variance สูงตาม content-fit**: physics ana-m/h 4/9, US history
+  ana-e 4/9 ana-m 3/10, biology ana-h 3/7 — บท narrative/numeric ที่ atom
+  ส่วนใหญ่เป็น rule/fact เดียวหา analysis pair ยาก เป็น content-fit ไม่ใช่
+  gate bug (ยืนยันโดย ana-hard US history กลับได้ 5/6 เพราะ directive ยืดหยุ่นกว่า)
+- **calculation skip ถูกต้อง** ในบทที่ไม่มี numeric content (biology cellular
+  respiration) และ US history ได้ 2/4 (บทนี้แทบไม่มีตัวเลข โมเดลฝืนสร้าง)
+
+### Findings ใหม่ที่เจอ live (แก้แล้วใน commit `623018c`, มี unit test ปักหมุด)
+
+1. **`distractor_reasons` schema mismatch** — DeepSeek ส่ง array of objects
+   (`[{"reason":"...","choice":"B"},...]` หรือ `[{"A":"reason"},...]`) แทน
+   array of strings ที่ schema สั่ง → `decodeDemandStringList` ล้มทั้งสอง branch
+   ([]string และ map) → candidate ล้มทิ้งทั้งชุดซ้ำทุกวิชา. แก้: prefer
+   reason-named key ต่อ object, รองรับ single-key object, fallback เก็บทุกค่า
+2. **`supporting_atom_ids` exact match เกินไป** — `sameIDs` บังคับ len+set เท่ากัน
+   แต่ draft ที่เพิ่ม atom เสริม (ยังครบทุกตัวที่ slot ต้องการ) ถูกทิ้งทั้งชุด
+   (physics app-hard 5/6 draft ล้มด้วยเหตุนี้). แก้เป็น `coversAll`: reject เฉพาะ
+   ทิศทางที่ซ่อนหลักฐาน (ขาด atom ที่จำเป็น) — หลักเดียวกับ bug 3 fix
+3. **`calculation.expected` tolerance เข้มเกิน** — `nearlyEqual` ใช้ 1e-6 relative
+   แต่ choice-text matcher ใช้ 1e-3 → "0.2648" จาก 0.26473265 (error 2.5e-4)
+   ล้มทั้งที่ choice ผ่าน. แก้ `expectedNearlyEqual` ใช้ 1e-3 เดียวกับ choice
+4. **`choiceMentionsNumber` พลาด writer's rounding** — Sprintf candidates
+   สร้าง "0.2647"/"0.265" จาก 0.26473265 แต่ writer เขียน "0.2648" (4 sig fig
+   ปัดขึ้น) → ไม่ match. แก้: สแกน numeric tokens ใน choice เอง (`decimalTokens`)
+   แล้ว accept ถ้า rounding อยู่ใน 1e-3
+
+### Answer-length bias (session 2026-08-06 ต่อเนื่อง 2, แผน C ตามที่ผู้ใช้ปรับ)
+
+ผู้ใช้จับได้จาก HTML เปรียบเทียบว่า "ข้อที่ยาวมักถูก" — วัดจาก 126 ข้อที่ผ่าน
+(4 วิชา) พบ: **67% มี correct ยาวกว่าตัวลวงเฉลี่ย, 30% ยาวกว่า 1.3x, worst 2.0x**
+(analysis-hard). นี่คือ answer-length heuristic: อ่านความยาว choice ก็เดาคำตอบ
+ได้โดยไม่ต้องรู้เนื้อหา
+
+การตัดสินใจ (ผู้ใช้ชี้): **ไม่ทำ gate A แบบ hard-reject** เพราะ "ข้อยาวเฟื้อยก็
+ทำเป็นข้อลวงได้" — ความยาวไม่ใช่สัญญาณ deterministic ที่ reliable และจะ
+false-positive กับข้อที่ correct ต้องอธิบายยาวจริง. แผน C ที่ทำ:
+
+- **Revert gate A** (ร่าง `checkCorrectChoiceLengthBias` ที่ค้างถูกถอน ไม่ commit)
+- **B: prompt fix** (`examgen/generation/prompt.go`) — สั่งชัดว่าเหตุผลที่
+  justify ต้องไป `explanation` field ไม่ใช่ correct choice text และตัวลวงต้อง
+  มี clause ความยาวเทียบเท่า "a student who reads only the option lengths must
+  not be able to pick the answer"
+- **Advisory flag `lenbias`** (`app/benchmark.go`) — ไม่ reject แต่บันทึกต่อข้อ
+  (`length_bias`) + counter (`lenbias_passed/total`) ใน report และ summary print
+
+**ผลพิสูจน์ (economics analysis-hard, เนื้อหาเดิม, candidate 1)**:
+ข้อที่เคย correct 152 ตัวอักษร vs ตัวลวง 74 (ratio 2.04) หลัง prompt fix กลายเป็น
+115 vs 100 (ratio 1.15); ข้อ second-worst 1.44 → 1.15. `lenbias 0/0` — ไม่มีข้อ
+ที่เดาได้ด้วยความยาวอีกแล้ว. recall case ก็ `lenbias 0/0` เช่นกัน
+
+เครื่องมือวิเคราะห์: `tools/analyze_length_bias.py` (สถิติข้ามวิชา) +
+`tools/show_lenbias_examples.py` (ต่อข้อ) + `tools/render_liveverify_html.py`
+(HTML เปรียบเทียบ tab ต่อวิชา, output `tools/liveverify-all-subjects.html`)
+
+Logs อยู่ที่ `backend/prototype-exam-quality/.scratch/liveverify-*.log` และ
+reports อยู่ใน scratch dir ของแต่ละวิชา (`benchmark-all.json` /
+`benchmark-applicationhard.json` / `benchmark-calculation.json`)
+
 ## Graph compile และ batching
 
 ค่า default ปัจจุบันคือไม่เกิน 4 chunks หรือประมาณ 8,000 runes ต่อ compile request
@@ -246,10 +329,8 @@ error message ระบุ `(widened retry)` ตรง ๆ ตอนเคมี
    ขนาดเล็ก ก่อนประกาศ pass rate เป็นคุณภาพ
 5. วัด token/call ต่อ stage ทุก benchmark; ยังไม่เพิ่ม planner หรือ per-question
    judge จนกว่าจะพิสูจน์ว่าคุณภาพต่อ token ดีขึ้นจริง
-6. **commit code ของ session 2026-08-06 ต่อเนื่อง** — ยังไม่ commit เลย
-   (9 ไฟล์แก้ ครอบคลุม bug fix 4 ตัว + analysis skill tier + benchmark preset
-   ใหม่) พิจารณาแยก commit ตาม concern (bug fix / analysis tier / preset) แทน
-   commit เดียวรวด
+6. ~~commit code ของ session 2026-08-06 ต่อเนื่อง~~ — **เสร็จแล้ว** commit
+   `8320cf8` (bug fix) + `97e6587` (analysis tier + preset)
 7. ทดสอบ US History (`samples/openstax-us-history.pdf`) และ sociology
    (`.scratch/university-sources/sociology-3e.pdf`) — ดาวน์โหลด/มีไฟล์แล้วแต่
    ไม่เคยรัน US History คือตัวแทน pure-qualitative humanities ตัวเดียวที่ยังไม่
@@ -263,8 +344,11 @@ error message ระบุ `(widened retry)` ตรง ๆ ตอนเคมี
    แย่ง atom เดียวกัน) — ยังไม่วัดว่ากระทบ yield ของ analysis slot บนวิชาที่
    คำนวณเยอะ (ฟิสิกส์/เคมี) มากกว่าวิชาที่ไม่ค่อยมีเลข (ชีวะ/สังคม) แค่ไหน
 10. live-verify ซ้ำ bug 1 (rounding tolerance) กับ bug 3 (coverage_contract
-    asymmetry) — มี unit test ครบแต่ยังไม่เจอ live run ที่ exercise เส้นทางนั้น
-    ตรง ๆ อีกครั้งหลังแก้
+    asymmetry) — **เริ่มแล้ว (session 2026-08-06 ต่อเนื่อง 2) ยังไม่จบ**: physics
+    + algebra บางส่วนรันแล้ว (ผลในหัวข้อ Live-verify ด้านบน) ยังไม่เจอ live
+    run ที่ exercise bug 1/3 ตรง ๆ; **ต้องสืบ findings ใหม่ 3 ข้อ** (application-
+    hard physics 0/6, analysis-easy algebra 0/10, `distractor_reasons` schema
+    mismatch) ก่อนรันวิชาที่เหลือ (chemistry/economics/US history/biology)
 
 ## เกณฑ์รอบถัดไป
 
