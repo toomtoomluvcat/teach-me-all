@@ -3,6 +3,7 @@ package evidence
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"sort"
 	"strings"
 	"unicode"
@@ -141,8 +142,28 @@ func PreflightCoverageContract(contract CoverageContract, graph *EvidenceGraph, 
 	return contract
 }
 
+// algebraicVariableExponentPattern matches a single-letter variable base
+// raised to a power, either with an explicit operator ("b^-7", "x**3",
+// "θ^-7") or as a literal Unicode superscript ("b⁻⁷") the way an extracted
+// textbook page often renders it — calc.go's own evaluator already has to
+// parse that same superscript alphabet for the same reason. \p{L} covers any
+// Unicode letter, not just ASCII, since exponent rules commonly use Greek
+// letters (θ, α) as the generic base. A claim built on this shape (an
+// exponent rule stated with a generic base, not a worked number) resolves to
+// a symbolic answer such as "1/b^7" rather than a decimal or integer, even
+// though the exponents themselves are digits. Calculation-eligibility only
+// looks for digits otherwise, so this claim would wrongly qualify without the
+// extra check — the natural answer isn't numeric no matter how it's dressed.
+var algebraicVariableExponentPattern = regexp.MustCompile(`\p{L}\s*(\^|\*\*)\s*-?\d|\p{L}[⁰¹²³⁴⁵⁶⁷⁸⁹⁻⁺]`)
+
 func shouldDowngradeCalculation(atom EvidenceAtom) bool {
-	return !containsConcreteNumber(atom.Claim) && !containsConcreteNumber(atom.Quote)
+	if !containsConcreteNumber(atom.Claim) && !containsConcreteNumber(atom.Quote) {
+		return true
+	}
+	if algebraicVariableExponentPattern.MatchString(atom.Claim) || algebraicVariableExponentPattern.MatchString(atom.Quote) {
+		return true
+	}
+	return false
 }
 
 func containsConcreteNumber(text string) bool {
@@ -858,8 +879,13 @@ func gateSetCoverage(q Question, contract CoverageContract, byChunk map[string]C
 		res.Reason = fmt.Sprintf("cited evidence chunk %s is not in the set context", q.EvidenceChunkID)
 		return res
 	}
-	if slot.RequiresCalculation != q.NeedsCalculation() {
-		res.Reason = fmt.Sprintf("slot %s requires_calculation=%t, got %t", slot.ID, slot.RequiresCalculation, q.NeedsCalculation())
+	// Only reject the direction that hides required verification: a slot that
+	// demands calculation but got none. A question that volunteers a verified
+	// calculation the slot didn't ask for is strictly more checked, not less,
+	// so it is accepted rather than punished for being more cautious than the
+	// slot required.
+	if slot.RequiresCalculation && !q.NeedsCalculation() {
+		res.Reason = fmt.Sprintf("slot %s requires calculation, got requires_calculation=false", slot.ID)
 		return res
 	}
 	if slot.RequiresCalculation && q.Calculation == nil {

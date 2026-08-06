@@ -10,33 +10,85 @@ import (
 
 // choiceMentionsNumber accepts the rounded and scientific-number forms that
 // appear in natural-language answer choices.
+//
+// A choice that states the value losslessly — including ordinary rounding
+// that does not meaningfully change it, like 35.348 for a computed
+// 35.34795918... — always matches. A choice that only matches after throwing
+// away real precision, like 1.7 for a computed 1.67, only matches when the
+// choice itself says it is approximate ("≈", "about", "ประมาณ", ...).
+// Otherwise a choice claiming an exact answer that is actually short a digit
+// reads as correct when it silently isn't.
 func choiceMentionsNumber(choice string, v float64) bool {
-	candidates := []string{
-		trimZeros(fmt.Sprintf("%.6f", v)), trimZeros(fmt.Sprintf("%.4f", v)),
-		trimZeros(fmt.Sprintf("%.3f", v)), trimZeros(fmt.Sprintf("%.2f", v)),
-		trimZeros(fmt.Sprintf("%.1f", v)), fmt.Sprintf("%.1f", v), fmt.Sprintf("%.2f", v),
-		fmt.Sprintf("%.3f", v), fmt.Sprintf("%.4f", v), fmt.Sprintf("%.6f", v),
-		fmt.Sprintf("%.0f", v), fmt.Sprintf("%g", v),
-	}
-	normalized := normalizeScientificNotation(choice)
-	for _, format := range []string{"%.0e", "%.1e", "%.2e", "%.3e", "%.4e"} {
-		candidates = append(candidates, normalizeScientificLiteral(fmt.Sprintf(format, v)))
-	}
 	haystack := strings.ReplaceAll(choice, ",", "")
-	for _, candidate := range candidates {
-		if candidate != "" && containsNumericToken(haystack, candidate) {
+	approx := hasApproxMarker(choice)
+
+	decimalCandidates := []string{
+		fmt.Sprintf("%.0f", v),
+		trimZeros(fmt.Sprintf("%.1f", v)), fmt.Sprintf("%.1f", v),
+		trimZeros(fmt.Sprintf("%.2f", v)), fmt.Sprintf("%.2f", v),
+		trimZeros(fmt.Sprintf("%.3f", v)), fmt.Sprintf("%.3f", v),
+		trimZeros(fmt.Sprintf("%.4f", v)), fmt.Sprintf("%.4f", v),
+		trimZeros(fmt.Sprintf("%.6f", v)), fmt.Sprintf("%.6f", v),
+		fmt.Sprintf("%g", v),
+	}
+	for _, text := range decimalCandidates {
+		if text != "" && isLosslessRounding(v, text) && containsNumericToken(haystack, text) {
 			return true
 		}
 	}
+	if approx {
+		for _, text := range decimalCandidates {
+			if text != "" && containsNumericToken(haystack, text) {
+				return true
+			}
+		}
+	}
+
 	if v >= 0 && v <= 20 && math.Abs(v-math.Round(v)) < 1e-9 {
 		words := []string{"zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen", "nineteen", "twenty"}
 		if containsWordToken(strings.ToLower(choice), words[int(math.Round(v))]) {
 			return true
 		}
 	}
+
+	// Scientific notation is its own convention: a mantissa is expected to be
+	// rounded to a handful of significant figures by definition, so it is not
+	// held to the same "must say approximate" rule as plain decimals.
+	normalized := normalizeScientificNotation(choice)
 	for _, format := range []string{"%.0e", "%.1e", "%.2e", "%.3e", "%.4e"} {
 		candidate := normalizeScientificLiteral(fmt.Sprintf(format, v))
-		if candidate != "" && containsNumericToken(normalized, candidate) {
+		if candidate != "" && (containsNumericToken(haystack, candidate) || containsNumericToken(normalized, candidate)) {
+			return true
+		}
+	}
+	return false
+}
+
+// isLosslessRounding reports whether formatting v as text and parsing it back
+// reproduces v closely enough that no meaningful precision was discarded.
+// The absolute allowance for values >= 1 mirrors gates.roundedAnswerTolerance
+// (5e-4): ordinary three-decimal rounding is normal and needs no
+// "approximately" marker. A jump like 1.67 -> "1.7" (0.03 away) is well
+// outside that and only matches when the choice marks itself approximate.
+func isLosslessRounding(v float64, text string) bool {
+	parsed, err := strconv.ParseFloat(text, 64)
+	if err != nil {
+		return false
+	}
+	if parsed == v {
+		return true
+	}
+	if math.Abs(v) >= 1 && math.Abs(parsed) >= 1 && math.Abs(parsed-v) <= 5e-4 {
+		return true
+	}
+	scale := math.Max(math.Abs(v), 1)
+	return math.Abs(parsed-v)/scale < 1e-6
+}
+
+func hasApproxMarker(choice string) bool {
+	lower := strings.ToLower(choice)
+	for _, marker := range []string{"≈", "~", "about ", "approx", "roughly", "around ", "ประมาณ", "โดยประมาณ"} {
+		if strings.Contains(lower, marker) {
 			return true
 		}
 	}

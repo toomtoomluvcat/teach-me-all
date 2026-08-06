@@ -189,17 +189,20 @@ type rawEvidenceResponse struct {
 // This keeps the normal token cost unchanged while preventing one oversized
 // response from aborting the entire graph compile.
 func (g *Generator) compileEvidenceBatch(ctx context.Context, graph examgen.EvidenceGraph, batch []examgen.Chunk) ([]examgen.EvidenceAtom, error) {
-	var out rawEvidenceResponse
 	msgs := []Message{
 		{Role: "system", Content: examgen.EvidenceCompileSystem()},
 		{Role: "user", Content: examgen.EvidenceCompilePrompt(graph, batch)},
 	}
 	opt := genOptions(evidenceCompileNumCtx, 0)
 	opt.NumPredict = evidenceCompileMaxOutputTokens
-	if err := g.c.ChatJSON(ctx, g.model, msgs, examgen.EvidenceCompileSchema(), opt, &out); err != nil {
-		if len(batch) <= 1 {
-			return nil, err
-		}
+
+	var out rawEvidenceResponse
+	err := g.c.ChatJSON(ctx, g.model, msgs, examgen.EvidenceCompileSchema(), opt, &out)
+	if err == nil {
+		return atomsFromRaw(out), nil
+	}
+
+	if len(batch) > 1 {
 		mid := len(batch) / 2
 		left, leftErr := g.compileEvidenceBatch(ctx, graph, batch[:mid])
 		if leftErr != nil {
@@ -212,6 +215,22 @@ func (g *Generator) compileEvidenceBatch(ctx context.Context, graph examgen.Evid
 		return append(left, right...), nil
 	}
 
+	// A single chunk still failed at the standard budget. Rune-count batching
+	// cannot split this any further, so the failure is not that the packet is
+	// too big — it is that this one chunk is unusually atom-dense (a page of
+	// short numbered problems, a dense equation list) and genuinely needs more
+	// output room. The provider-level retry inside ChatJSON resends at the same
+	// token budget, which reproduces an output-truncation failure identically;
+	// only a wider budget can fix that specific failure shape.
+	wideOpt := genOptions(evidenceCompileNumCtxWide, 0)
+	wideOpt.NumPredict = evidenceCompileMaxOutputTokensWide
+	if err := g.c.ChatJSON(ctx, g.model, msgs, examgen.EvidenceCompileSchema(), wideOpt, &out); err != nil {
+		return nil, fmt.Errorf("chunk %s (widened retry): %w", batch[0].ID, err)
+	}
+	return atomsFromRaw(out), nil
+}
+
+func atomsFromRaw(out rawEvidenceResponse) []examgen.EvidenceAtom {
 	atoms := make([]examgen.EvidenceAtom, 0, len(out.Atoms))
 	for _, atom := range out.Atoms {
 		chunkID := atom.SourceChunkID
@@ -232,7 +251,7 @@ func (g *Generator) compileEvidenceBatch(ctx context.Context, graph examgen.Evid
 			QuestionForms: []string(atom.QuestionForms),
 		})
 	}
-	return atoms, nil
+	return atoms
 }
 
 const (
@@ -243,6 +262,14 @@ const (
 	evidenceBatchMaxRunes          = 8_000
 	evidenceCompileNumCtx          = 12_288
 	evidenceCompileMaxOutputTokens = 4_096
+	// evidenceCompileMaxOutputTokensWide is the last-resort budget for a single
+	// chunk that still fails at the standard budget. Only used on retry, so it
+	// costs nothing on the normal path. evidenceCompileNumCtxWide grows the
+	// context window to match — a lone chunk can already carry close to
+	// evidenceBatchMaxRunes on its own, and that plus an 8k output budget can
+	// exceed the standard 12k context window.
+	evidenceCompileMaxOutputTokensWide = 8_192
+	evidenceCompileNumCtxWide          = 20_480
 )
 
 func evidenceBatches(chunks []examgen.Chunk) [][]examgen.Chunk {

@@ -52,6 +52,27 @@ func TestChoiceMentionsNumberWords(t *testing.T) {
 	}
 }
 
+func TestChoiceMentionsNumberRequiresApproxMarkerForCoarseRounding(t *testing.T) {
+	if choiceMentionsNumber("1.7 N", 1.67) {
+		t.Fatal("1.7 silently drops real precision from 1.67 and should not match without an approximate marker")
+	}
+	if !choiceMentionsNumber("about 1.7 N", 1.67) {
+		t.Fatal("1.7 should match once the choice marks itself approximate")
+	}
+	if !choiceMentionsNumber("≈1.7 N", 1.67) {
+		t.Fatal("1.7 should match once the choice marks itself approximate")
+	}
+	if !choiceMentionsNumber("1.67 N", 1.67) {
+		t.Fatal("the exact value should always match")
+	}
+}
+
+func TestChoiceMentionsNumberAllowsOrdinaryThreeDecimalRounding(t *testing.T) {
+	if !choiceMentionsNumber("35.348", 35.34795918367347) {
+		t.Fatal("ordinary three-decimal rounding on a value >= 1 should not need an approximate marker")
+	}
+}
+
 func TestChoiceMentionsNumberUsesNumericBoundaries(t *testing.T) {
 	for _, choice := range []string{"14 N", "40 m/s", "0.4 kg"} {
 		if choiceMentionsNumber(choice, 4) {

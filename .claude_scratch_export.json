@@ -1,0 +1,4819 @@
+{
+ "physics": [
+  {
+   "name": "application-easy",
+   "accepted": 5,
+   "drafts": 5,
+   "questions": [
+    {
+     "stem": "A box is being pushed across a frictionless floor with a net external force directed to the left. In which direction does the box accelerate?",
+     "choices": [
+      {
+       "content": "To the left",
+       "is_correct": true
+      },
+      {
+       "content": "To the right",
+       "is_correct": false
+      },
+      {
+       "content": "Upward",
+       "is_correct": false
+      },
+      {
+       "content": "It does not accelerate",
+       "is_correct": false
+      }
+     ],
+     "explanation": "The acceleration is in the same direction as the net external force. Since the net external force is to the left, the acceleration is also to the left.",
+     "skill": "application",
+     "difficulty": "easy",
+     "requires_calculation": false,
+     "calculation": null,
+     "passed": true,
+     "gates": [
+      {
+       "Gate": "well_formed",
+       "Pass": true,
+       "Reason": "structurally sound",
+       "Deterministic": true
+      },
+      {
+       "Gate": "source_role",
+       "Pass": true,
+       "Reason": "chunk p144-c13, page 144 is usable source text",
+       "Deterministic": true
+      },
+      {
+       "Gate": "quote_verbatim",
+       "Pass": true,
+       "Reason": "verbatim in chunk p144-c13, page 144",
+       "Deterministic": true
+      },
+      {
+       "Gate": "arithmetic",
+       "Pass": true,
+       "Reason": "no arithmetic in this question",
+       "Deterministic": true
+      },
+      {
+       "Gate": "unit_check",
+       "Pass": true,
+       "Reason": "no arithmetic in this question",
+       "Deterministic": true
+      },
+      {
+       "Gate": "demand_contract",
+       "Pass": true,
+       "Reason": "no medium/hard application demand contract required",
+       "Deterministic": true
+      },
+      {
+       "Gate": "coverage_contract",
+       "Pass": true,
+       "Reason": "slot S01 uses atom A053 from chunk p144-c13",
+       "Deterministic": true
+      },
+      {
+       "Gate": "not_a_duplicate",
+       "Pass": true,
+       "Reason": "distinct from the questions already accepted",
+       "Deterministic": true
+      }
+     ],
+     "source_quote": "The acceleration is in the same direction as the net external force, which is parallel to the ground and to the right."
+    },
+    {
+     "stem": "An object is weighed at two different locations on Earth's surface. Which statement correctly describes its weight?",
+     "choices": [
+      {
+       "content": "Its weight is slightly different at the two locations.",
+       "is_correct": true
+      },
+      {
+       "content": "Its weight is exactly the same at the two locations.",
+       "is_correct": false
+      },
+      {
+       "content": "Its weight is zero at both locations.",
+       "is_correct": false
+      },
+      {
+       "content": "Its weight depends only on its mass, not on location.",
+       "is_correct": false
+      }
+     ],
+     "explanation": "Gravity varies slightly over Earth's surface, so the weight of an object depends very slightly on its location on Earth. Therefore, the weight is slightly different at different locations.",
+     "skill": "application",
+     "difficulty": "easy",
+     "requires_calculation": false,
+     "calculation": null,
+     "passed": true,
+     "gates": [
+      {
+       "Gate": "well_formed",
+       "Pass": true,
+       "Reason": "structurally sound",
+       "Deterministic": true
+      },
+      {
+       "Gate": "source_role",
+       "Pass": true,
+       "Reason": "chunk p142-c8, page 142 is usable source text",
+       "Deterministic": true
+      },
+      {
+       "Gate": "quote_verbatim",
+       "Pass": true,
+       "Reason": "verbatim in chunk p142-c8, page 142",
+       "Deterministic": true
+      },
+      {
+       "Gate": "arithmetic",
+       "Pass": true,
+       "Reason": "no arithmetic in this question",
+       "Deterministic": true
+      },
+      {
+       "Gate": "unit_check",
+       "Pass": true,
+       "Reason": "no arithmetic in this question",
+       "Deterministic": true
+      },
+      {
+       "Gate": "demand_contract",
+       "Pass": true,
+       "Reason": "no medium/hard application demand contract required",
+       "Deterministic": true
+      },
+      {
+       "Gate": "coverage_contract",
+       "Pass": true,
+       "Reason": "slot S02 uses atom A038 from chunk p142-c8",
+       "Deterministic": true
+      },
+      {
+       "Gate": "not_a_duplicate",
+       "Pass": true,
+       "Reason": "distinct from the questions already accepted",
+       "Deterministic": true
+      }
+     ],
+     "source_quote": "Gravity varies slightly over the surface of Earth, so the weight of an object depends very slightly on its location on Earth."
+    },
+    {
+     "stem": "A 1.0-kg object is taken from Earth to the Moon, where the acceleration due to gravity is 1.67 m/s². Which statement correctly compares its mass and weight on the Moon to those on Earth?",
+     "choices": [
+      {
+       "content": "Its mass is the same, but its weight is less.",
+       "is_correct": true
+      },
+      {
+       "content": "Its mass is less, and its weight is less.",
+       "is_correct": false
+      },
+      {
+       "content": "Its mass is the same, and its weight is the same.",
+       "is_correct": false
+      },
+      {
+       "content": "Its mass is less, but its weight is the same.",
+       "is_correct": false
+      }
+     ],
+     "explanation": "Mass is the quantity of matter and does not vary, while weight is proportional to the force of gravity. On the Moon, gravity is weaker, so the weight is less while mass remains the same.",
+     "skill": "application",
+     "difficulty": "easy",
+     "requires_calculation": false,
+     "calculation": null,
+     "passed": true,
+     "gates": [
+      {
+       "Gate": "well_formed",
+       "Pass": true,
+       "Reason": "structurally sound",
+       "Deterministic": true
+      },
+      {
+       "Gate": "source_role",
+       "Pass": true,
+       "Reason": "chunk p142-c9, page 142 is usable source text",
+       "Deterministic": true
+      },
+      {
+       "Gate": "quote_verbatim",
+       "Pass": true,
+       "Reason": "verbatim in chunk p142-c9, page 142",
+       "Deterministic": true
+      },
+      {
+       "Gate": "arithmetic",
+       "Pass": true,
+       "Reason": "no arithmetic in this question",
+       "Deterministic": true
+      },
+      {
+       "Gate": "unit_check",
+       "Pass": true,
+       "Reason": "no arithmetic in this question",
+       "Deterministic": true
+      },
+      {
+       "Gate": "demand_contract",
+       "Pass": true,
+       "Reason": "no medium/hard application demand contract required",
+       "Deterministic": true
+      },
+      {
+       "Gate": "coverage_contract",
+       "Pass": true,
+       "Reason": "slot S03 uses atom A042 from chunk p142-c9",
+       "Deterministic": true
+      },
+      {
+       "Gate": "not_a_duplicate",
+       "Pass": true,
+       "Reason": "distinct from the questions already accepted",
+       "Deterministic": true
+      }
+     ],
+     "source_quote": "Mass is the quantity of matter in an object (how much stuff there is, or how hard it is to accelerate it) and does not vary, but weight is the gravitational force on an object and is proportional to the force of gravity."
+    },
+    {
+     "stem": "A skydiver has just jumped out of a plane and is falling with negligible air resistance. Which force is acting on the skydiver?",
+     "choices": [
+      {
+       "content": "Only the force of gravity",
+       "is_correct": true
+      },
+      {
+       "content": "Only the force of air resistance",
+       "is_correct": false
+      },
+      {
+       "content": "Both gravity and air resistance",
+       "is_correct": false
+      },
+      {
+       "content": "No forces at all",
+       "is_correct": false
+      }
+     ],
+     "explanation": "In freefall, the only force acting on the object is the force of gravity. Since air resistance is negligible, the skydiver is in freefall.",
+     "skill": "application",
+     "difficulty": "easy",
+     "requires_calculation": false,
+     "calculation": null,
+     "passed": true,
+     "gates": [
+      {
+       "Gate": "well_formed",
+       "Pass": true,
+       "Reason": "structurally sound",
+       "Deterministic": true
+      },
+      {
+       "Gate": "source_role",
+       "Pass": true,
+       "Reason": "chunk p142-c8, page 142 is usable source text",
+       "Deterministic": true
+      },
+      {
+       "Gate": "quote_verbatim",
+       "Pass": true,
+       "Reason": "verbatim in chunk p142-c8, page 142",
+       "Deterministic": true
+      },
+      {
+       "Gate": "arithmetic",
+       "Pass": true,
+       "Reason": "no arithmetic in this question",
+       "Deterministic": true
+      },
+      {
+       "Gate": "unit_check",
+       "Pass": true,
+       "Reason": "no arithmetic in this question",
+       "Deterministic": true
+      },
+      {
+       "Gate": "demand_contract",
+       "Pass": true,
+       "Reason": "no medium/hard application demand contract required",
+       "Deterministic": true
+      },
+      {
+       "Gate": "coverage_contract",
+       "Pass": true,
+       "Reason": "slot S04 uses atom A036 from chunk p142-c8",
+       "Deterministic": true
+      },
+      {
+       "Gate": "not_a_duplicate",
+       "Pass": true,
+       "Reason": "distinct from the questions already accepted",
+       "Deterministic": true
+      }
+     ],
+     "source_quote": "In this case, the only force acting on the object is the force of gravity."
+    },
+    {
+     "stem": "A rocket sled experiences a net external force and accelerates horizontally. To find the thrust of its engines, which law should be used first?",
+     "choices": [
+      {
+       "content": "Newton's second law",
+       "is_correct": true
+      },
+      {
+       "content": "Newton's first law",
+       "is_correct": false
+      },
+      {
+       "content": "The law of universal gravitation",
+       "is_correct": false
+      },
+      {
+       "content": "The law of conservation of momentum",
+       "is_correct": false
+      }
+     ],
+     "explanation": "To find the thrust of the engines, we start with Newton's second law and look for ways to find the thrust T of the engines.",
+     "skill": "application",
+     "difficulty": "easy",
+     "requires_calculation": false,
+     "calculation": null,
+     "passed": true,
+     "gates": [
+      {
+       "Gate": "well_formed",
+       "Pass": true,
+       "Reason": "structurally sound",
+       "Deterministic": true
+      },
+      {
+       "Gate": "source_role",
+       "Pass": true,
+       "Reason": "chunk p145-c15, page 145 is usable source text",
+       "Deterministic": true
+      },
+      {
+       "Gate": "quote_verbatim",
+       "Pass": true,
+       "Reason": "verbatim in chunk p145-c15, page 145",
+       "Deterministic": true
+      },
+      {
+       "Gate": "arithmetic",
+       "Pass": true,
+       "Reason": "no arithmetic in this question",
+       "Deterministic": true
+      },
+      {
+       "Gate": "unit_check",
+       "Pass": true,
+       "Reason": "no arithmetic in this question",
+       "Deterministic": true
+      },
+      {
+       "Gate": "demand_contract",
+       "Pass": true,
+       "Reason": "no medium/hard application demand contract required",
+       "Deterministic": true
+      },
+      {
+       "Gate": "coverage_contract",
+       "Pass": true,
+       "Reason": "slot S05 uses atom A063 from chunk p145-c15",
+       "Deterministic": true
+      },
+      {
+       "Gate": "not_a_duplicate",
+       "Pass": true,
+       "Reason": "distinct from the questions already accepted",
+       "Deterministic": true
+      }
+     ],
+     "source_quote": "We start with Newton’s second law and look for ways to find the thrust T of the engines."
+    }
+   ]
+  },
+  {
+   "name": "application-medium",
+   "accepted": 5,
+   "drafts": 5,
+   "questions": [
+    {
+     "stem": "A rocket sled moves horizontally to the right with a net external force pointing to the right. The sled's acceleration is directed to the right. If the net external force were instead directed to the left while the sled still moves to the right, what would be the direction of the sled's acceleration?",
+     "choices": [
+      {
+       "content": "To the left",
+       "is_correct": true
+      },
+      {
+       "content": "To the right",
+       "is_correct": false
+      },
+      {
+       "content": "Upward",
+       "is_correct": false
+      },
+      {
+       "content": "Downward",
+       "is_correct": false
+      }
+     ],
+     "explanation": "The acceleration is always in the same direction as the net external force. Since the net external force is now to the left, the acceleration must also be to the left, even though the sled's velocity is still to the right.",
+     "skill": "application",
+     "difficulty": "medium",
+     "requires_calculation": false,
+     "calculation": null,
+     "passed": true,
+     "gates": [
+      {
+       "Gate": "well_formed",
+       "Pass": true,
+       "Reason": "structurally sound",
+       "Deterministic": true
+      },
+      {
+       "Gate": "source_role",
+       "Pass": true,
+       "Reason": "chunk p144-c13, page 144 is usable source text",
+       "Deterministic": true
+      },
+      {
+       "Gate": "quote_verbatim",
+       "Pass": true,
+       "Reason": "verbatim in chunk p144-c13, page 144",
+       "Deterministic": true
+      },
+      {
+       "Gate": "arithmetic",
+       "Pass": true,
+       "Reason": "no arithmetic in this question",
+       "Deterministic": true
+      },
+      {
+       "Gate": "unit_check",
+       "Pass": true,
+       "Reason": "no arithmetic in this question",
+       "Deterministic": true
+      },
+      {
+       "Gate": "demand_contract",
+       "Pass": true,
+       "Reason": "medium application demand contract is present",
+       "Deterministic": true
+      },
+      {
+       "Gate": "coverage_contract",
+       "Pass": true,
+       "Reason": "slot S01 uses atom A053 from chunk p144-c13",
+       "Deterministic": true
+      },
+      {
+       "Gate": "not_a_duplicate",
+       "Pass": true,
+       "Reason": "distinct from the questions already accepted",
+       "Deterministic": true
+      }
+     ],
+     "source_quote": "The acceleration is in the same direction as the net external force, which is parallel to the ground and to the right."
+    },
+    {
+     "stem": "An object has a mass of 1.0 kg. It is weighed at two different locations on Earth's surface. Which statement correctly describes how its weight might differ between the two locations?",
+     "choices": [
+      {
+       "content": "Its weight could differ slightly because gravity varies slightly over Earth's surface.",
+       "is_correct": true
+      },
+      {
+       "content": "Its weight is exactly the same at all locations on Earth's surface.",
+       "is_correct": false
+      },
+      {
+       "content": "Its weight differs because its mass changes with location.",
+       "is_correct": false
+      },
+      {
+       "content": "Its weight differs only if the object is moved to a different planet.",
+       "is_correct": false
+      }
+     ],
+     "explanation": "Gravity varies slightly over Earth's surface, so the weight of an object depends very slightly on its location on Earth. Mass does not vary, so the difference is due to the variation in gravitational force.",
+     "skill": "application",
+     "difficulty": "medium",
+     "requires_calculation": false,
+     "calculation": null,
+     "passed": true,
+     "gates": [
+      {
+       "Gate": "well_formed",
+       "Pass": true,
+       "Reason": "structurally sound",
+       "Deterministic": true
+      },
+      {
+       "Gate": "source_role",
+       "Pass": true,
+       "Reason": "chunk p142-c8, page 142 is usable source text",
+       "Deterministic": true
+      },
+      {
+       "Gate": "quote_verbatim",
+       "Pass": true,
+       "Reason": "verbatim in chunk p142-c8, page 142",
+       "Deterministic": true
+      },
+      {
+       "Gate": "arithmetic",
+       "Pass": true,
+       "Reason": "no arithmetic in this question",
+       "Deterministic": true
+      },
+      {
+       "Gate": "unit_check",
+       "Pass": true,
+       "Reason": "no arithmetic in this question",
+       "Deterministic": true
+      },
+      {
+       "Gate": "demand_contract",
+       "Pass": true,
+       "Reason": "medium application demand contract is present",
+       "Deterministic": true
+      },
+      {
+       "Gate": "coverage_contract",
+       "Pass": true,
+       "Reason": "slot S02 uses atom A038 from chunk p142-c8",
+       "Deterministic": true
+      },
+      {
+       "Gate": "not_a_duplicate",
+       "Pass": true,
+       "Reason": "distinct from the questions already accepted",
+       "Deterministic": true
+      }
+     ],
+     "source_quote": "Gravity varies slightly over the surface of Earth, so the weight of an object depends very slightly on its location on Earth."
+    },
+    {
+     "stem": "A 1.0-kg object is taken from Earth to the Moon, where the acceleration due to gravity is 1.67 m/s². Which statement correctly compares its mass and weight on the Moon to its mass and weight on Earth?",
+     "choices": [
+      {
+       "content": "Its mass stays 1.0 kg, but its weight is less on the Moon.",
+       "is_correct": true
+      },
+      {
+       "content": "Its mass stays 1.0 kg, and its weight is the same on the Moon.",
+       "is_correct": false
+      },
+      {
+       "content": "Its mass decreases on the Moon, and its weight decreases.",
+       "is_correct": false
+      },
+      {
+       "content": "Its mass increases on the Moon, and its weight increases.",
+       "is_correct": false
+      }
+     ],
+     "explanation": "Mass is the quantity of matter and does not vary, so the mass remains 1.0 kg. Weight is the gravitational force and is proportional to the force of gravity; since the Moon's gravity is weaker, the weight is less.",
+     "skill": "application",
+     "difficulty": "medium",
+     "requires_calculation": false,
+     "calculation": null,
+     "passed": true,
+     "gates": [
+      {
+       "Gate": "well_formed",
+       "Pass": true,
+       "Reason": "structurally sound",
+       "Deterministic": true
+      },
+      {
+       "Gate": "source_role",
+       "Pass": true,
+       "Reason": "chunk p142-c9, page 142 is usable source text",
+       "Deterministic": true
+      },
+      {
+       "Gate": "quote_verbatim",
+       "Pass": true,
+       "Reason": "verbatim in chunk p142-c9, page 142",
+       "Deterministic": true
+      },
+      {
+       "Gate": "arithmetic",
+       "Pass": true,
+       "Reason": "no arithmetic in this question",
+       "Deterministic": true
+      },
+      {
+       "Gate": "unit_check",
+       "Pass": true,
+       "Reason": "no arithmetic in this question",
+       "Deterministic": true
+      },
+      {
+       "Gate": "demand_contract",
+       "Pass": true,
+       "Reason": "medium application demand contract is present",
+       "Deterministic": true
+      },
+      {
+       "Gate": "coverage_contract",
+       "Pass": true,
+       "Reason": "slot S03 uses atom A042 from chunk p142-c9",
+       "Deterministic": true
+      },
+      {
+       "Gate": "not_a_duplicate",
+       "Pass": true,
+       "Reason": "distinct from the questions already accepted",
+       "Deterministic": true
+      }
+     ],
+     "source_quote": "Mass is the quantity of matter in an object (how much stuff there is, or how hard it is to accelerate it) and does not vary, but weight is the gravitational force on an object and is proportional to the force of gravity."
+    },
+    {
+     "stem": "A skydiver jumps out of a plane. Immediately after jumping, before air resistance becomes significant, which statement best describes the forces acting on the skydiver?",
+     "choices": [
+      {
+       "content": "The only force acting is the force of gravity.",
+       "is_correct": true
+      },
+      {
+       "content": "The forces are gravity and a large upward air resistance.",
+       "is_correct": false
+      },
+      {
+       "content": "The forces are gravity and an upward buoyancy force from the air.",
+       "is_correct": false
+      },
+      {
+       "content": "There is no net force acting on the skydiver.",
+       "is_correct": false
+      }
+     ],
+     "explanation": "In freefall, the only force acting on the object is the force of gravity. Immediately after jumping, air resistance is negligible, so the skydiver is in freefall and only gravity acts.",
+     "skill": "application",
+     "difficulty": "medium",
+     "requires_calculation": false,
+     "calculation": null,
+     "passed": true,
+     "gates": [
+      {
+       "Gate": "well_formed",
+       "Pass": true,
+       "Reason": "structurally sound",
+       "Deterministic": true
+      },
+      {
+       "Gate": "source_role",
+       "Pass": true,
+       "Reason": "chunk p142-c8, page 142 is usable source text",
+       "Deterministic": true
+      },
+      {
+       "Gate": "quote_verbatim",
+       "Pass": true,
+       "Reason": "verbatim in chunk p142-c8, page 142",
+       "Deterministic": true
+      },
+      {
+       "Gate": "arithmetic",
+       "Pass": true,
+       "Reason": "no arithmetic in this question",
+       "Deterministic": true
+      },
+      {
+       "Gate": "unit_check",
+       "Pass": true,
+       "Reason": "no arithmetic in this question",
+       "Deterministic": true
+      },
+      {
+       "Gate": "demand_contract",
+       "Pass": true,
+       "Reason": "medium application demand contract is present",
+       "Deterministic": true
+      },
+      {
+       "Gate": "coverage_contract",
+       "Pass": true,
+       "Reason": "slot S04 uses atom A036 from chunk p142-c8",
+       "Deterministic": true
+      },
+      {
+       "Gate": "not_a_duplicate",
+       "Pass": true,
+       "Reason": "distinct from the questions already accepted",
+       "Deterministic": true
+      }
+     ],
+     "source_quote": "In this case, the only force acting on the object is the force of gravity."
+    },
+    {
+     "stem": "A rocket sled accelerates horizontally to the right. To determine the thrust of its engines, which law should you apply first?",
+     "choices": [
+      {
+       "content": "Newton's second law",
+       "is_correct": true
+      },
+      {
+       "content": "Newton's first law",
+       "is_correct": false
+      },
+      {
+       "content": "Newton's third law",
+       "is_correct": false
+      },
+      {
+       "content": "The law of universal gravitation",
+       "is_correct": false
+      }
+     ],
+     "explanation": "To find the thrust of the engines, you start with Newton's second law, which relates net force, mass, and acceleration. The thrust is found by applying Fnet = ma to the horizontal forces.",
+     "skill": "application",
+     "difficulty": "medium",
+     "requires_calculation": false,
+     "calculation": null,
+     "passed": true,
+     "gates": [
+      {
+       "Gate": "well_formed",
+       "Pass": true,
+       "Reason": "structurally sound",
+       "Deterministic": true
+      },
+      {
+       "Gate": "source_role",
+       "Pass": true,
+       "Reason": "chunk p145-c15, page 145 is usable source text",
+       "Deterministic": true
+      },
+      {
+       "Gate": "quote_verbatim",
+       "Pass": true,
+       "Reason": "verbatim in chunk p145-c15, page 145",
+       "Deterministic": true
+      },
+      {
+       "Gate": "arithmetic",
+       "Pass": true,
+       "Reason": "no arithmetic in this question",
+       "Deterministic": true
+      },
+      {
+       "Gate": "unit_check",
+       "Pass": true,
+       "Reason": "no arithmetic in this question",
+       "Deterministic": true
+      },
+      {
+       "Gate": "demand_contract",
+       "Pass": true,
+       "Reason": "medium application demand contract is present",
+       "Deterministic": true
+      },
+      {
+       "Gate": "coverage_contract",
+       "Pass": true,
+       "Reason": "slot S05 uses atom A063 from chunk p145-c15",
+       "Deterministic": true
+      },
+      {
+       "Gate": "not_a_duplicate",
+       "Pass": true,
+       "Reason": "distinct from the questions already accepted",
+       "Deterministic": true
+      }
+     ],
+     "source_quote": "We start with Newton’s second law and look for ways to find the thrust T of the engines."
+    }
+   ]
+  },
+  {
+   "name": "application-hard",
+   "accepted": 5,
+   "drafts": 8,
+   "questions": [
+    {
+     "stem": "A crate is being pushed across a horizontal floor. The pushing force is 120 N to the right, and the friction force is 90 N to the left. The crate's mass is 30 kg. What is the direction of the crate's acceleration?",
+     "choices": [
+      {
+       "content": "To the right",
+       "is_correct": true
+      },
+      {
+       "content": "To the left",
+       "is_correct": false
+      },
+      {
+       "content": "Upward",
+       "is_correct": false
+      },
+      {
+       "content": "There is no acceleration because the forces are balanced",
+       "is_correct": false
+      }
+     ],
+     "explanation": "The net external force is the vector sum of the pushing force and friction: 120 N right + 90 N left = 30 N right. Since the net external force is to the right and nonzero, the acceleration is in the same direction as the net external force, which is to the right.",
+     "skill": "application",
+     "difficulty": "hard",
+     "requires_calculation": false,
+     "calculation": null,
+     "passed": false,
+     "gates": [
+      {
+       "Gate": "well_formed",
+       "Pass": false,
+       "Reason": "choices are not parallel: longest is 56 runes, shortest is 6",
+       "Deterministic": true
+      },
+      {
+       "Gate": "source_role",
+       "Pass": true,
+       "Reason": "chunk p144-c13, page 144 is usable source text",
+       "Deterministic": true
+      },
+      {
+       "Gate": "quote_verbatim",
+       "Pass": true,
+       "Reason": "verbatim in chunk p144-c13, page 144",
+       "Deterministic": true
+      },
+      {
+       "Gate": "arithmetic",
+       "Pass": true,
+       "Reason": "no arithmetic in this question",
+       "Deterministic": true
+      },
+      {
+       "Gate": "unit_check",
+       "Pass": true,
+       "Reason": "no arithmetic in this question",
+       "Deterministic": true
+      },
+      {
+       "Gate": "demand_contract",
+       "Pass": true,
+       "Reason": "hard application demand contract is present",
+       "Deterministic": true
+      },
+      {
+       "Gate": "coverage_contract",
+       "Pass": true,
+       "Reason": "slot S01 uses atom A053 from chunk p144-c13",
+       "Deterministic": true
+      },
+      {
+       "Gate": "not_a_duplicate",
+       "Pass": true,
+       "Reason": "distinct from the questions already accepted",
+       "Deterministic": true
+      }
+     ],
+     "source_quote": "The acceleration is in the same direction as the net external force, which is parallel to the ground and to the right."
+    },
+    {
+     "stem": "A 5.0-kg object is taken from sea level on Earth to the top of a high mountain, where the acceleration due to gravity is slightly less than at sea level. Which statement correctly describes the object's mass and weight at the mountain top compared with at sea level?",
+     "choices": [
+      {
+       "content": "Mass stays the same, and weight decreases slightly.",
+       "is_correct": true
+      },
+      {
+       "content": "Mass decreases slightly, and weight stays the same.",
+       "is_correct": false
+      },
+      {
+       "content": "Both mass and weight stay the same.",
+       "is_correct": false
+      },
+      {
+       "content": "Both mass and weight decrease slightly.",
+       "is_correct": false
+      }
+     ],
+     "explanation": "Mass is the quantity of matter and does not vary with location. Weight is the gravitational force on the object and is proportional to the local acceleration due to gravity. Since gravity is slightly less at the mountain top, the weight decreases slightly while mass remains unchanged.",
+     "skill": "application",
+     "difficulty": "hard",
+     "requires_calculation": false,
+     "calculation": null,
+     "passed": true,
+     "gates": [
+      {
+       "Gate": "well_formed",
+       "Pass": true,
+       "Reason": "structurally sound",
+       "Deterministic": true
+      },
+      {
+       "Gate": "source_role",
+       "Pass": true,
+       "Reason": "chunk p142-c8, page 142 is usable source text",
+       "Deterministic": true
+      },
+      {
+       "Gate": "quote_verbatim",
+       "Pass": true,
+       "Reason": "verbatim in chunk p142-c8, page 142",
+       "Deterministic": true
+      },
+      {
+       "Gate": "arithmetic",
+       "Pass": true,
+       "Reason": "no arithmetic in this question",
+       "Deterministic": true
+      },
+      {
+       "Gate": "unit_check",
+       "Pass": true,
+       "Reason": "no arithmetic in this question",
+       "Deterministic": true
+      },
+      {
+       "Gate": "demand_contract",
+       "Pass": true,
+       "Reason": "hard application demand contract is present",
+       "Deterministic": true
+      },
+      {
+       "Gate": "coverage_contract",
+       "Pass": true,
+       "Reason": "slot S02 uses atom A038 from chunk p142-c8",
+       "Deterministic": true
+      },
+      {
+       "Gate": "not_a_duplicate",
+       "Pass": true,
+       "Reason": "distinct from the questions already accepted",
+       "Deterministic": true
+      }
+     ],
+     "source_quote": "Gravity varies slightly over the surface of Earth, so the weight of an object depends very slightly on its location on Earth."
+    },
+    {
+     "stem": "An astronaut takes a 10-kg rock from Earth to the moon, where the acceleration due to gravity is 1.67 m/s². Which statement correctly compares the rock's mass and weight on the moon with its mass and weight on Earth?",
+     "choices": [
+      {
+       "content": "Mass is 10 kg on both, and weight is about 98 N on Earth and about 16.7 N on the moon.",
+       "is_correct": true
+      },
+      {
+       "content": "Mass is 10 kg on both, and weight is about 98 N on both.",
+       "is_correct": false
+      },
+      {
+       "content": "Mass is about 1.7 kg on the moon, and weight is about 16.7 N on the moon.",
+       "is_correct": false
+      },
+      {
+       "content": "Mass is 10 kg on Earth and about 1.7 kg on the moon, and weight is about 98 N on Earth and about 16.7 N on the moon.",
+       "is_correct": false
+      }
+     ],
+     "explanation": "Mass is the quantity of matter and does not vary, so the rock's mass is 10 kg on both Earth and the moon. Weight is the gravitational force, W = mg. On Earth, W = 10 kg × 9.8 m/s² = 98 N. On the moon, W = 10 kg × 1.67 m/s² = 16.7 N.",
+     "skill": "application",
+     "difficulty": "hard",
+     "requires_calculation": true,
+     "calculation": {
+      "expression": "10*9.8",
+      "expected": 98
+     },
+     "passed": false,
+     "gates": [
+      {
+       "Gate": "well_formed",
+       "Pass": true,
+       "Reason": "structurally sound",
+       "Deterministic": true
+      },
+      {
+       "Gate": "source_role",
+       "Pass": true,
+       "Reason": "chunk p142-c9, page 142 is usable source text",
+       "Deterministic": true
+      },
+      {
+       "Gate": "quote_verbatim",
+       "Pass": true,
+       "Reason": "verbatim in chunk p142-c9, page 142",
+       "Deterministic": true
+      },
+      {
+       "Gate": "arithmetic",
+       "Pass": true,
+       "Reason": "10*9.8 = 98, matches the correct choice",
+       "Deterministic": true
+      },
+      {
+       "Gate": "unit_check",
+       "Pass": true,
+       "Reason": "dimensionless or no source-stated unit declared",
+       "Deterministic": true
+      },
+      {
+       "Gate": "demand_contract",
+       "Pass": true,
+       "Reason": "hard application demand contract is present",
+       "Deterministic": true
+      },
+      {
+       "Gate": "coverage_contract",
+       "Pass": false,
+       "Reason": "slot S03 requires_calculation=false, got true",
+       "Deterministic": true
+      },
+      {
+       "Gate": "not_a_duplicate",
+       "Pass": true,
+       "Reason": "distinct from the questions already accepted",
+       "Deterministic": true
+      }
+     ],
+     "source_quote": "Mass is the quantity of matter in an object (how much stuff there is, or how hard it is to accelerate it) and does not vary, but weight is the gravitational force on an object and is proportional to the force of gravity."
+    },
+    {
+     "stem": "A person pushes a lawn mower with a force of 80 N to the right. The friction opposing the motion is 50 N to the left. The mower accelerates to the right. What must be true about the magnitudes of the pushing force and the friction force?",
+     "choices": [
+      {
+       "content": "The pushing force must be greater than the friction force.",
+       "is_correct": true
+      },
+      {
+       "content": "The pushing force must be equal to the friction force.",
+       "is_correct": false
+      },
+      {
+       "content": "The pushing force must be less than the friction force.",
+       "is_correct": false
+      },
+      {
+       "content": "The pushing force must be greater than the weight of the mower.",
+       "is_correct": false
+      }
+     ],
+     "explanation": "Since the mower accelerates to the right, the net external force must be to the right. The net external force is the vector sum of the pushing force (to the right) and the friction force (to the left). For the net force to be to the right, the pushing force must be greater than the friction force.",
+     "skill": "application",
+     "difficulty": "hard",
+     "requires_calculation": false,
+     "calculation": null,
+     "passed": true,
+     "gates": [
+      {
+       "Gate": "well_formed",
+       "Pass": true,
+       "Reason": "structurally sound",
+       "Deterministic": true
+      },
+      {
+       "Gate": "source_role",
+       "Pass": true,
+       "Reason": "chunk p144-c13, page 144 is usable source text",
+       "Deterministic": true
+      },
+      {
+       "Gate": "quote_verbatim",
+       "Pass": true,
+       "Reason": "verbatim in chunk p144-c13, page 144",
+       "Deterministic": true
+      },
+      {
+       "Gate": "arithmetic",
+       "Pass": true,
+       "Reason": "no arithmetic in this question",
+       "Deterministic": true
+      },
+      {
+       "Gate": "unit_check",
+       "Pass": true,
+       "Reason": "no arithmetic in this question",
+       "Deterministic": true
+      },
+      {
+       "Gate": "demand_contract",
+       "Pass": true,
+       "Reason": "hard application demand contract is present",
+       "Deterministic": true
+      },
+      {
+       "Gate": "coverage_contract",
+       "Pass": true,
+       "Reason": "slot S04 uses atom A054 from chunk p144-c13",
+       "Deterministic": true
+      },
+      {
+       "Gate": "not_a_duplicate",
+       "Pass": true,
+       "Reason": "distinct from the questions already accepted",
+       "Deterministic": true
+      }
+     ],
+     "source_quote": "the force exerted by the person pushing the mower must be greater than the friction opposing the motion, because we are given that the net external force is in the direction in which the person pushes."
+    },
+    {
+     "stem": "A rocket sled accelerates horizontally to the right. The sled has a mass of 2000 kg. The total friction opposing the motion is 4000 N. The sled's acceleration is 30 m/s² to the right. What is the total thrust of the engines?",
+     "choices": [
+      {
+       "content": "64,000 N",
+       "is_correct": true
+      },
+      {
+       "content": "60,000 N",
+       "is_correct": false
+      },
+      {
+       "content": "56,000 N",
+       "is_correct": false
+      },
+      {
+       "content": "4,000 N",
+       "is_correct": false
+      }
+     ],
+     "explanation": "Start with Newton's second law: Fnet = ma. The net horizontal force is the total thrust minus the friction: Fnet = T_total - 4000 N. Given m = 2000 kg and a = 30 m/s², Fnet = 2000 × 30 = 60,000 N. Then T_total = Fnet + friction = 60,000 + 4,000 = 64,000 N.",
+     "skill": "application",
+     "difficulty": "hard",
+     "requires_calculation": true,
+     "calculation": {
+      "expression": "2000*30+4000",
+      "expected": 64000
+     },
+     "passed": false,
+     "gates": [
+      {
+       "Gate": "well_formed",
+       "Pass": true,
+       "Reason": "structurally sound",
+       "Deterministic": true
+      },
+      {
+       "Gate": "source_role",
+       "Pass": true,
+       "Reason": "chunk p145-c15, page 145 is usable source text",
+       "Deterministic": true
+      },
+      {
+       "Gate": "quote_verbatim",
+       "Pass": true,
+       "Reason": "verbatim in chunk p145-c15, page 145",
+       "Deterministic": true
+      },
+      {
+       "Gate": "arithmetic",
+       "Pass": true,
+       "Reason": "2000*30+4000 = 64000, matches the correct choice",
+       "Deterministic": true
+      },
+      {
+       "Gate": "unit_check",
+       "Pass": true,
+       "Reason": "dimensionless or no source-stated unit declared",
+       "Deterministic": true
+      },
+      {
+       "Gate": "demand_contract",
+       "Pass": true,
+       "Reason": "hard application demand contract is present",
+       "Deterministic": true
+      },
+      {
+       "Gate": "coverage_contract",
+       "Pass": false,
+       "Reason": "slot S05 requires_calculation=false, got true",
+       "Deterministic": true
+      },
+      {
+       "Gate": "not_a_duplicate",
+       "Pass": true,
+       "Reason": "distinct from the questions already accepted",
+       "Deterministic": true
+      }
+     ],
+     "source_quote": "We start with Newton’s second law and look for ways to find the thrust T of the engines."
+    },
+    {
+     "stem": "A rocket sled moves horizontally to the right. The net external force on the sled is 6000 N to the right, and the sled's mass is 1500 kg. The sled is initially moving to the left at 10 m/s. What is the direction of the sled's acceleration, and how does the sled's speed change immediately after the force is applied?",
+     "choices": [
+      {
+       "content": "Acceleration is to the right; the sled slows down while moving left, then speeds up to the right.",
+       "is_correct": true
+      },
+      {
+       "content": "Acceleration is to the left; the sled speeds up while moving left.",
+       "is_correct": false
+      },
+      {
+       "content": "Acceleration is to the right; the sled speeds up while moving left.",
+       "is_correct": false
+      },
+      {
+       "content": "Acceleration is to the left; the sled slows down while moving left, then speeds up to the right.",
+       "is_correct": false
+      }
+     ],
+     "explanation": "The net external force is to the right, so by Newton's second law the acceleration is in the same direction as the net force, which is to the right. Because the sled is initially moving to the left, the rightward acceleration opposes the motion, causing the sled to slow down while moving left; after it stops, it will speed up to the right.",
+     "skill": "application",
+     "difficulty": "hard",
+     "requires_calculation": false,
+     "calculation": null,
+     "passed": true,
+     "gates": [
+      {
+       "Gate": "well_formed",
+       "Pass": true,
+       "Reason": "structurally sound",
+       "Deterministic": true
+      },
+      {
+       "Gate": "source_role",
+       "Pass": true,
+       "Reason": "chunk p144-c13, page 144 is usable source text",
+       "Deterministic": true
+      },
+      {
+       "Gate": "quote_verbatim",
+       "Pass": true,
+       "Reason": "verbatim in chunk p144-c13, page 144",
+       "Deterministic": true
+      },
+      {
+       "Gate": "arithmetic",
+       "Pass": true,
+       "Reason": "no arithmetic in this question",
+       "Deterministic": true
+      },
+      {
+       "Gate": "unit_check",
+       "Pass": true,
+       "Reason": "no arithmetic in this question",
+       "Deterministic": true
+      },
+      {
+       "Gate": "demand_contract",
+       "Pass": true,
+       "Reason": "hard application demand contract is present",
+       "Deterministic": true
+      },
+      {
+       "Gate": "coverage_contract",
+       "Pass": true,
+       "Reason": "slot S01 uses atom A053 from chunk p144-c13",
+       "Deterministic": true
+      },
+      {
+       "Gate": "not_a_duplicate",
+       "Pass": true,
+       "Reason": "distinct from the questions already accepted",
+       "Deterministic": true
+      }
+     ],
+     "source_quote": "The acceleration is in the same direction as the net external force, which is parallel to the ground and to the right."
+    },
+    {
+     "stem": "An astronaut takes a 5.0-kg wrench from Earth to a planet where the acceleration due to gravity is 3.7 m/s². Which statement correctly compares the wrench's mass and weight on that planet with its mass and weight on Earth?",
+     "choices": [
+      {
+       "content": "Mass is 5.0 kg on both, and weight is about 49 N on Earth and about 18.5 N on the planet.",
+       "is_correct": true
+      },
+      {
+       "content": "Mass is 5.0 kg on both, and weight is about 49 N on both.",
+       "is_correct": false
+      },
+      {
+       "content": "Mass is about 1.9 kg on the planet, and weight is about 18.5 N on the planet.",
+       "is_correct": false
+      },
+      {
+       "content": "Mass is 5.0 kg on Earth and about 1.9 kg on the planet, and weight is about 49 N on Earth and about 18.5 N on the planet.",
+       "is_correct": false
+      }
+     ],
+     "explanation": "Mass is the quantity of matter and does not vary, so the wrench's mass is 5.0 kg on both Earth and the planet. Weight is the gravitational force and is proportional to the local gravity. On Earth, weight = 5.0 kg × 9.8 m/s² = 49 N. On the planet, weight = 5.0 kg × 3.7 m/s² = 18.5 N.",
+     "skill": "application",
+     "difficulty": "hard",
+     "requires_calculation": false,
+     "calculation": null,
+     "passed": true,
+     "gates": [
+      {
+       "Gate": "well_formed",
+       "Pass": true,
+       "Reason": "structurally sound",
+       "Deterministic": true
+      },
+      {
+       "Gate": "source_role",
+       "Pass": true,
+       "Reason": "chunk p142-c9, page 142 is usable source text",
+       "Deterministic": true
+      },
+      {
+       "Gate": "quote_verbatim",
+       "Pass": true,
+       "Reason": "verbatim in chunk p142-c9, page 142",
+       "Deterministic": true
+      },
+      {
+       "Gate": "arithmetic",
+       "Pass": true,
+       "Reason": "no arithmetic in this question",
+       "Deterministic": true
+      },
+      {
+       "Gate": "unit_check",
+       "Pass": true,
+       "Reason": "no arithmetic in this question",
+       "Deterministic": true
+      },
+      {
+       "Gate": "demand_contract",
+       "Pass": true,
+       "Reason": "hard application demand contract is present",
+       "Deterministic": true
+      },
+      {
+       "Gate": "coverage_contract",
+       "Pass": true,
+       "Reason": "slot S03 uses atom A042 from chunk p142-c9",
+       "Deterministic": true
+      },
+      {
+       "Gate": "not_a_duplicate",
+       "Pass": true,
+       "Reason": "distinct from the questions already accepted",
+       "Deterministic": true
+      }
+     ],
+     "source_quote": "Mass is the quantity of matter in an object (how much stuff there is, or how hard it is to accelerate it) and does not vary, but weight is the gravitational force on an object and is proportional to the force of gravity."
+    },
+    {
+     "stem": "A rocket sled accelerates horizontally to the right. The sled has a mass of 2000 kg. The total friction opposing the motion is 4000 N. The sled's acceleration is 30 m/s² to the right. What is the total thrust of the engines?",
+     "choices": [
+      {
+       "content": "64,000 N",
+       "is_correct": true
+      },
+      {
+       "content": "60,000 N",
+       "is_correct": false
+      },
+      {
+       "content": "56,000 N",
+       "is_correct": false
+      },
+      {
+       "content": "4,000 N",
+       "is_correct": false
+      }
+     ],
+     "explanation": "Start with Newton's second law: Fnet = ma. The net horizontal force is the total thrust minus friction, so T_total - 4000 N = (2000 kg)(30 m/s²) = 60,000 N. Therefore T_total = 60,000 N + 4000 N = 64,000 N.",
+     "skill": "application",
+     "difficulty": "hard",
+     "requires_calculation": false,
+     "calculation": null,
+     "passed": true,
+     "gates": [
+      {
+       "Gate": "well_formed",
+       "Pass": true,
+       "Reason": "structurally sound",
+       "Deterministic": true
+      },
+      {
+       "Gate": "source_role",
+       "Pass": true,
+       "Reason": "chunk p145-c15, page 145 is usable source text",
+       "Deterministic": true
+      },
+      {
+       "Gate": "quote_verbatim",
+       "Pass": true,
+       "Reason": "verbatim in chunk p145-c15, page 145",
+       "Deterministic": true
+      },
+      {
+       "Gate": "arithmetic",
+       "Pass": true,
+       "Reason": "no arithmetic in this question",
+       "Deterministic": true
+      },
+      {
+       "Gate": "unit_check",
+       "Pass": true,
+       "Reason": "no arithmetic in this question",
+       "Deterministic": true
+      },
+      {
+       "Gate": "demand_contract",
+       "Pass": true,
+       "Reason": "hard application demand contract is present",
+       "Deterministic": true
+      },
+      {
+       "Gate": "coverage_contract",
+       "Pass": true,
+       "Reason": "slot S05 uses atom A063 from chunk p145-c15",
+       "Deterministic": true
+      },
+      {
+       "Gate": "not_a_duplicate",
+       "Pass": true,
+       "Reason": "distinct from the questions already accepted",
+       "Deterministic": true
+      }
+     ],
+     "source_quote": "We start with Newton’s second law and look for ways to find the thrust T of the engines."
+    }
+   ]
+  },
+  {
+   "name": "calculation",
+   "accepted": 5,
+   "drafts": 5,
+   "questions": [
+    {
+     "stem": "A 3.0-kg object experiences a net force of 12 N. What is its acceleration?",
+     "choices": [
+      {
+       "content": "4.0 m/s²",
+       "is_correct": true
+      },
+      {
+       "content": "0.25 m/s²",
+       "is_correct": false
+      },
+      {
+       "content": "36 m/s²",
+       "is_correct": false
+      },
+      {
+       "content": "9.0 m/s²",
+       "is_correct": false
+      }
+     ],
+     "explanation": "Newton's second law gives F_net = ma, so a = F_net / m. Substituting 12 N for the net force and 3.0 kg for the mass gives a = 12 / 3.0 = 4.0 m/s².",
+     "skill": "understanding",
+     "difficulty": "easy",
+     "requires_calculation": true,
+     "calculation": {
+      "expression": "12/3.0",
+      "expected": 4
+     },
+     "passed": true,
+     "gates": [
+      {
+       "Gate": "well_formed",
+       "Pass": true,
+       "Reason": "structurally sound",
+       "Deterministic": true
+      },
+      {
+       "Gate": "source_role",
+       "Pass": true,
+       "Reason": "chunk p140-c3, page 140 is usable source text",
+       "Deterministic": true
+      },
+      {
+       "Gate": "quote_verbatim",
+       "Pass": true,
+       "Reason": "verbatim in chunk p140-c3, page 140",
+       "Deterministic": true
+      },
+      {
+       "Gate": "arithmetic",
+       "Pass": true,
+       "Reason": "12/3.0 = 4, matches the correct choice",
+       "Deterministic": true
+      },
+      {
+       "Gate": "unit_check",
+       "Pass": true,
+       "Reason": "dimensionless or no source-stated unit declared",
+       "Deterministic": true
+      },
+      {
+       "Gate": "demand_contract",
+       "Pass": true,
+       "Reason": "no medium/hard application demand contract required",
+       "Deterministic": true
+      },
+      {
+       "Gate": "coverage_contract",
+       "Pass": true,
+       "Reason": "slot S01 uses atom A012 from chunk p140-c3",
+       "Deterministic": true
+      },
+      {
+       "Gate": "not_a_duplicate",
+       "Pass": true,
+       "Reason": "distinct from the questions already accepted",
+       "Deterministic": true
+      }
+     ],
+     "source_quote": "Now, let’s rearrange Newton’s second law to solve for acceleration. We get 4.2 4.3"
+    },
+    {
+     "stem": "What is the weight of a 2.5-kg object on Earth, where the acceleration due to gravity is approximately 9.8 m/s²?",
+     "choices": [
+      {
+       "content": "24.5 N",
+       "is_correct": true
+      },
+      {
+       "content": "2.5 N",
+       "is_correct": false
+      },
+      {
+       "content": "9.8 N",
+       "is_correct": false
+      },
+      {
+       "content": "0.25 N",
+       "is_correct": false
+      }
+     ],
+     "explanation": "Weight is the gravitational force on a mass, given by W = mg. With m = 2.5 kg and g = 9.8 m/s², W = 2.5 × 9.8 = 24.5 N.",
+     "skill": "application",
+     "difficulty": "easy",
+     "requires_calculation": true,
+     "calculation": {
+      "expression": "2.5*9.8",
+      "expected": 24.5
+     },
+     "passed": true,
+     "gates": [
+      {
+       "Gate": "well_formed",
+       "Pass": true,
+       "Reason": "structurally sound",
+       "Deterministic": true
+      },
+      {
+       "Gate": "source_role",
+       "Pass": true,
+       "Reason": "chunk p142-c7, page 142 is usable source text",
+       "Deterministic": true
+      },
+      {
+       "Gate": "quote_verbatim",
+       "Pass": true,
+       "Reason": "verbatim in chunk p142-c7, page 142",
+       "Deterministic": true
+      },
+      {
+       "Gate": "arithmetic",
+       "Pass": true,
+       "Reason": "2.5*9.8 = 24.5, matches the correct choice",
+       "Deterministic": true
+      },
+      {
+       "Gate": "unit_check",
+       "Pass": true,
+       "Reason": "dimensionless or no source-stated unit declared",
+       "Deterministic": true
+      },
+      {
+       "Gate": "demand_contract",
+       "Pass": true,
+       "Reason": "no medium/hard application demand contract required",
+       "Deterministic": true
+      },
+      {
+       "Gate": "coverage_contract",
+       "Pass": true,
+       "Reason": "slot S02 uses atom A030 from chunk p142-c7",
+       "Deterministic": true
+      },
+      {
+       "Gate": "not_a_duplicate",
+       "Pass": true,
+       "Reason": "distinct from the questions already accepted",
+       "Deterministic": true
+      }
+     ],
+     "source_quote": "On Earth, so the weight (disregarding for now the direction of the weight) of a 1.0-kg object on Earth is"
+    },
+    {
+     "stem": "If 1 N is equal to 0.225 lb, how many pounds is 5 N of force?",
+     "choices": [
+      {
+       "content": "1.125 lb",
+       "is_correct": true
+      },
+      {
+       "content": "0.045 lb",
+       "is_correct": false
+      },
+      {
+       "content": "2.025 lb",
+       "is_correct": false
+      },
+      {
+       "content": "5.000 lb",
+       "is_correct": false
+      }
+     ],
+     "explanation": "Multiply the force in newtons by the conversion factor: 5 N × 0.225 lb/N = 1.125 lb.",
+     "skill": "recall",
+     "difficulty": "easy",
+     "requires_calculation": true,
+     "calculation": {
+      "expression": "5*0.225",
+      "expected": 1.125
+     },
+     "passed": true,
+     "gates": [
+      {
+       "Gate": "well_formed",
+       "Pass": true,
+       "Reason": "structurally sound",
+       "Deterministic": true
+      },
+      {
+       "Gate": "source_role",
+       "Pass": true,
+       "Reason": "chunk p145-c16, page 145 is usable source text",
+       "Deterministic": true
+      },
+      {
+       "Gate": "quote_verbatim",
+       "Pass": true,
+       "Reason": "verbatim in chunk p145-c16, page 145",
+       "Deterministic": true
+      },
+      {
+       "Gate": "arithmetic",
+       "Pass": true,
+       "Reason": "5*0.225 = 1.125, matches the correct choice",
+       "Deterministic": true
+      },
+      {
+       "Gate": "unit_check",
+       "Pass": true,
+       "Reason": "dimensionless or no source-stated unit declared",
+       "Deterministic": true
+      },
+      {
+       "Gate": "demand_contract",
+       "Pass": true,
+       "Reason": "no medium/hard application demand contract required",
+       "Deterministic": true
+      },
+      {
+       "Gate": "coverage_contract",
+       "Pass": true,
+       "Reason": "slot S03 uses atom A067 from chunk p145-c16",
+       "Deterministic": true
+      },
+      {
+       "Gate": "not_a_duplicate",
+       "Pass": true,
+       "Reason": "distinct from the questions already accepted",
+       "Deterministic": true
+      }
+     ],
+     "source_quote": "If 1 N is equal to 0.225 lb, how many pounds is 5 N of force?"
+    },
+    {
+     "stem": "A force of 8 N is applied to an object. What is this force in pounds, given that 1 N = 0.225 lb?",
+     "choices": [
+      {
+       "content": "1.8 lb",
+       "is_correct": true
+      },
+      {
+       "content": "0.028 lb",
+       "is_correct": false
+      },
+      {
+       "content": "8.0 lb",
+       "is_correct": false
+      },
+      {
+       "content": "35.6 lb",
+       "is_correct": false
+      }
+     ],
+     "explanation": "Use the conversion 1 N = 0.225 lb. Multiply 8 N by 0.225 lb/N to get 1.8 lb.",
+     "skill": "recall",
+     "difficulty": "easy",
+     "requires_calculation": true,
+     "calculation": {
+      "expression": "8*0.225",
+      "expected": 1.8
+     },
+     "passed": true,
+     "gates": [
+      {
+       "Gate": "well_formed",
+       "Pass": true,
+       "Reason": "structurally sound",
+       "Deterministic": true
+      },
+      {
+       "Gate": "source_role",
+       "Pass": true,
+       "Reason": "chunk p142-c7, page 142 is usable source text",
+       "Deterministic": true
+      },
+      {
+       "Gate": "quote_verbatim",
+       "Pass": true,
+       "Reason": "verbatim in chunk p142-c7, page 142",
+       "Deterministic": true
+      },
+      {
+       "Gate": "arithmetic",
+       "Pass": true,
+       "Reason": "8*0.225 = 1.8, matches the correct choice",
+       "Deterministic": true
+      },
+      {
+       "Gate": "unit_check",
+       "Pass": true,
+       "Reason": "dimensionless or no source-stated unit declared",
+       "Deterministic": true
+      },
+      {
+       "Gate": "demand_contract",
+       "Pass": true,
+       "Reason": "no medium/hard application demand contract required",
+       "Deterministic": true
+      },
+      {
+       "Gate": "coverage_contract",
+       "Pass": true,
+       "Reason": "slot S04 uses atom A031 from chunk p142-c7",
+       "Deterministic": true
+      },
+      {
+       "Gate": "not_a_duplicate",
+       "Pass": true,
+       "Reason": "distinct from the questions already accepted",
+       "Deterministic": true
+      }
+     ],
+     "source_quote": "Although most of the world uses newtons as the unit of force, in the United States the most familiar unit of force is the pound (lb), where 1 N = 0.225 lb."
+    },
+    {
+     "stem": "A 1.0-kg object is taken to the moon, where the acceleration due to gravity is 1.67 m/s². What is its weight there?",
+     "choices": [
+      {
+       "content": "1.7 N",
+       "is_correct": true
+      },
+      {
+       "content": "9.8 N",
+       "is_correct": false
+      },
+      {
+       "content": "1.0 N",
+       "is_correct": false
+      },
+      {
+       "content": "0.17 N",
+       "is_correct": false
+      }
+     ],
+     "explanation": "Weight is W = mg. On the moon, g = 1.67 m/s², so W = 1.0 kg × 1.67 m/s² = 1.67 N, which is about 1.7 N.",
+     "skill": "application",
+     "difficulty": "easy",
+     "requires_calculation": true,
+     "calculation": {
+      "expression": "1.0*1.67",
+      "expected": 1.67
+     },
+     "passed": true,
+     "gates": [
+      {
+       "Gate": "well_formed",
+       "Pass": true,
+       "Reason": "structurally sound",
+       "Deterministic": true
+      },
+      {
+       "Gate": "source_role",
+       "Pass": true,
+       "Reason": "chunk p142-c9, page 142 is usable source text",
+       "Deterministic": true
+      },
+      {
+       "Gate": "quote_verbatim",
+       "Pass": true,
+       "Reason": "verbatim in chunk p142-c9, page 142",
+       "Deterministic": true
+      },
+      {
+       "Gate": "arithmetic",
+       "Pass": true,
+       "Reason": "1.0*1.67 = 1.67, matches the correct choice",
+       "Deterministic": true
+      },
+      {
+       "Gate": "unit_check",
+       "Pass": true,
+       "Reason": "dimensionless or no source-stated unit declared",
+       "Deterministic": true
+      },
+      {
+       "Gate": "demand_contract",
+       "Pass": true,
+       "Reason": "no medium/hard application demand contract required",
+       "Deterministic": true
+      },
+      {
+       "Gate": "coverage_contract",
+       "Pass": true,
+       "Reason": "slot S05 uses atom A041 from chunk p142-c9",
+       "Deterministic": true
+      },
+      {
+       "Gate": "not_a_duplicate",
+       "Pass": true,
+       "Reason": "distinct from the questions already accepted",
+       "Deterministic": true
+      }
+     ],
+     "source_quote": "Because weight depends on the force of gravity, a 1.0-kg mass weighs 9.8 N on Earth and only about 1.7 N on the moon."
+    }
+   ]
+  }
+ ],
+ "thai-biology": [
+  {
+   "name": "application-easy",
+   "accepted": 4,
+   "drafts": 4,
+   "questions": [
+    {
+     "stem": "ถ้านักเรียนเคี้ยวข้าวเหนียวชิ้นใหญ่ให้แตกเป็นชิ้นเล็ก ๆ ก่อนกลืน การย่อยแป้งด้วยอะไมเลสในน้ำลายจะเกิดได้ดีกว่าเดิม เพราะเหตุใด",
+     "choices": [
+      {
+       "content": "ชิ้นเล็ก ๆ มีพื้นที่ผิวสัมผัสกับเอนไซม์มากขึ้น",
+       "is_correct": true
+      },
+      {
+       "content": "ชิ้นเล็ก ๆ มีโมเลกุลแป้งเล็กลงโดยตรง",
+       "is_correct": false
+      },
+      {
+       "content": "ชิ้นเล็ก ๆ ทำให้อะไมเลสทำงานเร็วขึ้นเพราะมีน้ำมากขึ้น",
+       "is_correct": false
+      },
+      {
+       "content": "ชิ้นเล็ก ๆ ทำให้ลิ้นดันอาหารเข้าหาฟันได้ดีขึ้น",
+       "is_correct": false
+      }
+     ],
+     "explanation": "การบดเคี้ยวทำให้อาหารมีขนาดเล็กลง ส่งผลให้พื้นที่ผิวสัมผัสกับเอนไซม์มากขึ้น จึงย่อยได้ดีขึ้น",
+     "skill": "application",
+     "difficulty": "easy",
+     "requires_calculation": false,
+     "calculation": null,
+     "passed": true,
+     "gates": [
+      {
+       "Gate": "well_formed",
+       "Pass": true,
+       "Reason": "structurally sound",
+       "Deterministic": true
+      },
+      {
+       "Gate": "source_role",
+       "Pass": true,
+       "Reason": "chunk p32-c43, page 32 is usable source text",
+       "Deterministic": true
+      },
+      {
+       "Gate": "quote_verbatim",
+       "Pass": true,
+       "Reason": "verbatim in chunk p32-c43, page 32",
+       "Deterministic": true
+      },
+      {
+       "Gate": "arithmetic",
+       "Pass": true,
+       "Reason": "no arithmetic in this question",
+       "Deterministic": true
+      },
+      {
+       "Gate": "unit_check",
+       "Pass": true,
+       "Reason": "no arithmetic in this question",
+       "Deterministic": true
+      },
+      {
+       "Gate": "demand_contract",
+       "Pass": true,
+       "Reason": "no medium/hard application demand contract required",
+       "Deterministic": true
+      },
+      {
+       "Gate": "coverage_contract",
+       "Pass": true,
+       "Reason": "slot S01 uses atom A079 from chunk p32-c43",
+       "Deterministic": true
+      },
+      {
+       "Gate": "not_a_duplicate",
+       "Pass": true,
+       "Reason": "distinct from the questions already accepted",
+       "Deterministic": true
+      }
+     ],
+     "source_quote": "ฟันทำ หน้าที่บดเคี้ยวอาหารให้มีขนาดเล็กลงทำ ให้พื้นที่ผิวของอาหารที่จะสัมผัสกับเอนไซม์มี มากขึ้น"
+    },
+    {
+     "stem": "ขณะที่กำลังกลืนอาหาร ถ้านักเรียนพูดคุยกับเพื่อนพร้อมกัน โอกาสที่อาหารจะเข้าไปในท่อลมจะเป็นอย่างไร",
+     "choices": [
+      {
+       "content": "มีโอกาสสูงขึ้น เพราะฝาปิดกล่องเสียงปิดไม่สนิท",
+       "is_correct": true
+      },
+      {
+       "content": "ไม่มีผล เพราะฝาปิดกล่องเสียงยังปิดสนิทตลอดเวลา",
+       "is_correct": false
+      },
+      {
+       "content": "มีโอกาสสูงขึ้น เพราะลิ้นไก่เปิดช่องให้อาหารผ่านเข้าไป",
+       "is_correct": false
+      },
+      {
+       "content": "ไม่มีผล เพราะอาหารจะถูกบังคับให้ไปทางหลอดอาหารเสมอ",
+       "is_correct": false
+      }
+     ],
+     "explanation": "การพูดคุยขณะกลืนทำให้ฝาปิดกล่องเสียงปิดไม่สนิท อาหารจึงอาจตกลงไปในกล่องเสียงและท่อลมได้",
+     "skill": "application",
+     "difficulty": "easy",
+     "requires_calculation": false,
+     "calculation": null,
+     "passed": true,
+     "gates": [
+      {
+       "Gate": "well_formed",
+       "Pass": true,
+       "Reason": "structurally sound",
+       "Deterministic": true
+      },
+      {
+       "Gate": "source_role",
+       "Pass": true,
+       "Reason": "chunk p32-c43, page 32 is usable source text",
+       "Deterministic": true
+      },
+      {
+       "Gate": "quote_verbatim",
+       "Pass": true,
+       "Reason": "verbatim in chunk p32-c43, page 32",
+       "Deterministic": true
+      },
+      {
+       "Gate": "arithmetic",
+       "Pass": true,
+       "Reason": "no arithmetic in this question",
+       "Deterministic": true
+      },
+      {
+       "Gate": "unit_check",
+       "Pass": true,
+       "Reason": "no arithmetic in this question",
+       "Deterministic": true
+      },
+      {
+       "Gate": "demand_contract",
+       "Pass": true,
+       "Reason": "no medium/hard application demand contract required",
+       "Deterministic": true
+      },
+      {
+       "Gate": "coverage_contract",
+       "Pass": true,
+       "Reason": "slot S02 uses atom A082 from chunk p32-c43",
+       "Deterministic": true
+      },
+      {
+       "Gate": "not_a_duplicate",
+       "Pass": true,
+       "Reason": "distinct from the questions already accepted",
+       "Deterministic": true
+      }
+     ],
+     "source_quote": "อาหารอาจตกลงไปในกล่องเสียงและท่อลม หรือขึ้นไปที่โพรงจมูกได้เพราะขณะที่หัวเราะ หรือ พูดคุยนั้นฝาปิดกล่องเสียงจะปิดกล่องเสียงไม่สนิท"
+    },
+    {
+     "stem": "ถ้าเด็กคนหนึ่งกลืนลูกอมเม็ดใหญ่แล้วลูกอมตกลงไปในท่อลมและอุดตันไว้ ผลที่อาจเกิดขึ้นตามข้อความในบทเรียนคืออะไร",
+     "choices": [
+      {
+       "content": "อาจทำให้เป็นอัมพาตได้",
+       "is_correct": true
+      },
+      {
+       "content": "อาจทำให้อาหารขึ้นไปในโพรงจมูก",
+       "is_correct": false
+      },
+      {
+       "content": "อาจทำให้เกิดการติดเชื้อในกระเพาะอาหาร",
+       "is_correct": false
+      },
+      {
+       "content": "อาจทำให้เกิดการย่อยอาหารช้าลง",
+       "is_correct": false
+      }
+     ],
+     "explanation": "อาหารขนาดใหญ่ที่ตกลงไปในท่อลมอาจไปอุดตัน ทำให้เป็นอัมพาตได้",
+     "skill": "application",
+     "difficulty": "easy",
+     "requires_calculation": false,
+     "calculation": null,
+     "passed": true,
+     "gates": [
+      {
+       "Gate": "well_formed",
+       "Pass": true,
+       "Reason": "structurally sound",
+       "Deterministic": true
+      },
+      {
+       "Gate": "source_role",
+       "Pass": true,
+       "Reason": "chunk p32-c44, page 32 is usable source text",
+       "Deterministic": true
+      },
+      {
+       "Gate": "quote_verbatim",
+       "Pass": true,
+       "Reason": "verbatim in chunk p32-c44, page 32",
+       "Deterministic": true
+      },
+      {
+       "Gate": "arithmetic",
+       "Pass": true,
+       "Reason": "no arithmetic in this question",
+       "Deterministic": true
+      },
+      {
+       "Gate": "unit_check",
+       "Pass": true,
+       "Reason": "no arithmetic in this question",
+       "Deterministic": true
+      },
+      {
+       "Gate": "demand_contract",
+       "Pass": true,
+       "Reason": "no medium/hard application demand contract required",
+       "Deterministic": true
+      },
+      {
+       "Gate": "coverage_contract",
+       "Pass": true,
+       "Reason": "slot S03 uses atom A083 from chunk p32-c44",
+       "Deterministic": true
+      },
+      {
+       "Gate": "not_a_duplicate",
+       "Pass": true,
+       "Reason": "distinct from the questions already accepted",
+       "Deterministic": true
+      }
+     ],
+     "source_quote": "ถ้าอาหารตกลงไปในท่อลมอาจทำ ให้เกิด การสำ ลักหรือถ้าอาหารมีขนาดใหญ่ อาจไปอุดตันทำ ให้เป็นอัมพาตได้"
+    },
+    {
+     "stem": "ขณะรับประทานอาหาร ถ้าเกิดอาการสำลักจนมีเศษอาหารออกมาทางจมูก สาเหตุโดยตรงคืออะไร",
+     "choices": [
+      {
+       "content": "ลิ้นไก่และเพดานอ่อนไม่ปิดกั้นทางติดต่อระหว่างคอหอยกับโพรงจมูก",
+       "is_correct": true
+      },
+      {
+       "content": "ฝาปิดกล่องเสียงเปิดค้างไว้ทำให้อาหารดันขึ้นข้างบน",
+       "is_correct": false
+      },
+      {
+       "content": "ลิ้นดันอาหารแรงเกินไปจนขึ้นไปทางจมูก",
+       "is_correct": false
+      },
+      {
+       "content": "หลอดอาหารหดตัวผิดปกติทำให้อาหารไหลย้อนขึ้นไป",
+       "is_correct": false
+      }
+     ],
+     "explanation": "เมื่อลิ้นไก่และเพดานอ่อนไม่ปิดกั้นทางติดต่อระหว่างคอหอยกับโพรงจมูก อาหารจากช่องปากจึงขึ้นไปในโพรงจมูกได้",
+     "skill": "application",
+     "difficulty": "easy",
+     "requires_calculation": false,
+     "calculation": null,
+     "passed": true,
+     "gates": [
+      {
+       "Gate": "well_formed",
+       "Pass": true,
+       "Reason": "structurally sound",
+       "Deterministic": true
+      },
+      {
+       "Gate": "source_role",
+       "Pass": true,
+       "Reason": "chunk p32-c44, page 32 is usable source text",
+       "Deterministic": true
+      },
+      {
+       "Gate": "quote_verbatim",
+       "Pass": true,
+       "Reason": "verbatim in chunk p32-c44, page 32",
+       "Deterministic": true
+      },
+      {
+       "Gate": "arithmetic",
+       "Pass": true,
+       "Reason": "no arithmetic in this question",
+       "Deterministic": true
+      },
+      {
+       "Gate": "unit_check",
+       "Pass": true,
+       "Reason": "no arithmetic in this question",
+       "Deterministic": true
+      },
+      {
+       "Gate": "demand_contract",
+       "Pass": true,
+       "Reason": "no medium/hard application demand contract required",
+       "Deterministic": true
+      },
+      {
+       "Gate": "coverage_contract",
+       "Pass": true,
+       "Reason": "slot S04 uses atom A084 from chunk p32-c44",
+       "Deterministic": true
+      },
+      {
+       "Gate": "not_a_duplicate",
+       "Pass": true,
+       "Reason": "distinct from the questions already accepted",
+       "Deterministic": true
+      }
+     ],
+     "source_quote": "เพราะลิ้นไก่และเพดานอ่อนไม่ปิดกั้นทางติดต่อระหว่างคอหอยกับโพรงจมูก ทำ ให้อาหารจาก ช่องปากขึ้นไปในโพรงจมูก"
+    }
+   ]
+  },
+  {
+   "name": "application-medium",
+   "accepted": 4,
+   "drafts": 4,
+   "questions": [
+    {
+     "stem": "ถ้านักเรียนเคี้ยวข้าวเหนียวชิ้นใหญ่จนแตกเป็นชิ้นเล็กๆ ก่อนกลืน การกระทำนี้ช่วยให้การย่อยแป้งในช่องปากมีประสิทธิภาพมากขึ้นเพราะเหตุใด",
+     "choices": [
+      {
+       "content": "เพราะฟันบดเคี้ยวทำให้พื้นที่ผิวของอาหารสัมผัสกับเอนไซม์อะไมเลสได้มากขึ้น",
+       "is_correct": true
+      },
+      {
+       "content": "เพราะฟันบดเคี้ยวทำให้โมเลกุลของแป้งถูกสลายเป็นน้ำตาลโมเลกุลเดี่ยวทันที",
+       "is_correct": false
+      },
+      {
+       "content": "เพราะฟันบดเคี้ยวทำให้น้ำลายถูกผลิตมากขึ้นเพื่อย่อยอาหารได้เร็วขึ้น",
+       "is_correct": false
+      },
+      {
+       "content": "เพราะฟันบดเคี้ยวทำให้อาหารเคลื่อนผ่านหลอดอาหารได้เร็วขึ้น",
+       "is_correct": false
+      }
+     ],
+     "explanation": "การบดเคี้ยวทำให้อาหารมีขนาดเล็กลง ส่งผลให้พื้นที่ผิวสัมผัสกับเอนไซม์มากขึ้น การย่อยจึงมีประสิทธิภาพมากขึ้น",
+     "skill": "application",
+     "difficulty": "medium",
+     "requires_calculation": false,
+     "calculation": null,
+     "passed": true,
+     "gates": [
+      {
+       "Gate": "well_formed",
+       "Pass": true,
+       "Reason": "structurally sound",
+       "Deterministic": true
+      },
+      {
+       "Gate": "source_role",
+       "Pass": true,
+       "Reason": "chunk p32-c43, page 32 is usable source text",
+       "Deterministic": true
+      },
+      {
+       "Gate": "quote_verbatim",
+       "Pass": true,
+       "Reason": "verbatim in chunk p32-c43, page 32",
+       "Deterministic": true
+      },
+      {
+       "Gate": "arithmetic",
+       "Pass": true,
+       "Reason": "no arithmetic in this question",
+       "Deterministic": true
+      },
+      {
+       "Gate": "unit_check",
+       "Pass": true,
+       "Reason": "no arithmetic in this question",
+       "Deterministic": true
+      },
+      {
+       "Gate": "demand_contract",
+       "Pass": true,
+       "Reason": "medium application demand contract is present",
+       "Deterministic": true
+      },
+      {
+       "Gate": "coverage_contract",
+       "Pass": true,
+       "Reason": "slot S01 uses atom A079 from chunk p32-c43",
+       "Deterministic": true
+      },
+      {
+       "Gate": "not_a_duplicate",
+       "Pass": true,
+       "Reason": "distinct from the questions already accepted",
+       "Deterministic": true
+      }
+     ],
+     "source_quote": "ฟันทำ หน้าที่บดเคี้ยวอาหารให้มีขนาดเล็กลงทำ ให้พื้นที่ผิวของอาหารที่จะสัมผัสกับเอนไซม์มี มากขึ้น"
+    },
+    {
+     "stem": "ขณะที่กำลังกลืนอาหาร ถ้านักเรียนพูดคุยกับเพื่อนพร้อมกัน โอกาสที่อาหารจะตกลงไปในท่อลมจะเพิ่มขึ้นเพราะสาเหตุใด",
+     "choices": [
+      {
+       "content": "เพราะฝาปิดกล่องเสียงปิดไม่สนิทในขณะที่พูดคุย",
+       "is_correct": true
+      },
+      {
+       "content": "เพราะลิ้นไม่สามารถดันอาหารไปยังคอหอยได้ในขณะที่พูด",
+       "is_correct": false
+      },
+      {
+       "content": "เพราะหลอดอาหารหดตัวไม่เป็นจังหวะในขณะที่พูด",
+       "is_correct": false
+      },
+      {
+       "content": "เพราะเพดานอ่อนปิดกั้นช่องทางไปยังโพรงจมูกสนิทเกินไป",
+       "is_correct": false
+      }
+     ],
+     "explanation": "การพูดคุยทำให้ฝาปิดกล่องเสียงปิดไม่สนิท จึงเปิดโอกาสให้อาหารตกลงไปในท่อลมได้",
+     "skill": "application",
+     "difficulty": "medium",
+     "requires_calculation": false,
+     "calculation": null,
+     "passed": true,
+     "gates": [
+      {
+       "Gate": "well_formed",
+       "Pass": true,
+       "Reason": "structurally sound",
+       "Deterministic": true
+      },
+      {
+       "Gate": "source_role",
+       "Pass": true,
+       "Reason": "chunk p32-c43, page 32 is usable source text",
+       "Deterministic": true
+      },
+      {
+       "Gate": "quote_verbatim",
+       "Pass": true,
+       "Reason": "verbatim in chunk p32-c43, page 32",
+       "Deterministic": true
+      },
+      {
+       "Gate": "arithmetic",
+       "Pass": true,
+       "Reason": "no arithmetic in this question",
+       "Deterministic": true
+      },
+      {
+       "Gate": "unit_check",
+       "Pass": true,
+       "Reason": "no arithmetic in this question",
+       "Deterministic": true
+      },
+      {
+       "Gate": "demand_contract",
+       "Pass": true,
+       "Reason": "medium application demand contract is present",
+       "Deterministic": true
+      },
+      {
+       "Gate": "coverage_contract",
+       "Pass": true,
+       "Reason": "slot S02 uses atom A082 from chunk p32-c43",
+       "Deterministic": true
+      },
+      {
+       "Gate": "not_a_duplicate",
+       "Pass": true,
+       "Reason": "distinct from the questions already accepted",
+       "Deterministic": true
+      }
+     ],
+     "source_quote": "อาหารอาจตกลงไปในกล่องเสียงและท่อลม หรือขึ้นไปที่โพรงจมูกได้เพราะขณะที่หัวเราะ หรือ พูดคุยนั้นฝาปิดกล่องเสียงจะปิดกล่องเสียงไม่สนิท"
+    },
+    {
+     "stem": "ถ้าชิ้นเนื้อชิ้นใหญ่หลุดลงไปในท่อลมของนักเรียนโดยไม่ได้ตั้งใจ ผลที่อาจเกิดขึ้นตามข้อความที่เรียนคืออะไร",
+     "choices": [
+      {
+       "content": "อาจเกิดการสำลักหรืออาจไปอุดตันทำให้เป็นอัมพาตได้",
+       "is_correct": true
+      },
+      {
+       "content": "อาจทำให้เกิดการติดเชื้อในกระเพาะอาหาร",
+       "is_correct": false
+      },
+      {
+       "content": "อาจทำให้เกิดการย่อยอาหารในปอด",
+       "is_correct": false
+      },
+      {
+       "content": "อาจทำให้เกิดการกลืนลำบากชั่วคราวเท่านั้น",
+       "is_correct": false
+      }
+     ],
+     "explanation": "อาหารที่ตกลงไปในท่อลมอาจทำให้สำลัก และถ้ามีขนาดใหญ่ก็อาจไปอุดตันทำให้เป็นอัมพาตได้",
+     "skill": "application",
+     "difficulty": "medium",
+     "requires_calculation": false,
+     "calculation": null,
+     "passed": true,
+     "gates": [
+      {
+       "Gate": "well_formed",
+       "Pass": true,
+       "Reason": "structurally sound",
+       "Deterministic": true
+      },
+      {
+       "Gate": "source_role",
+       "Pass": true,
+       "Reason": "chunk p32-c44, page 32 is usable source text",
+       "Deterministic": true
+      },
+      {
+       "Gate": "quote_verbatim",
+       "Pass": true,
+       "Reason": "verbatim in chunk p32-c44, page 32",
+       "Deterministic": true
+      },
+      {
+       "Gate": "arithmetic",
+       "Pass": true,
+       "Reason": "no arithmetic in this question",
+       "Deterministic": true
+      },
+      {
+       "Gate": "unit_check",
+       "Pass": true,
+       "Reason": "no arithmetic in this question",
+       "Deterministic": true
+      },
+      {
+       "Gate": "demand_contract",
+       "Pass": true,
+       "Reason": "medium application demand contract is present",
+       "Deterministic": true
+      },
+      {
+       "Gate": "coverage_contract",
+       "Pass": true,
+       "Reason": "slot S03 uses atom A083 from chunk p32-c44",
+       "Deterministic": true
+      },
+      {
+       "Gate": "not_a_duplicate",
+       "Pass": true,
+       "Reason": "distinct from the questions already accepted",
+       "Deterministic": true
+      }
+     ],
+     "source_quote": "ถ้าอาหารตกลงไปในท่อลมอาจทำ ให้เกิด การสำ ลักหรือถ้าอาหารมีขนาดใหญ่ อาจไปอุดตันทำ ให้เป็นอัมพาตได้"
+    },
+    {
+     "stem": "นักเรียนกำลังรับประทานข้าวและเกิดอาการสำลักจนมีเศษข้าวออกมาทางจมูก เหตุการณ์นี้เกิดขึ้นได้เพราะสาเหตุใด",
+     "choices": [
+      {
+       "content": "เพราะลิ้นไก่และเพดานอ่อนไม่ปิดกั้นทางติดต่อระหว่างคอหอยกับโพรงจมูก",
+       "is_correct": true
+      },
+      {
+       "content": "เพราะฝาปิดกล่องเสียงเปิดค้างไว้ทำให้อาหารไหลย้อนขึ้นจมูก",
+       "is_correct": false
+      },
+      {
+       "content": "เพราะหลอดอาหารหดตัวผิดปกติทำให้อาหารไหลย้อนขึ้นจมูก",
+       "is_correct": false
+      },
+      {
+       "content": "เพราะลิ้นดันอาหารแรงเกินไปจนอาหารกระเด็นขึ้นจมูก",
+       "is_correct": false
+      }
+     ],
+     "explanation": "เมื่อลิ้นไก่และเพดานอ่อนไม่ปิดกั้นทางติดต่อระหว่างคอหอยกับโพรงจมูก อาหารจากช่องปากจึงสามารถขึ้นไปในโพรงจมูกได้",
+     "skill": "application",
+     "difficulty": "medium",
+     "requires_calculation": false,
+     "calculation": null,
+     "passed": true,
+     "gates": [
+      {
+       "Gate": "well_formed",
+       "Pass": true,
+       "Reason": "structurally sound",
+       "Deterministic": true
+      },
+      {
+       "Gate": "source_role",
+       "Pass": true,
+       "Reason": "chunk p32-c44, page 32 is usable source text",
+       "Deterministic": true
+      },
+      {
+       "Gate": "quote_verbatim",
+       "Pass": true,
+       "Reason": "verbatim in chunk p32-c44, page 32",
+       "Deterministic": true
+      },
+      {
+       "Gate": "arithmetic",
+       "Pass": true,
+       "Reason": "no arithmetic in this question",
+       "Deterministic": true
+      },
+      {
+       "Gate": "unit_check",
+       "Pass": true,
+       "Reason": "no arithmetic in this question",
+       "Deterministic": true
+      },
+      {
+       "Gate": "demand_contract",
+       "Pass": true,
+       "Reason": "medium application demand contract is present",
+       "Deterministic": true
+      },
+      {
+       "Gate": "coverage_contract",
+       "Pass": true,
+       "Reason": "slot S04 uses atom A084 from chunk p32-c44",
+       "Deterministic": true
+      },
+      {
+       "Gate": "not_a_duplicate",
+       "Pass": true,
+       "Reason": "distinct from the questions already accepted",
+       "Deterministic": true
+      }
+     ],
+     "source_quote": "เพราะลิ้นไก่และเพดานอ่อนไม่ปิดกั้นทางติดต่อระหว่างคอหอยกับโพรงจมูก ทำ ให้อาหารจาก ช่องปากขึ้นไปในโพรงจมูก"
+    }
+   ]
+  },
+  {
+   "name": "application-hard",
+   "accepted": 3,
+   "drafts": 3,
+   "questions": [
+    {
+     "stem": "เมื่อรับประทานข้าวเหนียวคำใหญ่โดยไม่เคี้ยวให้ละเอียด แล้วกลืนลงไปทันที เมื่อเทียบกับการเคี้ยวข้าวเหนียวคำเดียวกันให้ละเอียดก่อนกลืน ข้อใดกล่าวถึงผลต่อการย่อยแป้งโดยอะไมเลสในช่องปากได้ถูกต้องที่สุด",
+     "choices": [
+      {
+       "content": "การเคี้ยวให้ละเอียดจะเพิ่มพื้นที่ผิวของอาหาร ทำให้อะไมเลสย่อยแป้งได้เร็วขึ้น",
+       "is_correct": true
+      },
+      {
+       "content": "การเคี้ยวให้ละเอียดจะทำให้อะไมเลสทำงานได้ดีขึ้น เพราะอะไมเลสจะถูกปล่อยออกมามากขึ้น",
+       "is_correct": false
+      },
+      {
+       "content": "การไม่เคี้ยวให้ละเอียดจะทำให้อะไมเลสไม่สามารถย่อยแป้งได้เลย เพราะแป้งยังมีขนาดใหญ่เกินไป",
+       "is_correct": false
+      },
+      {
+       "content": "การเคี้ยวให้ละเอียดจะทำให้อะไมเลสย่อยแป้งได้ช้าลง เพราะอาหารมีขนาดเล็กลงจนอะไมเลสจับกับแป้งได้น้อยลง",
+       "is_correct": false
+      }
+     ],
+     "explanation": "ฟันบดเคี้ยวอาหารให้มีขนาดเล็กลง ทำให้พื้นที่ผิวของอาหารที่จะสัมผัสกับเอนไซม์มีมากขึ้น ดังนั้นการเคี้ยวให้ละเอียดจะเพิ่มพื้นที่ผิว ทำให้อะไมเลสย่อยแป้งได้เร็วขึ้น",
+     "skill": "application",
+     "difficulty": "hard",
+     "requires_calculation": false,
+     "calculation": null,
+     "passed": true,
+     "gates": [
+      {
+       "Gate": "well_formed",
+       "Pass": true,
+       "Reason": "structurally sound",
+       "Deterministic": true
+      },
+      {
+       "Gate": "source_role",
+       "Pass": true,
+       "Reason": "chunk p32-c43, page 32 is usable source text",
+       "Deterministic": true
+      },
+      {
+       "Gate": "quote_verbatim",
+       "Pass": true,
+       "Reason": "verbatim in chunk p32-c43, page 32",
+       "Deterministic": true
+      },
+      {
+       "Gate": "arithmetic",
+       "Pass": true,
+       "Reason": "no arithmetic in this question",
+       "Deterministic": true
+      },
+      {
+       "Gate": "unit_check",
+       "Pass": true,
+       "Reason": "no arithmetic in this question",
+       "Deterministic": true
+      },
+      {
+       "Gate": "demand_contract",
+       "Pass": true,
+       "Reason": "hard application demand contract is present",
+       "Deterministic": true
+      },
+      {
+       "Gate": "coverage_contract",
+       "Pass": true,
+       "Reason": "slot S01 uses atom A079 from chunk p32-c43",
+       "Deterministic": true
+      },
+      {
+       "Gate": "not_a_duplicate",
+       "Pass": true,
+       "Reason": "distinct from the questions already accepted",
+       "Deterministic": true
+      }
+     ],
+     "source_quote": "ฟันทำ หน้าที่บดเคี้ยวอาหารให้มีขนาดเล็กลงทำ ให้พื้นที่ผิวของอาหารที่จะสัมผัสกับเอนไซม์มี มากขึ้น"
+    },
+    {
+     "stem": "ขณะรับประทานอาหารเย็นกับครอบครัว มีคนเล่าเรื่องตลกจนคุณหัวเราะออกมาในขณะที่กำลังเคี้ยวและกลืนอาหาร ทำให้เกิดอาการสำลักและมีเศษอาหารบางส่วนออกมาทางจมูก ข้อใดอธิบายกลไกที่ทำให้เกิดเหตุการณ์นี้ได้ถูกต้องที่สุด",
+     "choices": [
+      {
+       "content": "ขณะหัวเราะ ฝาปิดกล่องเสียงปิดไม่สนิท และลิ้นไก่กับเพดานอ่อนก็ปิดช่องทางไปโพรงจมูกไม่สนิท ทำให้อาหารเคลื่อนไปผิดทางทั้งสองทาง",
+       "is_correct": true
+      },
+      {
+       "content": "ขณะหัวเราะ ฝาปิดกล่องเสียงเปิดกว้างเพื่อให้อากาศผ่านได้สะดวก ทำให้อาหารตกลงไปในหลอดลมได้ง่าย",
+       "is_correct": false
+      },
+      {
+       "content": "ขณะหัวเราะ ลิ้นไก่และเพดานอ่อนปิดสนิทเพื่อป้องกันอาหารเข้าจมูก แต่ฝาปิดกล่องเสียงยังเปิดอยู่ ทำให้อาหารเข้าหลอดลม",
+       "is_correct": false
+      },
+      {
+       "content": "ขณะหัวเราะ กล้ามเนื้อหลอดอาหารหดตัวผิดจังหวะ ทำให้อาหารไหลย้อนกลับขึ้นไปทางจมูก",
+       "is_correct": false
+      }
+     ],
+     "explanation": "การหัวเราะหรือพูดคุยขณะกลืนอาหารทำให้ฝาปิดกล่องเสียงปิดไม่สนิท และลิ้นไก่กับเพดานอ่อนปิดช่องทางไปโพรงจมูกไม่สนิท จึงทำให้อาหารอาจตกลงไปในกล่องเสียงและท่อลม หรือขึ้นไปที่โพรงจมูกได้",
+     "skill": "application",
+     "difficulty": "hard",
+     "requires_calculation": false,
+     "calculation": null,
+     "passed": true,
+     "gates": [
+      {
+       "Gate": "well_formed",
+       "Pass": true,
+       "Reason": "structurally sound",
+       "Deterministic": true
+      },
+      {
+       "Gate": "source_role",
+       "Pass": true,
+       "Reason": "chunk p32-c43, page 32 is usable source text",
+       "Deterministic": true
+      },
+      {
+       "Gate": "quote_verbatim",
+       "Pass": true,
+       "Reason": "verbatim in chunk p32-c43, page 32",
+       "Deterministic": true
+      },
+      {
+       "Gate": "arithmetic",
+       "Pass": true,
+       "Reason": "no arithmetic in this question",
+       "Deterministic": true
+      },
+      {
+       "Gate": "unit_check",
+       "Pass": true,
+       "Reason": "no arithmetic in this question",
+       "Deterministic": true
+      },
+      {
+       "Gate": "demand_contract",
+       "Pass": true,
+       "Reason": "hard application demand contract is present",
+       "Deterministic": true
+      },
+      {
+       "Gate": "coverage_contract",
+       "Pass": true,
+       "Reason": "slot S02 uses atom A082 from chunk p32-c43",
+       "Deterministic": true
+      },
+      {
+       "Gate": "not_a_duplicate",
+       "Pass": true,
+       "Reason": "distinct from the questions already accepted",
+       "Deterministic": true
+      }
+     ],
+     "source_quote": "อาหารอาจตกลงไปในกล่องเสียงและท่อลม หรือขึ้นไปที่โพรงจมูกได้เพราะขณะที่หัวเราะ หรือ พูดคุยนั้นฝาปิดกล่องเสียงจะปิดกล่องเสียงไม่สนิท และเป็นจังหวะที่ลิ้นไก่และเพดานอ่อน ปิดช่องทางติดต่อกับโพรง"
+    },
+    {
+     "stem": "เด็กชาย ก กลืนลูกอมทั้งเม็ดโดยไม่เคี้ยว แล้วเกิดอาการสำลักและมีลูกอมติดอยู่ในลำคอ หายใจไม่ออก ข้อใดอธิบายผลที่อาจเกิดขึ้นตามมาได้ถูกต้องที่สุด",
+     "choices": [
+      {
+       "content": "ลูกอมอาจตกลงไปในท่อลม ทำให้เกิดการสำลัก และเนื่องจากลูกอมมีขนาดใหญ่ อาจไปอุดตันทางเดินหายใจจนเป็นอันตรายถึงชีวิตได้",
+       "is_correct": true
+      },
+      {
+       "content": "ลูกอมจะถูกเพอริสตัลซิสผลักลงสู่กระเพาะอาหารได้เองโดยไม่ติดขัด เพราะหลอดอาหารมีการบีบตัวแรงพอ",
+       "is_correct": false
+      },
+      {
+       "content": "ลูกอมจะละลายในน้ำลายจนมีขนาดเล็กลง แล้วจึงกลืนลงไปได้โดยไม่เกิดอันตราย",
+       "is_correct": false
+      },
+      {
+       "content": "ลูกอมจะถูกขับออกทางจมูกเนื่องจากลิ้นไก่และเพดานอ่อนเปิดช่องทางให้",
+       "is_correct": false
+      }
+     ],
+     "explanation": "ถ้าอาหารตกลงไปในท่อลมอาจทำให้เกิดการสำลัก และถ้าอาหารมีขนาดใหญ่ อาจไปอุดตันทำให้เป็นอัมพาตได้ ดังนั้นลูกอมทั้งเม็ดที่ตกลงไปในท่อลมอาจทำให้สำลักและอุดตันทางเดินหายใจ",
+     "skill": "application",
+     "difficulty": "hard",
+     "requires_calculation": false,
+     "calculation": null,
+     "passed": true,
+     "gates": [
+      {
+       "Gate": "well_formed",
+       "Pass": true,
+       "Reason": "structurally sound",
+       "Deterministic": true
+      },
+      {
+       "Gate": "source_role",
+       "Pass": true,
+       "Reason": "chunk p32-c44, page 32 is usable source text",
+       "Deterministic": true
+      },
+      {
+       "Gate": "quote_verbatim",
+       "Pass": true,
+       "Reason": "verbatim in chunk p32-c44, page 32",
+       "Deterministic": true
+      },
+      {
+       "Gate": "arithmetic",
+       "Pass": true,
+       "Reason": "no arithmetic in this question",
+       "Deterministic": true
+      },
+      {
+       "Gate": "unit_check",
+       "Pass": true,
+       "Reason": "no arithmetic in this question",
+       "Deterministic": true
+      },
+      {
+       "Gate": "demand_contract",
+       "Pass": true,
+       "Reason": "hard application demand contract is present",
+       "Deterministic": true
+      },
+      {
+       "Gate": "coverage_contract",
+       "Pass": true,
+       "Reason": "slot S03 uses atom A083 from chunk p32-c44",
+       "Deterministic": true
+      },
+      {
+       "Gate": "not_a_duplicate",
+       "Pass": true,
+       "Reason": "distinct from the questions already accepted",
+       "Deterministic": true
+      }
+     ],
+     "source_quote": "ถ้าอาหารตกลงไปในท่อลมอาจทำ ให้เกิด การสำ ลักหรือถ้าอาหารมีขนาดใหญ่ อาจไปอุดตันทำ ให้เป็นอัมพาตได้"
+    }
+   ]
+  },
+  {
+   "name": "calculation",
+   "accepted": 0,
+   "drafts": 0,
+   "questions": []
+  }
+ ],
+ "algebra": [
+  {
+   "name": "application-easy",
+   "accepted": 5,
+   "drafts": 5,
+   "questions": [
+    {
+     "stem": "A student simplifies the expression (x^3)^2 and writes x^5. Which rule should have been used, and what is the correct exponent?",
+     "choices": [
+      {
+       "content": "Power rule; the exponents should be multiplied, giving x^6",
+       "is_correct": true
+      },
+      {
+       "content": "Product rule; the exponents should be added, giving x^5",
+       "is_correct": false
+      },
+      {
+       "content": "Power rule; the exponents should be added, giving x^5",
+       "is_correct": false
+      },
+      {
+       "content": "Product rule; the exponents should be multiplied, giving x^6",
+       "is_correct": false
+      }
+     ],
+     "explanation": "The expression (x^3)^2 is a power raised to a power, so the power rule applies and the exponents are multiplied: 3 × 2 = 6, giving x^6.",
+     "skill": "application",
+     "difficulty": "easy",
+     "requires_calculation": false,
+     "calculation": null,
+     "passed": true,
+     "gates": [
+      {
+       "Gate": "well_formed",
+       "Pass": true,
+       "Reason": "structurally sound",
+       "Deterministic": true
+      },
+      {
+       "Gate": "source_role",
+       "Pass": true,
+       "Reason": "chunk p35-c14, page 35 is usable source text",
+       "Deterministic": true
+      },
+      {
+       "Gate": "quote_verbatim",
+       "Pass": true,
+       "Reason": "verbatim in chunk p35-c14, page 35",
+       "Deterministic": true
+      },
+      {
+       "Gate": "arithmetic",
+       "Pass": true,
+       "Reason": "no arithmetic in this question",
+       "Deterministic": true
+      },
+      {
+       "Gate": "unit_check",
+       "Pass": true,
+       "Reason": "no arithmetic in this question",
+       "Deterministic": true
+      },
+      {
+       "Gate": "demand_contract",
+       "Pass": true,
+       "Reason": "no medium/hard application demand contract required",
+       "Deterministic": true
+      },
+      {
+       "Gate": "coverage_contract",
+       "Pass": true,
+       "Reason": "slot S01 uses atom A026 from chunk p35-c14",
+       "Deterministic": true
+      },
+      {
+       "Gate": "not_a_duplicate",
+       "Pass": true,
+       "Reason": "distinct from the questions already accepted",
+       "Deterministic": true
+      }
+     ],
+     "source_quote": "When using the power rule, a term in exponential notation is raised to a power. In this case, you multiply the exponents."
+    },
+    {
+     "stem": "A calculator returns an error when evaluating 0^0. Based on the zero exponent rule, what is the value of 0^0?",
+     "choices": [
+      {
+       "content": "Undefined",
+       "is_correct": true
+      },
+      {
+       "content": "1",
+       "is_correct": false
+      },
+      {
+       "content": "0",
+       "is_correct": false
+      },
+      {
+       "content": "Infinity",
+       "is_correct": false
+      }
+     ],
+     "explanation": "The zero exponent rule states a^0 = 1 for any nonzero real number a, but the sole exception is 0^0, which is considered undefined.",
+     "skill": "application",
+     "difficulty": "easy",
+     "requires_calculation": false,
+     "calculation": null,
+     "passed": true,
+     "gates": [
+      {
+       "Gate": "well_formed",
+       "Pass": true,
+       "Reason": "structurally sound",
+       "Deterministic": true
+      },
+      {
+       "Gate": "source_role",
+       "Pass": true,
+       "Reason": "chunk p36-c15, page 36 is usable source text",
+       "Deterministic": true
+      },
+      {
+       "Gate": "quote_verbatim",
+       "Pass": true,
+       "Reason": "verbatim in chunk p36-c15, page 36",
+       "Deterministic": true
+      },
+      {
+       "Gate": "arithmetic",
+       "Pass": true,
+       "Reason": "no arithmetic in this question",
+       "Deterministic": true
+      },
+      {
+       "Gate": "unit_check",
+       "Pass": true,
+       "Reason": "no arithmetic in this question",
+       "Deterministic": true
+      },
+      {
+       "Gate": "demand_contract",
+       "Pass": true,
+       "Reason": "no medium/hard application demand contract required",
+       "Deterministic": true
+      },
+      {
+       "Gate": "coverage_contract",
+       "Pass": true,
+       "Reason": "slot S02 uses atom A031 from chunk p36-c15",
+       "Deterministic": true
+      },
+      {
+       "Gate": "not_a_duplicate",
+       "Pass": true,
+       "Reason": "distinct from the questions already accepted",
+       "Deterministic": true
+      }
+     ],
+     "source_quote": "The sole exception is the expression 00 . This appears later in more advanced courses, but for now, we will consider the value to be undefined."
+    },
+    {
+     "stem": "To simplify (a/b)^3, a student rewrites it as (a * b^(-1))^3 and then applies the power of a product rule. Which expression correctly shows the result?",
+     "choices": [
+      {
+       "content": "a^3 / b^3",
+       "is_correct": true
+      },
+      {
+       "content": "a^3 * b^3",
+       "is_correct": false
+      },
+      {
+       "content": "a^3 / b^(-3)",
+       "is_correct": false
+      },
+      {
+       "content": "a^3 * b^(-3)",
+       "is_correct": false
+      }
+     ],
+     "explanation": "Rewrite a/b as a * b^(-1). Then (a * b^(-1))^3 = a^3 * (b^(-1))^3 = a^3 * b^(-3) = a^3 / b^3. This matches the power of a quotient rule.",
+     "skill": "application",
+     "difficulty": "easy",
+     "requires_calculation": false,
+     "calculation": null,
+     "passed": true,
+     "gates": [
+      {
+       "Gate": "well_formed",
+       "Pass": true,
+       "Reason": "structurally sound",
+       "Deterministic": true
+      },
+      {
+       "Gate": "source_role",
+       "Pass": true,
+       "Reason": "chunk p39-c21, page 39 is usable source text",
+       "Deterministic": true
+      },
+      {
+       "Gate": "quote_verbatim",
+       "Pass": true,
+       "Reason": "verbatim in chunk p39-c21, page 39",
+       "Deterministic": true
+      },
+      {
+       "Gate": "arithmetic",
+       "Pass": true,
+       "Reason": "no arithmetic in this question",
+       "Deterministic": true
+      },
+      {
+       "Gate": "unit_check",
+       "Pass": true,
+       "Reason": "no arithmetic in this question",
+       "Deterministic": true
+      },
+      {
+       "Gate": "demand_contract",
+       "Pass": true,
+       "Reason": "no medium/hard application demand contract required",
+       "Deterministic": true
+      },
+      {
+       "Gate": "coverage_contract",
+       "Pass": true,
+       "Reason": "slot S03 uses atom A055 from chunk p39-c21",
+       "Deterministic": true
+      },
+      {
+       "Gate": "not_a_duplicate",
+       "Pass": true,
+       "Reason": "distinct from the questions already accepted",
+       "Deterministic": true
+      }
+     ],
+     "source_quote": "It appears from the last two steps that we can use the power of a product rule as a power of a quotient rule."
+    },
+    {
+     "stem": "Simplify the expression (√(2x))^7 / (√(2x))^2 using the quotient rule. What is the result?",
+     "choices": [
+      {
+       "content": "(√(2x))^5",
+       "is_correct": true
+      },
+      {
+       "content": "(√(2x))^9",
+       "is_correct": false
+      },
+      {
+       "content": "(√(2x))^14",
+       "is_correct": false
+      },
+      {
+       "content": "(√(2x))^3.5",
+       "is_correct": false
+      }
+     ],
+     "explanation": "The quotient rule subtracts exponents when dividing same bases: 7 - 2 = 5, so the result is (√(2x))^5.",
+     "skill": "application",
+     "difficulty": "easy",
+     "requires_calculation": false,
+     "calculation": null,
+     "passed": true,
+     "gates": [
+      {
+       "Gate": "well_formed",
+       "Pass": true,
+       "Reason": "structurally sound",
+       "Deterministic": true
+      },
+      {
+       "Gate": "source_role",
+       "Pass": true,
+       "Reason": "chunk p35-c13, page 35 is usable source text",
+       "Deterministic": true
+      },
+      {
+       "Gate": "quote_verbatim",
+       "Pass": true,
+       "Reason": "verbatim in chunk p35-c13, page 35",
+       "Deterministic": true
+      },
+      {
+       "Gate": "arithmetic",
+       "Pass": true,
+       "Reason": "no arithmetic in this question",
+       "Deterministic": true
+      },
+      {
+       "Gate": "unit_check",
+       "Pass": true,
+       "Reason": "no arithmetic in this question",
+       "Deterministic": true
+      },
+      {
+       "Gate": "demand_contract",
+       "Pass": true,
+       "Reason": "no medium/hard application demand contract required",
+       "Deterministic": true
+      },
+      {
+       "Gate": "coverage_contract",
+       "Pass": true,
+       "Reason": "slot S04 uses atom A022 from chunk p35-c13",
+       "Deterministic": true
+      },
+      {
+       "Gate": "not_a_duplicate",
+       "Pass": true,
+       "Reason": "distinct from the questions already accepted",
+       "Deterministic": true
+      }
+     ],
+     "source_quote": "b. t 23 __ t 15 ​ = t 23 − 15 = t8 c. ​ z√— 2 ​  5 ________ z√— 2 ​ ​ = ​​z√— 2 ​  5 − 1 = ​​z√— 2 ​  4"
+    },
+    {
+     "stem": "The distance from Earth to a star is 94,600,000,000,000,000 meters. To write this in scientific notation, you move the decimal point to the right of the first digit. What is the correct scientific notation?",
+     "choices": [
+      {
+       "content": "9.46 × 10^16",
+       "is_correct": true
+      },
+      {
+       "content": "9.46 × 10^15",
+       "is_correct": false
+      },
+      {
+       "content": "9.46 × 10^17",
+       "is_correct": false
+      },
+      {
+       "content": "9.46 × 10^14",
+       "is_correct": false
+      }
+     ],
+     "explanation": "Move the decimal point to the right of the first digit (9), giving 9.46. Count the places moved: the decimal moves 16 places to the left, so n = 16 and the exponent is positive because the number is very large.",
+     "skill": "application",
+     "difficulty": "easy",
+     "requires_calculation": false,
+     "calculation": null,
+     "passed": true,
+     "gates": [
+      {
+       "Gate": "well_formed",
+       "Pass": true,
+       "Reason": "structurally sound",
+       "Deterministic": true
+      },
+      {
+       "Gate": "source_role",
+       "Pass": true,
+       "Reason": "chunk p41-c25, page 41 is usable source text",
+       "Deterministic": true
+      },
+      {
+       "Gate": "quote_verbatim",
+       "Pass": true,
+       "Reason": "verbatim in chunk p41-c25, page 41",
+       "Deterministic": true
+      },
+      {
+       "Gate": "arithmetic",
+       "Pass": true,
+       "Reason": "no arithmetic in this question",
+       "Deterministic": true
+      },
+      {
+       "Gate": "unit_check",
+       "Pass": true,
+       "Reason": "no arithmetic in this question",
+       "Deterministic": true
+      },
+      {
+       "Gate": "demand_contract",
+       "Pass": true,
+       "Reason": "no medium/hard application demand contract required",
+       "Deterministic": true
+      },
+      {
+       "Gate": "coverage_contract",
+       "Pass": true,
+       "Reason": "slot S05 uses atom A060 from chunk p41-c25",
+       "Deterministic": true
+      },
+      {
+       "Gate": "not_a_duplicate",
+       "Pass": true,
+       "Reason": "distinct from the questions already accepted",
+       "Deterministic": true
+      }
+     ],
+     "source_quote": "To write a number in scientific notation, move the decimal point to the right of the first digit in the number. Write the digits as a decimal number between 1 and 10. Count the number of places n that you moved the decimal point. Multiply the decimal number by 10 raised to a power of n. If you moved the decimal left s in a very large number, n is positive."
+    }
+   ]
+  },
+  {
+   "name": "application-medium",
+   "accepted": 5,
+   "drafts": 7,
+   "questions": [
+    {
+     "stem": "A student simplifies the expression (x^3)^4 and writes x^7. Which rule did the student misuse, and what is the correct simplified form?",
+     "choices": [
+      {
+       "content": "The student used the product rule instead of the power rule; the correct form is x^12.",
+       "is_correct": true
+      },
+      {
+       "content": "The student used the power rule instead of the product rule; the correct form is x^7.",
+       "is_correct": false
+      },
+      {
+       "content": "The student used the product rule instead of the power rule; the correct form is x^81.",
+       "is_correct": false
+      },
+      {
+       "content": "The student used the power rule instead of the product rule; the correct form is x^12.",
+       "is_correct": false
+      }
+     ],
+     "explanation": "The expression (x^3)^4 is a power raised to a power, so the power rule applies: multiply the exponents, giving x^(3·4)=x^12. The student added the exponents (3+4=7), which is the product rule, but that rule applies only when multiplying same bases, not when raising a power to a power.",
+     "skill": "application",
+     "difficulty": "medium",
+     "requires_calculation": false,
+     "calculation": null,
+     "passed": true,
+     "gates": [
+      {
+       "Gate": "well_formed",
+       "Pass": true,
+       "Reason": "structurally sound",
+       "Deterministic": true
+      },
+      {
+       "Gate": "source_role",
+       "Pass": true,
+       "Reason": "chunk p35-c14, page 35 is usable source text",
+       "Deterministic": true
+      },
+      {
+       "Gate": "quote_verbatim",
+       "Pass": true,
+       "Reason": "verbatim in chunk p35-c14, page 35",
+       "Deterministic": true
+      },
+      {
+       "Gate": "arithmetic",
+       "Pass": true,
+       "Reason": "no arithmetic in this question",
+       "Deterministic": true
+      },
+      {
+       "Gate": "unit_check",
+       "Pass": true,
+       "Reason": "no arithmetic in this question",
+       "Deterministic": true
+      },
+      {
+       "Gate": "demand_contract",
+       "Pass": true,
+       "Reason": "medium application demand contract is present",
+       "Deterministic": true
+      },
+      {
+       "Gate": "coverage_contract",
+       "Pass": true,
+       "Reason": "slot S01 uses atom A026 from chunk p35-c14",
+       "Deterministic": true
+      },
+      {
+       "Gate": "not_a_duplicate",
+       "Pass": true,
+       "Reason": "distinct from the questions already accepted",
+       "Deterministic": true
+      }
+     ],
+     "source_quote": "When using the product rule, different terms with the same bases are raised to exponents. In this case, you add the exponents. When using the power rule, a term in exponential notation is raised to a power. In this case, you multiply the exponents."
+    },
+    {
+     "stem": "Which of the following expressions is undefined according to the zero exponent rule?",
+     "choices": [
+      {
+       "content": "0^0",
+       "is_correct": true
+      },
+      {
+       "content": "0^5",
+       "is_correct": false
+      },
+      {
+       "content": "5^0",
+       "is_correct": false
+      },
+      {
+       "content": "(-5)^0",
+       "is_correct": false
+      }
+     ],
+     "explanation": "The zero exponent rule states that any nonzero base raised to the zero power equals 1, but the sole exception is 0^0, which is undefined.",
+     "skill": "application",
+     "difficulty": "medium",
+     "requires_calculation": false,
+     "calculation": null,
+     "passed": true,
+     "gates": [
+      {
+       "Gate": "well_formed",
+       "Pass": true,
+       "Reason": "structurally sound",
+       "Deterministic": true
+      },
+      {
+       "Gate": "source_role",
+       "Pass": true,
+       "Reason": "chunk p36-c15, page 36 is usable source text",
+       "Deterministic": true
+      },
+      {
+       "Gate": "quote_verbatim",
+       "Pass": true,
+       "Reason": "verbatim in chunk p36-c15, page 36",
+       "Deterministic": true
+      },
+      {
+       "Gate": "arithmetic",
+       "Pass": true,
+       "Reason": "no arithmetic in this question",
+       "Deterministic": true
+      },
+      {
+       "Gate": "unit_check",
+       "Pass": true,
+       "Reason": "no arithmetic in this question",
+       "Deterministic": true
+      },
+      {
+       "Gate": "demand_contract",
+       "Pass": true,
+       "Reason": "medium application demand contract is present",
+       "Deterministic": true
+      },
+      {
+       "Gate": "coverage_contract",
+       "Pass": true,
+       "Reason": "slot S02 uses atom A031 from chunk p36-c15",
+       "Deterministic": true
+      },
+      {
+       "Gate": "not_a_duplicate",
+       "Pass": true,
+       "Reason": "distinct from the questions already accepted",
+       "Deterministic": true
+      }
+     ],
+     "source_quote": "The sole exception is the expression 00 . This appears later in more advanced courses, but for now, we will consider the value to be undefined."
+    },
+    {
+     "stem": "To simplify (a/b)^3, a student rewrites it as (a * b^(-1))^3 and then applies the power of a product rule. Which of the following correctly shows the result?",
+     "choices": [
+      {
+       "content": "a^3 / b^3",
+       "is_correct": true
+      },
+      {
+       "content": "a^3 * b^3",
+       "is_correct": false
+      },
+      {
+       "content": "a^3 / b^(-3)",
+       "is_correct": false
+      },
+      {
+       "content": "a^3 * b^(-3)",
+       "is_correct": false
+      }
+     ],
+     "explanation": "Rewrite a/b as a * b^(-1). Then (a * b^(-1))^3 = a^3 * (b^(-1))^3 = a^3 * b^(-3) = a^3 / b^3. This shows how the power of a quotient rule can be derived from the power of a product rule.",
+     "skill": "application",
+     "difficulty": "medium",
+     "requires_calculation": false,
+     "calculation": null,
+     "passed": true,
+     "gates": [
+      {
+       "Gate": "well_formed",
+       "Pass": true,
+       "Reason": "structurally sound",
+       "Deterministic": true
+      },
+      {
+       "Gate": "source_role",
+       "Pass": true,
+       "Reason": "chunk p39-c21, page 39 is usable source text",
+       "Deterministic": true
+      },
+      {
+       "Gate": "quote_verbatim",
+       "Pass": true,
+       "Reason": "verbatim in chunk p39-c21, page 39",
+       "Deterministic": true
+      },
+      {
+       "Gate": "arithmetic",
+       "Pass": true,
+       "Reason": "no arithmetic in this question",
+       "Deterministic": true
+      },
+      {
+       "Gate": "unit_check",
+       "Pass": true,
+       "Reason": "no arithmetic in this question",
+       "Deterministic": true
+      },
+      {
+       "Gate": "demand_contract",
+       "Pass": true,
+       "Reason": "medium application demand contract is present",
+       "Deterministic": true
+      },
+      {
+       "Gate": "coverage_contract",
+       "Pass": true,
+       "Reason": "slot S03 uses atom A055 from chunk p39-c21",
+       "Deterministic": true
+      },
+      {
+       "Gate": "not_a_duplicate",
+       "Pass": true,
+       "Reason": "distinct from the questions already accepted",
+       "Deterministic": true
+      }
+     ],
+     "source_quote": "It appears from the last two steps that we can use the power of a product rule as a power of a quotient rule."
+    },
+    {
+     "stem": "Simplify the expression (sqrt(2))^7 / (sqrt(2))^3 using the quotient rule.",
+     "choices": [
+      {
+       "content": "(sqrt(2))^4",
+       "is_correct": true
+      },
+      {
+       "content": "(sqrt(2))^10",
+       "is_correct": false
+      },
+      {
+       "content": "(sqrt(2))^21",
+       "is_correct": false
+      },
+      {
+       "content": "(sqrt(2))^7/3",
+       "is_correct": false
+      }
+     ],
+     "explanation": "The quotient rule states that when dividing same bases, subtract the exponents: (sqrt(2))^7 / (sqrt(2))^3 = (sqrt(2))^(7-3) = (sqrt(2))^4.",
+     "skill": "application",
+     "difficulty": "medium",
+     "requires_calculation": false,
+     "calculation": null,
+     "passed": false,
+     "gates": [
+      {
+       "Gate": "well_formed",
+       "Pass": true,
+       "Reason": "structurally sound",
+       "Deterministic": true
+      },
+      {
+       "Gate": "source_role",
+       "Pass": true,
+       "Reason": "chunk p35-c13, page 35 is usable source text",
+       "Deterministic": true
+      },
+      {
+       "Gate": "quote_verbatim",
+       "Pass": false,
+       "Reason": "quote not found verbatim in chunk p35-c13 (page 35)",
+       "Deterministic": true
+      },
+      {
+       "Gate": "arithmetic",
+       "Pass": true,
+       "Reason": "no arithmetic in this question",
+       "Deterministic": true
+      },
+      {
+       "Gate": "unit_check",
+       "Pass": true,
+       "Reason": "no arithmetic in this question",
+       "Deterministic": true
+      },
+      {
+       "Gate": "demand_contract",
+       "Pass": true,
+       "Reason": "medium application demand contract is present",
+       "Deterministic": true
+      },
+      {
+       "Gate": "coverage_contract",
+       "Pass": false,
+       "Reason": "source quote does not cover the atom evidence for slot S04",
+       "Deterministic": true
+      },
+      {
+       "Gate": "not_a_duplicate",
+       "Pass": true,
+       "Reason": "distinct from the questions already accepted",
+       "Deterministic": true
+      }
+     ],
+     "source_quote": "b. t 23 __ t 15  = t 23 − 15 = t8 c.  (z√— 2 ) 5 ________ z√— 2   = (z√— 2 ) 5 − 1 = (z√— 2 ) 4"
+    },
+    {
+     "stem": "The distance from Earth to a nearby star is 40,200,000,000,000 km. Write this number in scientific notation.",
+     "choices": [
+      {
+       "content": "4.02 × 10^13",
+       "is_correct": true
+      },
+      {
+       "content": "4.02 × 10^12",
+       "is_correct": false
+      },
+      {
+       "content": "40.2 × 10^12",
+       "is_correct": false
+      },
+      {
+       "content": "4.02 × 10^14",
+       "is_correct": false
+      }
+     ],
+     "explanation": "Move the decimal point to the right of the first digit (4), giving 4.02. Count the places moved: from after the last zero to after the 4 is 13 places. Since the number is large and the decimal moved left, n is positive, so the scientific notation is 4.02 × 10^13.",
+     "skill": "application",
+     "difficulty": "medium",
+     "requires_calculation": false,
+     "calculation": null,
+     "passed": false,
+     "gates": [
+      {
+       "Gate": "well_formed",
+       "Pass": false,
+       "Reason": "stem asks nothing — no question mark and no question word: \"The distance from Earth to a nearby star is 40,200,000,000,000 km. Write this nu…\"",
+       "Deterministic": true
+      },
+      {
+       "Gate": "source_role",
+       "Pass": true,
+       "Reason": "chunk p41-c25, page 41 is usable source text",
+       "Deterministic": true
+      },
+      {
+       "Gate": "quote_verbatim",
+       "Pass": true,
+       "Reason": "verbatim in chunk p41-c25, page 41",
+       "Deterministic": true
+      },
+      {
+       "Gate": "arithmetic",
+       "Pass": true,
+       "Reason": "no arithmetic in this question",
+       "Deterministic": true
+      },
+      {
+       "Gate": "unit_check",
+       "Pass": true,
+       "Reason": "no arithmetic in this question",
+       "Deterministic": true
+      },
+      {
+       "Gate": "demand_contract",
+       "Pass": true,
+       "Reason": "medium application demand contract is present",
+       "Deterministic": true
+      },
+      {
+       "Gate": "coverage_contract",
+       "Pass": true,
+       "Reason": "slot S05 uses atom A060 from chunk p41-c25",
+       "Deterministic": true
+      },
+      {
+       "Gate": "not_a_duplicate",
+       "Pass": true,
+       "Reason": "distinct from the questions already accepted",
+       "Deterministic": true
+      }
+     ],
+     "source_quote": "To write a number in scientific notation, move the decimal point to the right of the first digit in the number. Write the digits as a decimal number between 1 and 10. Count the number of places n that you moved the decimal point. Multiply the decimal number by 10 raised to a power of n. If you moved the decimal left s in a very large number, n is positive."
+    },
+    {
+     "stem": "Simplify the expression (3x)^7 / (3x)^3 using the quotient rule. Which of the following is the correct result?",
+     "choices": [
+      {
+       "content": "(3x)^4",
+       "is_correct": true
+      },
+      {
+       "content": "(3x)^10",
+       "is_correct": false
+      },
+      {
+       "content": "(3x)^21",
+       "is_correct": false
+      },
+      {
+       "content": "(3x)^(7/3)",
+       "is_correct": false
+      }
+     ],
+     "explanation": "The quotient rule states that when dividing exponential expressions with the same base, subtract the exponents. Here the base is (3x), so (3x)^7 / (3x)^3 = (3x)^(7−3) = (3x)^4.",
+     "skill": "application",
+     "difficulty": "medium",
+     "requires_calculation": false,
+     "calculation": null,
+     "passed": true,
+     "gates": [
+      {
+       "Gate": "well_formed",
+       "Pass": true,
+       "Reason": "structurally sound",
+       "Deterministic": true
+      },
+      {
+       "Gate": "source_role",
+       "Pass": true,
+       "Reason": "chunk p35-c13, page 35 is usable source text",
+       "Deterministic": true
+      },
+      {
+       "Gate": "quote_verbatim",
+       "Pass": true,
+       "Reason": "verbatim in chunk p35-c13, page 35",
+       "Deterministic": true
+      },
+      {
+       "Gate": "arithmetic",
+       "Pass": true,
+       "Reason": "no arithmetic in this question",
+       "Deterministic": true
+      },
+      {
+       "Gate": "unit_check",
+       "Pass": true,
+       "Reason": "no arithmetic in this question",
+       "Deterministic": true
+      },
+      {
+       "Gate": "demand_contract",
+       "Pass": true,
+       "Reason": "medium application demand contract is present",
+       "Deterministic": true
+      },
+      {
+       "Gate": "coverage_contract",
+       "Pass": true,
+       "Reason": "slot S04 uses atom A022 from chunk p35-c13",
+       "Deterministic": true
+      },
+      {
+       "Gate": "not_a_duplicate",
+       "Pass": true,
+       "Reason": "distinct from the questions already accepted",
+       "Deterministic": true
+      }
+     ],
+     "source_quote": "b. t 23 __ t 15 ​ = t 23 − 15 = t8 c. ​ z√— 2 ​  5 ________ z√— 2 ​ ​ = ​​z√— 2 ​  5 − 1 = ​​z√— 2 ​  4"
+    },
+    {
+     "stem": "The distance from Earth to a nearby star is 40,200,000,000,000 km. Which of the following is the correct scientific notation for this distance?",
+     "choices": [
+      {
+       "content": "4.02 × 10^13 km",
+       "is_correct": true
+      },
+      {
+       "content": "4.02 × 10^12 km",
+       "is_correct": false
+      },
+      {
+       "content": "40.2 × 10^12 km",
+       "is_correct": false
+      },
+      {
+       "content": "4.02 × 10^14 km",
+       "is_correct": false
+      }
+     ],
+     "explanation": "To write 40,200,000,000,000 in scientific notation, move the decimal point to the right of the first digit (4), giving 4.02. The decimal point moved 13 places to the left, so n = 13 and the number is 4.02 × 10^13.",
+     "skill": "application",
+     "difficulty": "medium",
+     "requires_calculation": false,
+     "calculation": null,
+     "passed": true,
+     "gates": [
+      {
+       "Gate": "well_formed",
+       "Pass": true,
+       "Reason": "structurally sound",
+       "Deterministic": true
+      },
+      {
+       "Gate": "source_role",
+       "Pass": true,
+       "Reason": "chunk p41-c25, page 41 is usable source text",
+       "Deterministic": true
+      },
+      {
+       "Gate": "quote_verbatim",
+       "Pass": true,
+       "Reason": "verbatim in chunk p41-c25, page 41",
+       "Deterministic": true
+      },
+      {
+       "Gate": "arithmetic",
+       "Pass": true,
+       "Reason": "no arithmetic in this question",
+       "Deterministic": true
+      },
+      {
+       "Gate": "unit_check",
+       "Pass": true,
+       "Reason": "no arithmetic in this question",
+       "Deterministic": true
+      },
+      {
+       "Gate": "demand_contract",
+       "Pass": true,
+       "Reason": "medium application demand contract is present",
+       "Deterministic": true
+      },
+      {
+       "Gate": "coverage_contract",
+       "Pass": true,
+       "Reason": "slot S05 uses atom A060 from chunk p41-c25",
+       "Deterministic": true
+      },
+      {
+       "Gate": "not_a_duplicate",
+       "Pass": true,
+       "Reason": "distinct from the questions already accepted",
+       "Deterministic": true
+      }
+     ],
+     "source_quote": "To write a number in scientific notation, move the decimal point to the right of the first digit in the number. Write the digits as a decimal number between 1 and 10. Count the number of places n that you moved the decimal point. Multiply the decimal number by 10 raised to a power of n. If you moved the decimal left s in a very large number, n is positive."
+    }
+   ]
+  },
+  {
+   "name": "application-hard",
+   "accepted": 5,
+   "drafts": 5,
+   "questions": [
+    {
+     "stem": "A student simplifies the expression (x^2)^3 · x^4. Which single base and exponent correctly represent the simplified result?",
+     "choices": [
+      {
+       "content": "x^10",
+       "is_correct": true
+      },
+      {
+       "content": "x^9",
+       "is_correct": false
+      },
+      {
+       "content": "x^24",
+       "is_correct": false
+      },
+      {
+       "content": "x^13",
+       "is_correct": false
+      }
+     ],
+     "explanation": "First apply the power rule to (x^2)^3: multiply exponents 2 and 3 to get x^6. Then apply the product rule to x^6 · x^4: add exponents 6 and 4 to get x^10. The power rule multiplies exponents, while the product rule adds them.",
+     "skill": "application",
+     "difficulty": "hard",
+     "requires_calculation": false,
+     "calculation": null,
+     "passed": true,
+     "gates": [
+      {
+       "Gate": "well_formed",
+       "Pass": true,
+       "Reason": "structurally sound",
+       "Deterministic": true
+      },
+      {
+       "Gate": "source_role",
+       "Pass": true,
+       "Reason": "chunk p35-c14, page 35 is usable source text",
+       "Deterministic": true
+      },
+      {
+       "Gate": "quote_verbatim",
+       "Pass": true,
+       "Reason": "verbatim in chunk p35-c14, page 35",
+       "Deterministic": true
+      },
+      {
+       "Gate": "arithmetic",
+       "Pass": true,
+       "Reason": "no arithmetic in this question",
+       "Deterministic": true
+      },
+      {
+       "Gate": "unit_check",
+       "Pass": true,
+       "Reason": "no arithmetic in this question",
+       "Deterministic": true
+      },
+      {
+       "Gate": "demand_contract",
+       "Pass": true,
+       "Reason": "hard application demand contract is present",
+       "Deterministic": true
+      },
+      {
+       "Gate": "coverage_contract",
+       "Pass": true,
+       "Reason": "slot S01 uses atom A026 from chunk p35-c14",
+       "Deterministic": true
+      },
+      {
+       "Gate": "not_a_duplicate",
+       "Pass": true,
+       "Reason": "distinct from the questions already accepted",
+       "Deterministic": true
+      }
+     ],
+     "source_quote": "Be careful to distinguish between uses of the product rule and the power rule. When using the product rule, different terms with the same bases are raised to exponents. In this case, you add the exponents. When using the power rule, a term in exponential notation is raised to a power. In this case, you multiply the exponents."
+    },
+    {
+     "stem": "A student evaluates the expression 0^0 and claims it equals 1 because any number to the zero power is 1. Which statement correctly addresses this claim?",
+     "choices": [
+      {
+       "content": "The claim is incorrect because 0^0 is undefined.",
+       "is_correct": true
+      },
+      {
+       "content": "The claim is correct because a^0 = 1 for any real number a.",
+       "is_correct": false
+      },
+      {
+       "content": "The claim is incorrect because 0^0 equals 0.",
+       "is_correct": false
+      },
+      {
+       "content": "The claim is correct because the zero exponent rule applies to all numbers.",
+       "is_correct": false
+      }
+     ],
+     "explanation": "The zero exponent rule states a^0 = 1 for any nonzero real number a. The sole exception is 0^0, which is considered undefined. Therefore, the student's claim is incorrect because 0^0 is not defined as 1.",
+     "skill": "application",
+     "difficulty": "hard",
+     "requires_calculation": false,
+     "calculation": null,
+     "passed": true,
+     "gates": [
+      {
+       "Gate": "well_formed",
+       "Pass": true,
+       "Reason": "structurally sound",
+       "Deterministic": true
+      },
+      {
+       "Gate": "source_role",
+       "Pass": true,
+       "Reason": "chunk p36-c15, page 36 is usable source text",
+       "Deterministic": true
+      },
+      {
+       "Gate": "quote_verbatim",
+       "Pass": true,
+       "Reason": "verbatim in chunk p36-c15, page 36",
+       "Deterministic": true
+      },
+      {
+       "Gate": "arithmetic",
+       "Pass": true,
+       "Reason": "no arithmetic in this question",
+       "Deterministic": true
+      },
+      {
+       "Gate": "unit_check",
+       "Pass": true,
+       "Reason": "no arithmetic in this question",
+       "Deterministic": true
+      },
+      {
+       "Gate": "demand_contract",
+       "Pass": true,
+       "Reason": "hard application demand contract is present",
+       "Deterministic": true
+      },
+      {
+       "Gate": "coverage_contract",
+       "Pass": true,
+       "Reason": "slot S02 uses atom A031 from chunk p36-c15",
+       "Deterministic": true
+      },
+      {
+       "Gate": "not_a_duplicate",
+       "Pass": true,
+       "Reason": "distinct from the questions already accepted",
+       "Deterministic": true
+      }
+     ],
+     "source_quote": "The sole exception is the expression 00 . This appears later in more advanced courses, but for now, we will consider the value to be undefined."
+    },
+    {
+     "stem": "Which expression is equivalent to (x/y)^4, where y ≠ 0, and demonstrates the power of a quotient rule?",
+     "choices": [
+      {
+       "content": "x^4 / y^4",
+       "is_correct": true
+      },
+      {
+       "content": "x^4 · y^4",
+       "is_correct": false
+      },
+      {
+       "content": "x^(4-y)",
+       "is_correct": false
+      },
+      {
+       "content": "x^4 / y^(-4)",
+       "is_correct": false
+      }
+     ],
+     "explanation": "The power of a quotient rule states that (a/b)^n = a^n / b^n. Applying this to (x/y)^4 gives x^4 / y^4. This can be derived by rewriting x/y as x · y^(-1) and then applying the power of a product rule: (x · y^(-1))^4 = x^4 · y^(-4) = x^4 / y^4.",
+     "skill": "application",
+     "difficulty": "hard",
+     "requires_calculation": false,
+     "calculation": null,
+     "passed": true,
+     "gates": [
+      {
+       "Gate": "well_formed",
+       "Pass": true,
+       "Reason": "structurally sound",
+       "Deterministic": true
+      },
+      {
+       "Gate": "source_role",
+       "Pass": true,
+       "Reason": "chunk p39-c21, page 39 is usable source text",
+       "Deterministic": true
+      },
+      {
+       "Gate": "quote_verbatim",
+       "Pass": true,
+       "Reason": "verbatim in chunk p39-c21, page 39",
+       "Deterministic": true
+      },
+      {
+       "Gate": "arithmetic",
+       "Pass": true,
+       "Reason": "no arithmetic in this question",
+       "Deterministic": true
+      },
+      {
+       "Gate": "unit_check",
+       "Pass": true,
+       "Reason": "no arithmetic in this question",
+       "Deterministic": true
+      },
+      {
+       "Gate": "demand_contract",
+       "Pass": true,
+       "Reason": "hard application demand contract is present",
+       "Deterministic": true
+      },
+      {
+       "Gate": "coverage_contract",
+       "Pass": true,
+       "Reason": "slot S03 uses atom A055 from chunk p39-c21",
+       "Deterministic": true
+      },
+      {
+       "Gate": "not_a_duplicate",
+       "Pass": true,
+       "Reason": "distinct from the questions already accepted",
+       "Deterministic": true
+      }
+     ],
+     "source_quote": "It appears from the last two steps that we can use the power of a product rule as a power of a quotient rule."
+    },
+    {
+     "stem": "Simplify the expression (√[3]{z})^5 / (√[3]{z})^2 using the quotient rule. What is the result?",
+     "choices": [
+      {
+       "content": "(√[3]{z})^3",
+       "is_correct": true
+      },
+      {
+       "content": "(√[3]{z})^7",
+       "is_correct": false
+      },
+      {
+       "content": "(√[3]{z})^10",
+       "is_correct": false
+      },
+      {
+       "content": "(√[3]{z})^2",
+       "is_correct": false
+      }
+     ],
+     "explanation": "The quotient rule states that when dividing exponential expressions with the same base, subtract the exponents. Here the base is √[3]{z}. So (√[3]{z})^5 / (√[3]{z})^2 = (√[3]{z})^(5-2) = (√[3]{z})^3.",
+     "skill": "application",
+     "difficulty": "hard",
+     "requires_calculation": false,
+     "calculation": null,
+     "passed": true,
+     "gates": [
+      {
+       "Gate": "well_formed",
+       "Pass": true,
+       "Reason": "structurally sound",
+       "Deterministic": true
+      },
+      {
+       "Gate": "source_role",
+       "Pass": true,
+       "Reason": "chunk p35-c13, page 35 is usable source text",
+       "Deterministic": true
+      },
+      {
+       "Gate": "quote_verbatim",
+       "Pass": true,
+       "Reason": "verbatim in chunk p35-c13, page 35",
+       "Deterministic": true
+      },
+      {
+       "Gate": "arithmetic",
+       "Pass": true,
+       "Reason": "no arithmetic in this question",
+       "Deterministic": true
+      },
+      {
+       "Gate": "unit_check",
+       "Pass": true,
+       "Reason": "no arithmetic in this question",
+       "Deterministic": true
+      },
+      {
+       "Gate": "demand_contract",
+       "Pass": true,
+       "Reason": "hard application demand contract is present",
+       "Deterministic": true
+      },
+      {
+       "Gate": "coverage_contract",
+       "Pass": true,
+       "Reason": "slot S04 uses atom A022 from chunk p35-c13",
+       "Deterministic": true
+      },
+      {
+       "Gate": "not_a_duplicate",
+       "Pass": true,
+       "Reason": "distinct from the questions already accepted",
+       "Deterministic": true
+      }
+     ],
+     "source_quote": "b. t 23 __ t 15 ​ = t 23 − 15 = t8 c. ​ z√— 2 ​  5 ________ z√— 2 ​ ​ = ​​z√— 2 ​  5 − 1 = ​​z√— 2 ​  4"
+    },
+    {
+     "stem": "The distance from Earth to a nearby star is 92,900,000 miles. Which expression represents this distance in scientific notation?",
+     "choices": [
+      {
+       "content": "9.29 × 10^7",
+       "is_correct": true
+      },
+      {
+       "content": "9.29 × 10^8",
+       "is_correct": false
+      },
+      {
+       "content": "92.9 × 10^6",
+       "is_correct": false
+      },
+      {
+       "content": "0.929 × 10^8",
+       "is_correct": false
+      }
+     ],
+     "explanation": "To write 92,900,000 in scientific notation, move the decimal point to the right of the first digit (9), giving 9.29. Count the number of places moved: the decimal moves 7 places to the left. Since the original number is large, the exponent is positive 7. Thus the scientific notation is 9.29 × 10^7.",
+     "skill": "application",
+     "difficulty": "hard",
+     "requires_calculation": false,
+     "calculation": null,
+     "passed": true,
+     "gates": [
+      {
+       "Gate": "well_formed",
+       "Pass": true,
+       "Reason": "structurally sound",
+       "Deterministic": true
+      },
+      {
+       "Gate": "source_role",
+       "Pass": true,
+       "Reason": "chunk p41-c25, page 41 is usable source text",
+       "Deterministic": true
+      },
+      {
+       "Gate": "quote_verbatim",
+       "Pass": true,
+       "Reason": "verbatim in chunk p41-c25, page 41",
+       "Deterministic": true
+      },
+      {
+       "Gate": "arithmetic",
+       "Pass": true,
+       "Reason": "no arithmetic in this question",
+       "Deterministic": true
+      },
+      {
+       "Gate": "unit_check",
+       "Pass": true,
+       "Reason": "no arithmetic in this question",
+       "Deterministic": true
+      },
+      {
+       "Gate": "demand_contract",
+       "Pass": true,
+       "Reason": "hard application demand contract is present",
+       "Deterministic": true
+      },
+      {
+       "Gate": "coverage_contract",
+       "Pass": true,
+       "Reason": "slot S05 uses atom A060 from chunk p41-c25",
+       "Deterministic": true
+      },
+      {
+       "Gate": "not_a_duplicate",
+       "Pass": true,
+       "Reason": "distinct from the questions already accepted",
+       "Deterministic": true
+      }
+     ],
+     "source_quote": "To write a number in scientific notation, move the decimal point to the right of the first digit in the number. Write the digits as a decimal number between 1 and 10. Count the number of places n that you moved the decimal point. Multiply the decimal number by 10 raised to a power of n. If you moved the decimal left s in a very large number, n is positive."
+    }
+   ]
+  },
+  {
+   "name": "calculation",
+   "accepted": 3,
+   "drafts": 9,
+   "questions": [
+    {
+     "stem": "A large number is written in scientific notation as 2.780418 × 10^6. What is the original number in standard form?",
+     "choices": [
+      {
+       "content": "2,780,418",
+       "is_correct": true
+      },
+      {
+       "content": "0.000002780418",
+       "is_correct": false
+      },
+      {
+       "content": "27,804,180",
+       "is_correct": false
+      },
+      {
+       "content": "2.780418",
+       "is_correct": false
+      }
+     ],
+     "explanation": "Scientific notation a × 10^n means the decimal point in a is moved n places to the right when n is positive. For 2.780418 × 10^6, moving the decimal 6 places to the right gives 2,780,418.",
+     "skill": "understanding",
+     "difficulty": "easy",
+     "requires_calculation": true,
+     "calculation": {
+      "expression": "2.780418*10^6",
+      "expected": 2780418
+     },
+     "passed": true,
+     "gates": [
+      {
+       "Gate": "well_formed",
+       "Pass": true,
+       "Reason": "structurally sound",
+       "Deterministic": true
+      },
+      {
+       "Gate": "source_role",
+       "Pass": true,
+       "Reason": "chunk p41-c26, page 41 is usable source text",
+       "Deterministic": true
+      },
+      {
+       "Gate": "quote_verbatim",
+       "Pass": true,
+       "Reason": "verbatim in chunk p41-c26, page 41",
+       "Deterministic": true
+      },
+      {
+       "Gate": "arithmetic",
+       "Pass": true,
+       "Reason": "2.780418*10^6 = 2.780418e+06, matches the correct choice",
+       "Deterministic": true
+      },
+      {
+       "Gate": "unit_check",
+       "Pass": true,
+       "Reason": "dimensionless or no source-stated unit declared",
+       "Deterministic": true
+      },
+      {
+       "Gate": "demand_contract",
+       "Pass": true,
+       "Reason": "no medium/hard application demand contract required",
+       "Deterministic": true
+      },
+      {
+       "Gate": "coverage_contract",
+       "Pass": true,
+       "Reason": "slot S01 uses atom A062 from chunk p41-c26",
+       "Deterministic": true
+      },
+      {
+       "Gate": "not_a_duplicate",
+       "Pass": true,
+       "Reason": "distinct from the questions already accepted",
+       "Deterministic": true
+      }
+     ],
+     "source_quote": "We obtain 2.780418 by moving the decimal point 6 places to the left. Therefore, the exponent of 10 is 6, and it is positive because we moved the decimal point to the left."
+    },
+    {
+     "stem": "Simplify θ^3 / θ^10 and write the answer with a positive exponent.",
+     "choices": [
+      {
+       "content": "1/θ^7",
+       "is_correct": true
+      },
+      {
+       "content": "θ^7",
+       "is_correct": false
+      },
+      {
+       "content": "1/θ^13",
+       "is_correct": false
+      },
+      {
+       "content": "θ^13",
+       "is_correct": false
+      }
+     ],
+     "explanation": "Using the quotient rule, subtract exponents: θ^(3−10) = θ^(−7). Then apply the negative exponent rule to get 1/θ^7.",
+     "skill": "application",
+     "difficulty": "easy",
+     "requires_calculation": true,
+     "calculation": {
+      "expression": "3-10",
+      "expected": -7
+     },
+     "passed": false,
+     "gates": [
+      {
+       "Gate": "well_formed",
+       "Pass": true,
+       "Reason": "structurally sound",
+       "Deterministic": true
+      },
+      {
+       "Gate": "source_role",
+       "Pass": true,
+       "Reason": "chunk p37-c18, page 37 is usable source text",
+       "Deterministic": true
+      },
+      {
+       "Gate": "quote_verbatim",
+       "Pass": true,
+       "Reason": "verbatim in chunk p37-c18, page 37",
+       "Deterministic": true
+      },
+      {
+       "Gate": "arithmetic",
+       "Pass": false,
+       "Reason": "expression evaluates to -7 but the correct choice reads \"1/θ^7\"",
+       "Deterministic": true
+      },
+      {
+       "Gate": "unit_check",
+       "Pass": true,
+       "Reason": "dimensionless or no source-stated unit declared",
+       "Deterministic": true
+      },
+      {
+       "Gate": "demand_contract",
+       "Pass": true,
+       "Reason": "no medium/hard application demand contract required",
+       "Deterministic": true
+      },
+      {
+       "Gate": "coverage_contract",
+       "Pass": true,
+       "Reason": "slot S02 uses atom A042 from chunk p37-c18",
+       "Deterministic": true
+      },
+      {
+       "Gate": "not_a_duplicate",
+       "Pass": true,
+       "Reason": "distinct from the questions already accepted",
+       "Deterministic": true
+      }
+     ],
+     "source_quote": "a. θ 3 _ θ 10 ​= θ 3 − 10 = θ−7 = ​ _ 1 θ7"
+    },
+    {
+     "stem": "Using the negative rule of exponents, rewrite a^(−5) with a positive exponent.",
+     "choices": [
+      {
+       "content": "1/a^5",
+       "is_correct": true
+      },
+      {
+       "content": "a^5",
+       "is_correct": false
+      },
+      {
+       "content": "1/a^(−5)",
+       "is_correct": false
+      },
+      {
+       "content": "−a^5",
+       "is_correct": false
+      }
+     ],
+     "explanation": "The negative rule states a^(−n) = 1/a^n. For n = 5, a^(−5) = 1/a^5.",
+     "skill": "recall",
+     "difficulty": "easy",
+     "requires_calculation": true,
+     "calculation": {
+      "expression": "5",
+      "expected": 5
+     },
+     "passed": false,
+     "gates": [
+      {
+       "Gate": "well_formed",
+       "Pass": false,
+       "Reason": "stem asks nothing — no question mark and no question word: \"Using the negative rule of exponents, rewrite a^(−5) with a positive exponent.\"",
+       "Deterministic": true
+      },
+      {
+       "Gate": "source_role",
+       "Pass": true,
+       "Reason": "chunk p37-c18, page 37 is usable source text",
+       "Deterministic": true
+      },
+      {
+       "Gate": "quote_verbatim",
+       "Pass": true,
+       "Reason": "verbatim in chunk p37-c18, page 37",
+       "Deterministic": true
+      },
+      {
+       "Gate": "arithmetic",
+       "Pass": true,
+       "Reason": "5 = 5, matches the correct choice",
+       "Deterministic": true
+      },
+      {
+       "Gate": "unit_check",
+       "Pass": true,
+       "Reason": "dimensionless or no source-stated unit declared",
+       "Deterministic": true
+      },
+      {
+       "Gate": "demand_contract",
+       "Pass": true,
+       "Reason": "no medium/hard application demand contract required",
+       "Deterministic": true
+      },
+      {
+       "Gate": "coverage_contract",
+       "Pass": true,
+       "Reason": "slot S03 uses atom A039 from chunk p37-c18",
+       "Deterministic": true
+      },
+      {
+       "Gate": "not_a_duplicate",
+       "Pass": true,
+       "Reason": "distinct from the questions already accepted",
+       "Deterministic": true
+      }
+     ],
+     "source_quote": "For any nonzero real number a and natural number n, the negative rule of exponents states that a−n = ​ _ 1 an"
+    },
+    {
+     "stem": "The radius of an electron is 0.00000000000047 m. What is this number in scientific notation?",
+     "choices": [
+      {
+       "content": "4.7 × 10^(−13) m",
+       "is_correct": true
+      },
+      {
+       "content": "4.7 × 10^(13) m",
+       "is_correct": false
+      },
+      {
+       "content": "0.47 × 10^(−13) m",
+       "is_correct": false
+      },
+      {
+       "content": "4.7 × 10^(−12) m",
+       "is_correct": false
+      }
+     ],
+     "explanation": "Move the decimal point 13 places to the right to get 4.7. Since the original number is less than 1, the exponent is negative, giving 4.7 × 10^(−13) m.",
+     "skill": "understanding",
+     "difficulty": "easy",
+     "requires_calculation": true,
+     "calculation": {
+      "expression": "4.7*10^-13",
+      "expected": 0
+     },
+     "passed": false,
+     "gates": [
+      {
+       "Gate": "well_formed",
+       "Pass": true,
+       "Reason": "structurally sound",
+       "Deterministic": true
+      },
+      {
+       "Gate": "source_role",
+       "Pass": true,
+       "Reason": "chunk p41-c26, page 41 is usable source text",
+       "Deterministic": true
+      },
+      {
+       "Gate": "quote_verbatim",
+       "Pass": true,
+       "Reason": "verbatim in chunk p41-c26, page 41",
+       "Deterministic": true
+      },
+      {
+       "Gate": "arithmetic",
+       "Pass": false,
+       "Reason": "expression \"4.7*10^-13\" evaluates to 4.7e-13 but the model stated 0",
+       "Deterministic": true
+      },
+      {
+       "Gate": "unit_check",
+       "Pass": true,
+       "Reason": "dimensionless or no source-stated unit declared",
+       "Deterministic": true
+      },
+      {
+       "Gate": "demand_contract",
+       "Pass": true,
+       "Reason": "no medium/hard application demand contract required",
+       "Deterministic": true
+      },
+      {
+       "Gate": "coverage_contract",
+       "Pass": true,
+       "Reason": "slot S04 uses atom A063 from chunk p41-c26",
+       "Deterministic": true
+      },
+      {
+       "Gate": "not_a_duplicate",
+       "Pass": true,
+       "Reason": "distinct from the questions already accepted",
+       "Deterministic": true
+      }
+     ],
+     "source_quote": "We move the decimal point 13 places to the right, so the exponent of 10 is 13. The exponent is negative because we moved the decimal point to the right."
+    },
+    {
+     "stem": "Simplify b^2 · b^(−8) and write the answer with a positive exponent.",
+     "choices": [
+      {
+       "content": "1/b^6",
+       "is_correct": true
+      },
+      {
+       "content": "b^6",
+       "is_correct": false
+      },
+      {
+       "content": "1/b^(−6)",
+       "is_correct": false
+      },
+      {
+       "content": "b^(−6)",
+       "is_correct": false
+      }
+     ],
+     "explanation": "Use the product rule: add exponents 2 + (−8) = −6, giving b^(−6). Then apply the negative exponent rule to get 1/b^6.",
+     "skill": "application",
+     "difficulty": "easy",
+     "requires_calculation": true,
+     "calculation": {
+      "expression": "2-8",
+      "expected": -6
+     },
+     "passed": false,
+     "gates": [
+      {
+       "Gate": "well_formed",
+       "Pass": true,
+       "Reason": "structurally sound",
+       "Deterministic": true
+      },
+      {
+       "Gate": "source_role",
+       "Pass": true,
+       "Reason": "chunk p38-c19, page 38 is usable source text",
+       "Deterministic": true
+      },
+      {
+       "Gate": "quote_verbatim",
+       "Pass": true,
+       "Reason": "verbatim in chunk p38-c19, page 38",
+       "Deterministic": true
+      },
+      {
+       "Gate": "arithmetic",
+       "Pass": false,
+       "Reason": "expression evaluates to -6 but the correct choice reads \"1/b^6\"",
+       "Deterministic": true
+      },
+      {
+       "Gate": "unit_check",
+       "Pass": true,
+       "Reason": "dimensionless or no source-stated unit declared",
+       "Deterministic": true
+      },
+      {
+       "Gate": "demand_contract",
+       "Pass": true,
+       "Reason": "no medium/hard application demand contract required",
+       "Deterministic": true
+      },
+      {
+       "Gate": "coverage_contract",
+       "Pass": true,
+       "Reason": "slot S05 uses atom A045 from chunk p38-c19",
+       "Deterministic": true
+      },
+      {
+       "Gate": "not_a_duplicate",
+       "Pass": true,
+       "Reason": "distinct from the questions already accepted",
+       "Deterministic": true
+      }
+     ],
+     "source_quote": "a. b2 ∙ b−8 = b2 − 8 = b−6 = ​ 1 __ b6"
+    },
+    {
+     "stem": "Simplify the quotient θ^3 / θ^10 using the quotient rule, and write the result with a positive exponent. What is the simplified expression?",
+     "choices": [
+      {
+       "content": "1/θ^7",
+       "is_correct": true
+      },
+      {
+       "content": "θ^7",
+       "is_correct": false
+      },
+      {
+       "content": "1/θ^13",
+       "is_correct": false
+      },
+      {
+       "content": "θ^13",
+       "is_correct": false
+      }
+     ],
+     "explanation": "Apply the quotient rule: subtract the exponents, 3 − 10 = −7, giving θ^(−7). Then use the negative rule to rewrite with a positive exponent: θ^(−7) = 1/θ^7.",
+     "skill": "application",
+     "difficulty": "easy",
+     "requires_calculation": true,
+     "calculation": {
+      "expression": "3-10",
+      "expected": -7
+     },
+     "passed": false,
+     "gates": [
+      {
+       "Gate": "well_formed",
+       "Pass": true,
+       "Reason": "structurally sound",
+       "Deterministic": true
+      },
+      {
+       "Gate": "source_role",
+       "Pass": true,
+       "Reason": "chunk p37-c18, page 37 is usable source text",
+       "Deterministic": true
+      },
+      {
+       "Gate": "quote_verbatim",
+       "Pass": true,
+       "Reason": "verbatim in chunk p37-c18, page 37",
+       "Deterministic": true
+      },
+      {
+       "Gate": "arithmetic",
+       "Pass": false,
+       "Reason": "expression evaluates to -7 but the correct choice reads \"1/θ^7\"",
+       "Deterministic": true
+      },
+      {
+       "Gate": "unit_check",
+       "Pass": true,
+       "Reason": "dimensionless or no source-stated unit declared",
+       "Deterministic": true
+      },
+      {
+       "Gate": "demand_contract",
+       "Pass": true,
+       "Reason": "no medium/hard application demand contract required",
+       "Deterministic": true
+      },
+      {
+       "Gate": "coverage_contract",
+       "Pass": true,
+       "Reason": "slot S02 uses atom A042 from chunk p37-c18",
+       "Deterministic": true
+      },
+      {
+       "Gate": "not_a_duplicate",
+       "Pass": true,
+       "Reason": "distinct from the questions already accepted",
+       "Deterministic": true
+      }
+     ],
+     "source_quote": "a. θ 3 _ θ 10 ​= θ 3 − 10 = θ−7 = ​ _ 1 θ7"
+    },
+    {
+     "stem": "For any nonzero real number a and natural number n, the negative rule of exponents states that a^(−n) equals which of the following?",
+     "choices": [
+      {
+       "content": "1/a^n",
+       "is_correct": true
+      },
+      {
+       "content": "a^n",
+       "is_correct": false
+      },
+      {
+       "content": "1/a^(−n)",
+       "is_correct": false
+      },
+      {
+       "content": "−a^n",
+       "is_correct": false
+      }
+     ],
+     "explanation": "The negative rule of exponents states that a^(−n) = 1/a^n for any nonzero real number a and natural number n.",
+     "skill": "recall",
+     "difficulty": "easy",
+     "requires_calculation": true,
+     "calculation": {
+      "expression": "1",
+      "expected": 1
+     },
+     "passed": true,
+     "gates": [
+      {
+       "Gate": "well_formed",
+       "Pass": true,
+       "Reason": "structurally sound",
+       "Deterministic": true
+      },
+      {
+       "Gate": "source_role",
+       "Pass": true,
+       "Reason": "chunk p37-c18, page 37 is usable source text",
+       "Deterministic": true
+      },
+      {
+       "Gate": "quote_verbatim",
+       "Pass": true,
+       "Reason": "verbatim in chunk p37-c18, page 37",
+       "Deterministic": true
+      },
+      {
+       "Gate": "arithmetic",
+       "Pass": true,
+       "Reason": "1 = 1, matches the correct choice",
+       "Deterministic": true
+      },
+      {
+       "Gate": "unit_check",
+       "Pass": true,
+       "Reason": "dimensionless or no source-stated unit declared",
+       "Deterministic": true
+      },
+      {
+       "Gate": "demand_contract",
+       "Pass": true,
+       "Reason": "no medium/hard application demand contract required",
+       "Deterministic": true
+      },
+      {
+       "Gate": "coverage_contract",
+       "Pass": true,
+       "Reason": "slot S03 uses atom A039 from chunk p37-c18",
+       "Deterministic": true
+      },
+      {
+       "Gate": "not_a_duplicate",
+       "Pass": true,
+       "Reason": "distinct from the questions already accepted",
+       "Deterministic": true
+      }
+     ],
+     "source_quote": "For any nonzero real number a and natural number n, the negative rule of exponents states that a−n = ​ _ 1 an"
+    },
+    {
+     "stem": "The radius of an electron is 0.00000000000047 m. When written in scientific notation, what is the exponent of 10?",
+     "choices": [
+      {
+       "content": "−13",
+       "is_correct": true
+      },
+      {
+       "content": "13",
+       "is_correct": false
+      },
+      {
+       "content": "−12",
+       "is_correct": false
+      },
+      {
+       "content": "−14",
+       "is_correct": false
+      }
+     ],
+     "explanation": "Move the decimal point 13 places to the right to obtain 4.7, so the exponent of 10 is 13. Because the decimal point moved to the right, the exponent is negative, giving −13.",
+     "skill": "understanding",
+     "difficulty": "easy",
+     "requires_calculation": true,
+     "calculation": {
+      "expression": "13",
+      "expected": 13
+     },
+     "passed": true,
+     "gates": [
+      {
+       "Gate": "well_formed",
+       "Pass": true,
+       "Reason": "structurally sound",
+       "Deterministic": true
+      },
+      {
+       "Gate": "source_role",
+       "Pass": true,
+       "Reason": "chunk p41-c26, page 41 is usable source text",
+       "Deterministic": true
+      },
+      {
+       "Gate": "quote_verbatim",
+       "Pass": true,
+       "Reason": "verbatim in chunk p41-c26, page 41",
+       "Deterministic": true
+      },
+      {
+       "Gate": "arithmetic",
+       "Pass": true,
+       "Reason": "13 = 13, matches the correct choice",
+       "Deterministic": true
+      },
+      {
+       "Gate": "unit_check",
+       "Pass": true,
+       "Reason": "dimensionless or no source-stated unit declared",
+       "Deterministic": true
+      },
+      {
+       "Gate": "demand_contract",
+       "Pass": true,
+       "Reason": "no medium/hard application demand contract required",
+       "Deterministic": true
+      },
+      {
+       "Gate": "coverage_contract",
+       "Pass": true,
+       "Reason": "slot S04 uses atom A063 from chunk p41-c26",
+       "Deterministic": true
+      },
+      {
+       "Gate": "not_a_duplicate",
+       "Pass": true,
+       "Reason": "distinct from the questions already accepted",
+       "Deterministic": true
+      }
+     ],
+     "source_quote": "Take, for example, the radius of an electron, 0.00000000000047 m. Perform the same series of steps as above, except move the decimal point to the right. Be careful not to include the leading 0 in your count. We move the decimal point 13 places to the right, so the exponent of 10 is 13. The exponent is negative because we moved the decimal point to the right."
+    },
+    {
+     "stem": "Simplify the product b^2 · b^(−8) using the product rule, and write the result with a positive exponent. What is the simplified expression?",
+     "choices": [
+      {
+       "content": "1/b^6",
+       "is_correct": true
+      },
+      {
+       "content": "b^6",
+       "is_correct": false
+      },
+      {
+       "content": "1/b^(−6)",
+       "is_correct": false
+      },
+      {
+       "content": "b^(−6)",
+       "is_correct": false
+      }
+     ],
+     "explanation": "Apply the product rule: add the exponents, 2 + (−8) = −6, giving b^(−6). Then use the negative rule to rewrite with a positive exponent: b^(−6) = 1/b^6.",
+     "skill": "application",
+     "difficulty": "easy",
+     "requires_calculation": true,
+     "calculation": {
+      "expression": "2-8",
+      "expected": -6
+     },
+     "passed": false,
+     "gates": [
+      {
+       "Gate": "well_formed",
+       "Pass": true,
+       "Reason": "structurally sound",
+       "Deterministic": true
+      },
+      {
+       "Gate": "source_role",
+       "Pass": true,
+       "Reason": "chunk p38-c19, page 38 is usable source text",
+       "Deterministic": true
+      },
+      {
+       "Gate": "quote_verbatim",
+       "Pass": true,
+       "Reason": "verbatim in chunk p38-c19, page 38",
+       "Deterministic": true
+      },
+      {
+       "Gate": "arithmetic",
+       "Pass": false,
+       "Reason": "expression evaluates to -6 but the correct choice reads \"1/b^6\"",
+       "Deterministic": true
+      },
+      {
+       "Gate": "unit_check",
+       "Pass": true,
+       "Reason": "dimensionless or no source-stated unit declared",
+       "Deterministic": true
+      },
+      {
+       "Gate": "demand_contract",
+       "Pass": true,
+       "Reason": "no medium/hard application demand contract required",
+       "Deterministic": true
+      },
+      {
+       "Gate": "coverage_contract",
+       "Pass": true,
+       "Reason": "slot S05 uses atom A045 from chunk p38-c19",
+       "Deterministic": true
+      },
+      {
+       "Gate": "not_a_duplicate",
+       "Pass": true,
+       "Reason": "distinct from the questions already accepted",
+       "Deterministic": true
+      }
+     ],
+     "source_quote": "a. b2 ∙ b−8 = b2 − 8 = b−6 = ​ 1 __ b6"
+    }
+   ]
+  }
+ ]
+}
