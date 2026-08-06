@@ -210,8 +210,8 @@ func (s *Stats) Report() string {
 	sort.Slice(labels, func(i, j int) bool { return s.by[labels[i]].Total > s.by[labels[j]].Total })
 
 	var w strings.Builder
-	fmt.Fprintf(&w, "%-14s %6s %9s %6s %10s %10s %8s\n",
-		"call", "count", "total", "share", "in tok", "out tok", "tok/s")
+	fmt.Fprintf(&w, "%-14s %6s %9s %6s %10s %10s %10s %8s\n",
+		"call", "count", "total", "share", "in tok", "cached in", "out tok", "tok/s")
 	for _, l := range labels {
 		b := s.by[l]
 		share := 0.0
@@ -222,8 +222,8 @@ func (s *Stats) Report() string {
 		if b.Eval > 0 {
 			rate = float64(b.EvalTokens) / b.Eval.Seconds()
 		}
-		fmt.Fprintf(&w, "%-14s %6d %9s %5.0f%% %10d %10d %8.1f\n",
-			l, b.Calls, round(b.Total), share, b.PromptTokens, b.EvalTokens, rate)
+		fmt.Fprintf(&w, "%-14s %6d %9s %5.0f%% %10d %10d %10d %8.1f\n",
+			l, b.Calls, round(b.Total), share, b.PromptTokens, b.CachedInputTokens, b.EvalTokens, rate)
 	}
 
 	var loads time.Duration
