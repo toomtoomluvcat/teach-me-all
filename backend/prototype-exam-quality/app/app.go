@@ -107,10 +107,10 @@ func newModelRuntime(cfg config) (modelRuntime, error) {
 		client.MinInterval = cfg.geminiMinInterval
 		return modelRuntime{client: client, stats: client.Stats}, nil
 	}
-	if !cfg.extractOnly && cfg.deepseekAPIKey == "" {
-		return modelRuntime{}, fmt.Errorf("DeepSeek provider requires DEEPSEEK_API_KEY or --deepseek-api-key")
-	}
-	client := llm.NewDeepSeekAt(cfg.deepseekHost, cfg.deepseekAPIKey, nil)
+	// No key check here: a local OpenAI-compatible server usually wants none,
+	// and a hosted one reports a missing key far more precisely than a guess
+	// made before the first request.
+	client := llm.NewOpenAICompatibleAt(cfg.baseURL, cfg.apiKey, nil)
 	return modelRuntime{client: client, stats: client.Stats}, nil
 }
 
@@ -135,8 +135,11 @@ func buildDependencies(cfg config, modelClient llm.ModelClient) examgen.Deps {
 	return deps
 }
 
+// hostedProvider reports whether the provider has a context window big enough
+// to map every chunk in one request. The native Ollama client keeps its
+// measured one-call-per-chunk path instead.
 func hostedProvider(provider string) bool {
-	return provider == "gemini" || provider == "deepseek"
+	return provider == "gemini" || provider == "openai"
 }
 
 func extractDocument(ctx context.Context, cfg config, from, to int) (extractionCache, error) {

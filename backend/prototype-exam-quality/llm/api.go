@@ -22,7 +22,7 @@ type Options = core.Options
 type Stats = core.Stats
 type Bucket = core.Bucket
 
-type DeepSeekClient = providers.DeepSeekClient
+type OpenAIClient = providers.OpenAIClient
 type GeminiClient = providers.GeminiClient
 type Generator = generation.Generator
 type BatchedTopicGenerator = generation.BatchedTopicGenerator
@@ -31,8 +31,8 @@ type QualityGrader = judging.QualityGrader
 
 func New(host string) *Client { return core.New(host) }
 
-func NewDeepSeekAt(host, apiKey string, client *http.Client) *DeepSeekClient {
-	return providers.NewDeepSeekAt(host, apiKey, client)
+func NewOpenAICompatibleAt(baseURL, apiKey string, client *http.Client) *OpenAIClient {
+	return providers.NewOpenAICompatibleAt(baseURL, apiKey, client)
 }
 func NewGeminiAt(host, apiKey string, client *http.Client) *GeminiClient {
 	return providers.NewGeminiAt(host, apiKey, client)

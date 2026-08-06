@@ -9,7 +9,7 @@ import (
 	"testing"
 )
 
-func TestDeepSeekChatJSONUsesJSONModeAndCountsCall(t *testing.T) {
+func TestOpenAICompatibleChatJSONUsesJSONModeAndCountsCall(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/chat/completions" {
 			t.Fatalf("path = %s", r.URL.Path)
@@ -34,7 +34,7 @@ func TestDeepSeekChatJSONUsesJSONModeAndCountsCall(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := NewDeepSeekAt(server.URL, "test-key", server.Client())
+	client := NewOpenAICompatibleAt(server.URL, "test-key", server.Client())
 	var out struct {
 		Topics []string `json:"topics"`
 	}
@@ -53,7 +53,7 @@ func TestDeepSeekChatJSONUsesJSONModeAndCountsCall(t *testing.T) {
 	}
 }
 
-func TestDeepSeekChatToolsRoundTripPreservesToolCallID(t *testing.T) {
+func TestOpenAICompatibleChatToolsRoundTripPreservesToolCallID(t *testing.T) {
 	requests := 0
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		requests++
@@ -77,7 +77,7 @@ func TestDeepSeekChatToolsRoundTripPreservesToolCallID(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := NewDeepSeekAt(server.URL, "test-key", server.Client())
+	client := NewOpenAICompatibleAt(server.URL, "test-key", server.Client())
 	tools := []Tool{{Type: "function", Function: ToolFunction{Name: "calc", Description: "calculate", Parameters: map[string]any{"type": "object"}}}}
 	first, err := client.ChatTools(context.Background(), "deepseek-chat", []Message{{Role: "user", Content: "calculate"}}, tools, nil)
 	if err != nil {
@@ -96,5 +96,48 @@ func TestDeepSeekChatToolsRoundTripPreservesToolCallID(t *testing.T) {
 	}
 	if second.Content != "DONE" || requests != 2 {
 		t.Fatalf("second response=%q requests=%d", second.Content, requests)
+	}
+}
+
+func TestOpenAICompatibleEmbedMapsVectorsBackByIndex(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/embeddings" {
+			t.Fatalf("path = %s", r.URL.Path)
+		}
+		var body struct {
+			Model string   `json:"model"`
+			Input []string `json:"input"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatalf("decode request: %v", err)
+		}
+		if body.Model != "bge-m3" || len(body.Input) != 2 {
+			t.Fatalf("request = %#v", body)
+		}
+		// Out of order on purpose: the response carries an index, and the caller
+		// pairs vectors with its own inputs by that index rather than by arrival.
+		_, _ = w.Write([]byte(`{"data":[{"index":1,"embedding":[0.5,0.25]},{"index":0,"embedding":[1,2]}]}`))
+	}))
+	defer server.Close()
+
+	client := NewOpenAICompatibleAt(server.URL, "", server.Client())
+	vecs, err := client.Embed(context.Background(), "bge-m3", []string{"first", "second"})
+	if err != nil {
+		t.Fatalf("Embed() error = %v", err)
+	}
+	if len(vecs) != 2 || vecs[0][0] != 1 || vecs[1][0] != 0.5 {
+		t.Fatalf("vectors = %#v, want them restored to input order", vecs)
+	}
+}
+
+func TestOpenAICompatibleEmbedRejectsAShortReply(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`{"data":[{"index":0,"embedding":[1,2]}]}`))
+	}))
+	defer server.Close()
+
+	client := NewOpenAICompatibleAt(server.URL, "", server.Client())
+	if _, err := client.Embed(context.Background(), "bge-m3", []string{"a", "b"}); err == nil {
+		t.Fatal("Embed() accepted one vector for two inputs; the duplicate gate would silently lose a stem")
 	}
 }

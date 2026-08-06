@@ -76,7 +76,7 @@ func TestBatchedTopicsUsesOneCallAndRestoresOrder(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := NewGeminiAt(server.URL, "test-key", server.Client())
+	client := providers.NewGeminiAt(server.URL, "test-key", server.Client())
 	batcher := NewBatchedTopicGenerator(client, "gemini-2.5-flash")
 	got, err := batcher.BatchTopics(context.Background(), []examgen.Chunk{
 		{ID: "p1-c0", Page: 1, Text: "first passage"},
@@ -102,7 +102,7 @@ func TestBatchedTopicsCarriesTheClassificationThrough(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := providers.NewDeepSeekAt(server.URL, "test-key", server.Client())
+	client := providers.NewOpenAICompatibleAt(server.URL, "test-key", server.Client())
 	batcher := NewBatchedTopicGenerator(client, "deepseek-chat")
 	got, err := batcher.BatchTopics(context.Background(), []examgen.Chunk{
 		{ID: "p1-c0", Page: 1, Text: "digestion in the mouth"},
@@ -132,7 +132,7 @@ func TestBatchedTopicsFallsBackForOmittedChunks(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := providers.NewDeepSeekAt(server.URL, "test-key", server.Client())
+	client := providers.NewOpenAICompatibleAt(server.URL, "test-key", server.Client())
 	batcher := NewBatchedTopicGenerator(client, "deepseek-chat")
 	got, err := batcher.BatchTopics(context.Background(), []examgen.Chunk{
 		{ID: "p1-c0", Page: 1, Text: "first passage"},
@@ -174,7 +174,7 @@ func TestBatchedTopicsBoundsLargeDocumentRequests(t *testing.T) {
 		}
 	}
 	wantCalls := PlannedTopicBatches(chunks)
-	client := providers.NewDeepSeekAt(server.URL, "test-key", server.Client())
+	client := providers.NewOpenAICompatibleAt(server.URL, "test-key", server.Client())
 	batcher := NewBatchedTopicGenerator(client, "deepseek-chat")
 	got, err := batcher.BatchTopics(context.Background(), chunks, nil)
 	if err != nil {
@@ -209,7 +209,7 @@ func TestBatchedTopicsSplitsOnlyMalformedBatch(t *testing.T) {
 	for i := range chunks {
 		chunks[i] = examgen.Chunk{ID: fmt.Sprintf("p1-c%d", i), Page: 1, Text: "passage"}
 	}
-	client := providers.NewDeepSeekAt(server.URL, "test-key", server.Client())
+	client := providers.NewOpenAICompatibleAt(server.URL, "test-key", server.Client())
 	batcher := NewBatchedTopicGenerator(client, "deepseek-chat")
 	got, err := batcher.BatchTopics(context.Background(), chunks, nil)
 	if err != nil {
@@ -237,7 +237,7 @@ func TestBatchedTopicsStopsAfterTerminalBatchFailure(t *testing.T) {
 	for i := range chunks {
 		chunks[i] = examgen.Chunk{ID: fmt.Sprintf("p1-c%d", i), Page: 1, Text: "passage"}
 	}
-	client := providers.NewDeepSeekAt(server.URL, "test-key", server.Client())
+	client := providers.NewOpenAICompatibleAt(server.URL, "test-key", server.Client())
 	batcher := NewBatchedTopicGenerator(client, "deepseek-chat")
 	_, err := batcher.BatchTopics(context.Background(), chunks, nil)
 	if err == nil {
@@ -263,7 +263,7 @@ func TestGeminiRetries429AndCountsBothAttempts(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := NewGeminiAt(server.URL, "test-key", server.Client())
+	client := providers.NewGeminiAt(server.URL, "test-key", server.Client())
 	var out struct {
 		OK bool `json:"ok"`
 	}

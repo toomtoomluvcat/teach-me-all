@@ -32,8 +32,8 @@ type config struct {
 	host               string
 	geminiHost         string
 	geminiAPIKey       string
-	deepseekHost       string
-	deepseekAPIKey     string
+	baseURL            string
+	apiKey             string
 	geminiMinInterval  time.Duration
 	forceCalc          bool
 	benchmark          string
@@ -63,7 +63,7 @@ type extractionCache struct {
 // straightforward description of the CLI surface.
 func parseConfig() config {
 	var cfg config
-	flag.StringVar(&cfg.provider, "provider", "ollama", "model provider: ollama | gemini | deepseek")
+	flag.StringVar(&cfg.provider, "provider", "ollama", "model provider: ollama | openai | gemini, or a preset name such as deepseek")
 	flag.StringVar(&cfg.pdfPath, "pdf", "", "path to the source PDF (required)")
 	flag.StringVar(&cfg.extract, "extract", "auto", "extraction mode: auto | docling (both use Docling; auto is the default name)")
 	flag.StringVar(&cfg.extractDir, "extract-dir", "", "directory for the extraction bundle; default .scratch/<hash>/extract")
@@ -84,8 +84,8 @@ func parseConfig() config {
 	flag.StringVar(&cfg.geminiHost, "gemini-host", "https://generativelanguage.googleapis.com", "Gemini API host")
 	flag.StringVar(&cfg.geminiAPIKey, "gemini-api-key", "", "Gemini API key (prefer GEMINI_API_KEY)")
 	flag.DurationVar(&cfg.geminiMinInterval, "gemini-min-interval", 13*time.Second, "minimum delay between Gemini requests; 0 disables throttling")
-	flag.StringVar(&cfg.deepseekHost, "deepseek-host", "https://api.deepseek.com", "DeepSeek API host")
-	flag.StringVar(&cfg.deepseekAPIKey, "deepseek-api-key", "", "DeepSeek API key (prefer DEEPSEEK_API_KEY)")
+	flag.StringVar(&cfg.baseURL, "base-url", "", "OpenAI-compatible base URL, without /chat/completions; e.g. https://openrouter.ai/api/v1 or http://localhost:8000/v1")
+	flag.StringVar(&cfg.apiKey, "api-key", "", "API key for the OpenAI-compatible provider (prefer LLM_API_KEY; a local server usually needs none)")
 	flag.BoolVar(&cfg.forceCalc, "force-calc", false, "require arithmetic on every generated question (skill remains cognitive demand)")
 	flag.StringVar(&cfg.benchmark, "benchmark", "", "run benchmark suite: all | application-easy | application-medium | application-hard | calculation")
 	flag.StringVar(&cfg.benchmarkLesson, "benchmark-lesson", "", "lesson title fragment for a generic benchmark; enables subject-neutral directives")
@@ -112,18 +112,24 @@ func applyConfigDefaults(cfg *config) error {
 	if cfg.geminiAPIKey == "" {
 		cfg.geminiAPIKey = os.Getenv("GEMINI_API_KEY")
 	}
-	if cfg.deepseekAPIKey == "" {
-		cfg.deepseekAPIKey = os.Getenv("DEEPSEEK_API_KEY")
+	if err := applyProviderPreset(cfg); err != nil {
+		return err
 	}
-	if cfg.provider != "ollama" && cfg.provider != "gemini" && cfg.provider != "deepseek" {
-		return fmt.Errorf("--provider must be ollama, gemini, or deepseek, got %q", cfg.provider)
+	if cfg.apiKey == "" {
+		cfg.apiKey = os.Getenv("LLM_API_KEY")
+	}
+	if cfg.provider != "ollama" && cfg.provider != "gemini" && cfg.provider != "openai" {
+		return fmt.Errorf("--provider must be ollama, openai, or gemini (or a preset such as deepseek), got %q", cfg.provider)
+	}
+	if cfg.provider == "openai" && cfg.baseURL == "" {
+		return fmt.Errorf("--provider openai needs --base-url, e.g. https://openrouter.ai/api/v1 or http://localhost:8000/v1")
 	}
 	if cfg.model == "" {
 		switch cfg.provider {
 		case "gemini":
 			cfg.model = "gemini-2.5-flash"
-		case "deepseek":
-			cfg.model = "deepseek-chat"
+		case "openai":
+			return fmt.Errorf("--provider openai needs --model; the base URL does not imply one")
 		default:
 			cfg.model = "scb10x/typhoon2.5-qwen3-4b"
 		}
@@ -140,9 +146,9 @@ func applyConfigDefaults(cfg *config) error {
 		switch cfg.provider {
 		case "gemini":
 			cfg.embedModel = "gemini-embedding-001"
-		case "deepseek":
-			// DeepSeek exposes chat completions, not embeddings. Leave ranking
-			// disabled unless a separate embedder is wired later.
+		case "openai":
+			// Whether the host implements /embeddings is a property of that host,
+			// not of the protocol. Leave it off unless the operator names a model.
 			cfg.embedModel = ""
 		default:
 			cfg.embedModel = "bge-m3"
@@ -152,6 +158,41 @@ func applyConfigDefaults(cfg *config) error {
 		return fmt.Errorf("--pdf is required")
 	}
 	return nil
+}
+
+// applyProviderPreset expands a shorthand provider name into the generic
+// OpenAI-compatible provider plus its base URL, key source, and default model.
+// Everything a preset sets can still be overridden on the command line, so a
+// new vendor never needs code here — only a base URL.
+func applyProviderPreset(cfg *config) error {
+	preset, ok := providerPresets[cfg.provider]
+	if !ok {
+		return nil
+	}
+	cfg.provider = "openai"
+	if cfg.baseURL == "" {
+		cfg.baseURL = preset.baseURL
+	}
+	if cfg.apiKey == "" {
+		cfg.apiKey = os.Getenv(preset.keyEnv)
+	}
+	if cfg.model == "" {
+		cfg.model = preset.model
+	}
+	return nil
+}
+
+type providerPreset struct {
+	baseURL string
+	keyEnv  string
+	model   string
+}
+
+var providerPresets = map[string]providerPreset{
+	"deepseek": {baseURL: "https://api.deepseek.com", keyEnv: "DEEPSEEK_API_KEY", model: "deepseek-chat"},
+	// Ollama's OpenAI-compatible endpoint, for running the same code path
+	// against a local model instead of the native Ollama client.
+	"local": {baseURL: "http://localhost:11434/v1", keyEnv: "LLM_API_KEY", model: "scb10x/typhoon2.5-qwen3-4b"},
 }
 
 // loadDotEnv loads the nearest .env from the working directory or one of its

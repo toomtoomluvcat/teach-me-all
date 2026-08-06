@@ -2,10 +2,8 @@ package generation
 
 import (
 	"context"
-	"net/http"
 
 	"protoexam/llm/core"
-	"protoexam/llm/providers"
 )
 
 type ModelClient = core.ModelClient
@@ -16,7 +14,3 @@ type ToolFunction = core.ToolFunction
 type Options = core.Options
 
 func WithLabel(ctx context.Context, label string) context.Context { return core.WithLabel(ctx, label) }
-
-func NewGeminiAt(host, apiKey string, client *http.Client) *providers.GeminiClient {
-	return providers.NewGeminiAt(host, apiKey, client)
-}

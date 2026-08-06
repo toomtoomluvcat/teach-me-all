@@ -91,10 +91,18 @@ will have to do anyway. Building it here is not throwaway work.
 - Gemini is also supported through the Gemini REST API. Set `GEMINI_API_KEY`
   before running; the default Gemini models are `gemini-2.5-flash` and
   `gemini-embedding-001`.
-- DeepSeek is supported through its OpenAI-compatible chat API. Set
-  `DEEPSEEK_API_KEY` before running; the default model is `deepseek-chat`.
-  DeepSeek has no embeddings endpoint here, so duplicate/ranking embeddings are
-  disabled for this provider.
+- `--provider openai` talks to any host that speaks the OpenAI
+  `/chat/completions` wire format — DeepSeek, OpenRouter, Groq, Together,
+  Mistral, Fireworks, and, for a local model, vLLM, llama.cpp, LM Studio, or
+  Ollama's own `/v1` endpoint. Give it `--base-url` and `--model`; the key comes
+  from `LLM_API_KEY` or `--api-key`, and a local server usually needs none.
+  Whether embeddings work is a property of the host, not the protocol, so
+  `--embed-model` stays empty unless you name one.
+- Preset provider names fill in a base URL, key variable, and default model, and
+  everything they set can still be overridden on the command line:
+  `--provider deepseek` (`DEEPSEEK_API_KEY`, `deepseek-chat`) and
+  `--provider local` (Ollama's `/v1` endpoint). Adding a vendor needs a base
+  URL, not code.
 - The CLI also loads the nearest `.env` from the working directory or its
   parents. Already-exported environment variables take precedence.
 - For the best `--extract=auto` path: Python 3.12 plus the project-local
@@ -133,7 +141,7 @@ Flags:
 | Flag | Default | Meaning |
 |------|---------|---------|
 | `--pdf` | *(required)* | source PDF |
-| `--provider` | `ollama` | `ollama`, `gemini`, or `deepseek` |
+| `--provider` | `ollama` | `ollama`, `openai`, `gemini`, or a preset (`deepseek`, `local`) |
 | `--extract` | `auto` | `auto` and `docling` both run the single supported Docling pipeline; there is no lower-quality fallback |
 | `--extract-dir` | `.scratch/<hash>/extract` | output directory for the reusable extraction bundle |
 | `--docling-python` | auto-detected | Python executable containing Docling; overrides `DOCLING_PYTHON` |
@@ -143,13 +151,13 @@ Flags:
 | `--docling-formulas` | `auto` | conservative by default; auto warns when formula-like prose is detected, while `on` runs Docling's heavier formula-to-LaTeX pass |
 | `--docling-ocr-full-page` | `false` | OCR the complete page; normally leave off so native PDF text stays native |
 | `--calc-tool` | `true` | model calls a calculator before writing calculation questions. Took arithmetic failures from 5 to 0 — see VERDICT.md |
-| `--model` | provider default | generation + judge model; Ollama defaults to `scb10x/typhoon2.5-qwen3-4b`, Gemini to `gemini-2.5-flash`, DeepSeek to `deepseek-chat` |
-| `--embed-model` | provider default | Ollama `bge-m3`, Gemini `gemini-embedding-001`, DeepSeek disabled; pass an explicit empty value to disable ranking |
+| `--model` | provider default | generation + review model; Ollama defaults to `scb10x/typhoon2.5-qwen3-4b`, Gemini to `gemini-2.5-flash`, the `deepseek` preset to `deepseek-chat`. `--provider openai` has no default and requires this |
+| `--embed-model` | provider default | Ollama `bge-m3`, Gemini `gemini-embedding-001`, `openai` off unless named; pass an explicit empty value to disable ranking |
 | `--gemini-host` | `https://generativelanguage.googleapis.com` | Gemini API host |
 | `--gemini-api-key` | `GEMINI_API_KEY` | Gemini API key; the flag is useful for one-off runs |
 | `--gemini-min-interval` | `13s` | minimum delay between Gemini requests; conservative for a 5-RPM free-tier project, pass `0s` to disable |
-| `--deepseek-host` | `https://api.deepseek.com` | DeepSeek API host |
-| `--deepseek-api-key` | `DEEPSEEK_API_KEY` | DeepSeek API key; the flag is useful for one-off runs |
+| `--base-url` | preset default | OpenAI-compatible base URL, without `/chat/completions` |
+| `--api-key` | `LLM_API_KEY` | API key for the OpenAI-compatible provider; the flag is useful for one-off runs |
 | `--force-calc` | `false` | require arithmetic on every question; keep `skill` as cognitive demand |
 | `--pages` | all | page range, e.g. `10-40` |
 | `--fresh` | `false` | ignore the cache and redo extraction/embedding |
@@ -191,7 +199,7 @@ continue and `[q + enter]` to quit.
 Extraction and embedding are cached under `.scratch/` (gitignored) because they are
 slow and rerunning them while iterating on prompts is a waste.
 
-For Gemini and DeepSeek, pass 1 maps chunks in bounded structured batches of at
+For Gemini and OpenAI-compatible providers, pass 1 maps chunks in bounded structured batches of at
 most 32 chunks and about 36,000 runes, then uses one reduce request. The CLI
 prints this base call count before sending anything. Batches run concurrently
 up to `--parallel`; Gemini still spaces request starts by 13 seconds. If JSON is
@@ -200,7 +208,7 @@ only that chunk is retried. Terminal network/auth errors cancel pending batches.
 Use `--fresh` to regenerate a cached outline after changing provider or prompts.
 
 At the end of every process, including one that exits after an API error, the run
-prints a cumulative call report. With Gemini or DeepSeek, `TOTAL` is the exact
+prints a cumulative call report. With a hosted provider, `TOTAL` is the exact
 number of provider HTTP requests attempted by the process, including retries and
 429/5xx responses. The `embed` row counts batch embedding requests, not
 individual texts; the other rows identify the pipeline stage (`outline/map`,
