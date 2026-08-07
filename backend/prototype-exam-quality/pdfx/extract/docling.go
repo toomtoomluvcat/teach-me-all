@@ -238,6 +238,15 @@ finished:
 				preparedPage.Assets = append(preparedPage.Assets, asset)
 			}
 		}
+		if refs := len(markdownImage.FindAllString(raw.Markdown, -1)); refs > len(preparedPage.Assets) {
+			result.Prepared.Warnings = append(result.Prepared.Warnings, fmt.Sprintf(
+				"page %d: markdown references %d image(s) but only %d were extracted as assets — possible figure-extraction failure",
+				raw.Number, refs, len(preparedPage.Assets)))
+		}
+		for _, tableWarning := range raggedTableWarnings(raw.Markdown) {
+			result.Prepared.Warnings = append(result.Prepared.Warnings,
+				fmt.Sprintf("page %d: %s", raw.Number, tableWarning))
+		}
 		result.Prepared.Pages = append(result.Prepared.Pages, preparedPage)
 	}
 	if opts.Progress != nil {
@@ -317,4 +326,47 @@ func stripMarkdownImages(markdown string) string {
 func markdownReferencesAsset(markdown, assetPath string) bool {
 	path := filepath.ToSlash(assetPath)
 	return strings.Contains(filepath.ToSlash(markdown), path) || strings.Contains(filepath.ToSlash(markdown), "../"+path)
+}
+
+// raggedTableWarnings flags Markdown table blocks whose rows disagree on cell
+// count. Docling's table-structure pass (do_table_structure=True) writes
+// tables as GFM Markdown directly into page text rather than as a separate
+// asset, so a malformed table has no other extraction signal to catch it —
+// every row of a well-formed table has the same number of "|" separators,
+// including the header-separator row.
+func raggedTableWarnings(markdown string) []string {
+	var warnings []string
+	var block []string
+	flush := func() {
+		if len(block) < 2 {
+			block = nil
+			return
+		}
+		min, max := -1, -1
+		for _, row := range block {
+			n := strings.Count(row, "|")
+			if min == -1 || n < min {
+				min = n
+			}
+			if n > max {
+				max = n
+			}
+		}
+		if min != max {
+			warnings = append(warnings, fmt.Sprintf(
+				"table has inconsistent column counts (%d-%d cells per row across %d rows) — possible malformed table extraction",
+				min, max, len(block)))
+		}
+		block = nil
+	}
+	for line := range strings.SplitSeq(markdown, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "|") {
+			block = append(block, trimmed)
+			continue
+		}
+		flush()
+	}
+	flush()
+	return warnings
 }

@@ -37,7 +37,10 @@ func dumpExtraction(cfg config, pages []examgen.Page) error {
 }
 
 func writeExtractionBundle(cfg config, mode string, from, to int, pages []examgen.Page, prepared *pdfx.PreparedBundle) error {
-	result, err := pdfx.WriteBundle(pdfx.BundleOptions{
+	// Warnings are already printed by printExtractionWarnings before this
+	// runs (run() calls it unconditionally, ahead of the --extract-only
+	// branch) — printing result.Warnings here too would just repeat them.
+	_, err := pdfx.WriteBundle(pdfx.BundleOptions{
 		OutputDir:      extractionDir(cfg),
 		SourcePDF:      cfg.pdfPath,
 		RequestedMode:  cfg.extract,
@@ -51,9 +54,6 @@ func writeExtractionBundle(cfg config, mode string, from, to int, pages []examge
 	})
 	if err != nil {
 		return fmt.Errorf("write extraction bundle: %w", err)
-	}
-	for _, warning := range result.Warnings {
-		fmt.Printf("\n%swarning: %s%s\n", yellow, warning, reset)
 	}
 	fmt.Printf("\n%sextraction bundle written to %s%s\n", dim, extractionDir(cfg), reset)
 	return nil

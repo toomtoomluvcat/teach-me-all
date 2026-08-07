@@ -63,6 +63,7 @@ func run(ctx context.Context, cfg config) error {
 	chunks := examgen.ChunkPages(pages, examgen.DefaultChunkOptions())
 	renderProgress("extract", len(pages), len(pages), "ready: "+displayMode)
 	renderExtraction(cfg.pdfPath, displayMode, pages, chunks, !cfg.extractOnly)
+	printExtractionWarnings(extracted.Prepared)
 
 	// A scanned PDF has pages but no characters on them. Counting pages is not
 	// enough to notice — count what actually came out.
@@ -268,23 +269,59 @@ const minRunesPerPage = 40
 // document that has no text in it.
 func checkExtraction(cfg config, pages []examgen.Page) error {
 	total := 0
-	empty := 0
+	var weak []int
 	for _, p := range pages {
 		n := examgen.RuneLen(strings.TrimSpace(p.Text))
 		total += n
 		if n < minRunesPerPage {
-			empty++
+			weak = append(weak, p.Number)
 		}
 	}
 
 	if total == 0 {
 		return fmt.Errorf("Docling returned no text for any of the %d pages in %s — inspect the extraction bundle and OCR settings", len(pages), cfg.pdfPath)
 	}
-	if empty*2 > len(pages) {
-		fmt.Printf("\n%swarning: %d of %d pages came out effectively empty; inspect those pages and adjust Docling OCR settings if needed.%s\n",
-			yellow, empty, len(pages), reset)
+	if len(weak) > 0 {
+		severity := "note"
+		if len(weak)*2 > len(pages) {
+			severity = "warning"
+		}
+		fmt.Printf("\n%s%s: %d of %d pages came out effectively empty (page(s) %s) — likely scanned; inspect those pages and adjust Docling OCR settings if needed.%s\n",
+			yellow, severity, len(weak), len(pages), formatPageList(weak), reset)
 	}
 	return nil
+}
+
+// formatPageList renders page numbers for a diagnostic message, capping the
+// list so a document with hundreds of scanned pages doesn't flood the
+// terminal.
+func formatPageList(pages []int) string {
+	const shown = 15
+	if len(pages) <= shown {
+		return joinInts(pages)
+	}
+	return joinInts(pages[:shown]) + fmt.Sprintf(" and %d more", len(pages)-shown)
+}
+
+func joinInts(values []int) string {
+	parts := make([]string, len(values))
+	for i, v := range values {
+		parts[i] = strconv.Itoa(v)
+	}
+	return strings.Join(parts, ", ")
+}
+
+// printExtractionWarnings surfaces per-page diagnostics (scanned/weak pages,
+// figure-extraction mismatches, formula signals) before the pipeline spends
+// model time downstream — graph compile and the writer have no way to tell a
+// missing table from a missing chunk, so the failure has to be caught here.
+func printExtractionWarnings(prepared *pdfx.PreparedBundle) {
+	if prepared == nil {
+		return
+	}
+	for _, warning := range prepared.Warnings {
+		fmt.Printf("\n%swarning: %s%s\n", yellow, warning, reset)
+	}
 }
 
 // preflight checks the models are pulled before anything slow starts.

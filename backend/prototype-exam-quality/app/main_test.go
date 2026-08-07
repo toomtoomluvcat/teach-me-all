@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"protoexam/examgen"
+	"protoexam/pdfx"
 )
 
 func TestExtractionDirDefaultAndExplicit(t *testing.T) {
@@ -34,6 +35,69 @@ func TestRenderExtractionOnlyDoesNotOfferUnreadInput(t *testing.T) {
 	})
 	if !strings.Contains(out, "[enter]") || !strings.Contains(out, "[q + enter]") {
 		t.Fatalf("interactive extraction omitted keyboard actions: %q", out)
+	}
+}
+
+func TestCheckExtractionListsWeakPagesInsteadOfJustACount(t *testing.T) {
+	cfg := config{pdfPath: "lesson.pdf"}
+	pages := []examgen.Page{
+		{Number: 1, Text: strings.Repeat("x", 100)},
+		{Number: 2, Text: ""},
+		{Number: 3, Text: strings.Repeat("x", 100)},
+	}
+	out := captureStdout(t, func() {
+		if err := checkExtraction(cfg, pages); err != nil {
+			t.Fatal(err)
+		}
+	})
+	if !strings.Contains(out, "note:") || !strings.Contains(out, "page(s) 2") {
+		t.Fatalf("expected a note naming the weak page, got %q", out)
+	}
+}
+
+func TestCheckExtractionEscalatesToWarningPastHalfEmpty(t *testing.T) {
+	cfg := config{pdfPath: "lesson.pdf"}
+	pages := []examgen.Page{
+		{Number: 1, Text: strings.Repeat("x", 100)},
+		{Number: 2, Text: ""},
+		{Number: 3, Text: ""},
+	}
+	out := captureStdout(t, func() {
+		if err := checkExtraction(cfg, pages); err != nil {
+			t.Fatal(err)
+		}
+	})
+	if !strings.Contains(out, "warning:") || !strings.Contains(out, "page(s) 2, 3") {
+		t.Fatalf("expected a warning naming both weak pages, got %q", out)
+	}
+}
+
+func TestCheckExtractionRejectsAllEmpty(t *testing.T) {
+	cfg := config{pdfPath: "lesson.pdf"}
+	pages := []examgen.Page{{Number: 1, Text: ""}, {Number: 2, Text: ""}}
+	if err := checkExtraction(cfg, pages); err == nil || !strings.Contains(err.Error(), "no text") {
+		t.Fatalf("expected a no-text error, got %v", err)
+	}
+}
+
+func TestFormatPageListCapsLongRuns(t *testing.T) {
+	pages := make([]int, 20)
+	for i := range pages {
+		pages[i] = i + 1
+	}
+	got := formatPageList(pages)
+	if !strings.Contains(got, "and 5 more") {
+		t.Fatalf("expected the tail to be summarized, got %q", got)
+	}
+}
+
+func TestPrintExtractionWarningsSurfacesFigureMismatch(t *testing.T) {
+	prepared := &pdfx.PreparedBundle{Warnings: []string{
+		"page 4: markdown references 2 image(s) but only 1 were extracted as assets — possible figure-extraction failure",
+	}}
+	out := captureStdout(t, func() { printExtractionWarnings(prepared) })
+	if !strings.Contains(out, "page 4") || !strings.Contains(out, "figure-extraction failure") {
+		t.Fatalf("expected the figure-mismatch warning to be printed, got %q", out)
 	}
 }
 
