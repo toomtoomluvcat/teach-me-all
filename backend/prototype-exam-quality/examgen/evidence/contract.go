@@ -146,8 +146,26 @@ func canonicalSkill(skill string) string {
 	if strings.EqualFold(strings.TrimSpace(skill), "calculation") {
 		return "understanding"
 	}
-	return strings.ToLower(strings.TrimSpace(skill))
+	lower := strings.ToLower(strings.TrimSpace(skill))
+	// One idea, three spellings a model reaches for interchangeably.
+	switch lower {
+	case "error_finding", "error finding", "errorfinding":
+		return SkillErrorFinding
+	}
+	return lower
 }
+
+// SkillErrorFinding asks the student to locate the mistake in a worked attempt
+// the stem shows them, rather than to produce the answer themselves.
+//
+// It is deliberately restricted to material that supports arithmetic. The
+// question type generalises — "which step of this argument does not follow" is
+// the same idea in prose — but only the numeric form can be checked: Go
+// evaluates the flawed work, proves it differs from the correct value, and
+// confirms the stem actually prints the wrong result. Shipping the prose form
+// would mean shipping a skill whose defining property nothing verifies, which
+// is the failure this whole line of work exists to stop repeating.
+const SkillErrorFinding = "error-finding"
 
 // NormalizeEvidenceGraph drops compiler output with unknown provenance and
 // assigns stable atom IDs. A valid-looking claim with no source chunk is not
@@ -488,6 +506,12 @@ func sharesConcept(left, right []string) bool {
 func coverageDirectiveTargets(directive string, forceCalc bool) (skill, difficulty string, requiresCalculation bool) {
 	lower := strings.ToLower(strings.TrimSpace(directive))
 	switch {
+	// Checked before the arithmetic cases: an error-finding run needs both a
+	// skill and the calculation flag, and the arithmetic case alone would set
+	// only the flag and leave the skill to the rotation.
+	case strings.Contains(lower, "skill to error-finding") || strings.Contains(lower, "error-finding questions"):
+		skill = SkillErrorFinding
+		requiresCalculation = true
 	case forceCalc || strings.Contains(lower, "skill to calculation") || strings.Contains(lower, "calculation questions only") || strings.Contains(lower, "requires_calculation"):
 		requiresCalculation = true
 	case strings.Contains(lower, "skill to analysis") || strings.Contains(lower, "analysis questions"):
@@ -586,6 +610,11 @@ func relationPriority(relation string) int {
 }
 
 func supportsForm(atom EvidenceAtom, form string) bool {
+	// An error-finding item needs arithmetic to display and contradict, so it
+	// is eligible exactly where a calculation item is.
+	if strings.EqualFold(strings.TrimSpace(form), SkillErrorFinding) {
+		return supportsForm(atom, "calculation")
+	}
 	for _, candidate := range atom.QuestionForms {
 		if strings.EqualFold(strings.TrimSpace(candidate), form) {
 			if strings.EqualFold(strings.TrimSpace(form), "calculation") && shouldDowngradeCalculation(atom) {

@@ -279,6 +279,11 @@ type Question struct {
 	// a unit conversion ("20 cm" in the stem, 0.2 in the expression). The model
 	// declares, Go verifies each value is really in the stem and really unused.
 	DecoyValues []string `json:"decoy_values,omitempty"`
+	// FlawedExpression is what the mistaken work shown in an error-finding
+	// stem computes. Calculation still holds the correct arithmetic, so Go can
+	// prove the displayed attempt really is wrong instead of taking the
+	// question's word for it.
+	FlawedExpression string `json:"flawed_expression,omitempty"`
 
 	// Set-generation provenance. The per-chunk path leaves these empty; the
 	// set path requires them so a question can be traced to one graph atom and
@@ -452,6 +457,9 @@ const (
 	// evaluates to the number printed in that choice, and really differs from
 	// the key.
 	GateDistractorPath GateName = "distractor_path"
+	// GateFlawedWork checks that the mistaken work an error-finding stem
+	// displays really is wrong and really is on the page.
+	GateFlawedWork GateName = "flawed_work"
 )
 
 // GateResult is the outcome of one check.

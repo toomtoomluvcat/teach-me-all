@@ -25,6 +25,7 @@ const (
 
 	GateDecoy          = model.GateDecoy
 	GateDistractorPath = model.GateDistractorPath
+	GateFlawedWork     = model.GateFlawedWork
 
 	SourceRoleUnknown          = model.SourceRoleUnknown
 	SourceRoleCore             = model.SourceRoleCore

@@ -89,9 +89,20 @@ func benchmarkCases(selection string, lessonHint string) ([]benchmarkCase, error
 		TargetDifficulty: "hard",
 	}
 
+	errorFinding := benchmarkCase{
+		Name:                "error-finding",
+		LessonContains:      "newton",
+		Directive:           "Generate error-finding questions. Each stem must display a short worked attempt that contains exactly one plausible student mistake and prints the wrong result that mistake produces; the question asks what is wrong or what the result should be. Put the mistaken arithmetic in flawed_expression and the correct arithmetic in calculation.expression. Set skill to error-finding.",
+		ForceCalc:           true,
+		TargetSkill:         "error-finding",
+		RequiresCalculation: true,
+	}
+
 	switch strings.ToLower(strings.TrimSpace(selection)) {
 	case "all":
-		return []benchmarkCase{applicationEasy, applicationMedium, applicationHard, calculation, analysis}, nil
+		return []benchmarkCase{applicationEasy, applicationMedium, applicationHard, calculation, errorFinding, analysis}, nil
+	case "error-finding", "error_finding", "errorfinding":
+		return []benchmarkCase{errorFinding}, nil
 	case "application-easy", "application_easy":
 		return []benchmarkCase{applicationEasy}, nil
 	case "application-hard", "application_hard":
@@ -157,6 +168,24 @@ func genericBenchmarkCases(selection, lessonHint string) ([]benchmarkCase, error
 		TargetSkill:      "analysis",
 		TargetDifficulty: "hard",
 	}
+	errorFinding := benchmarkCase{
+		Name:                "error-finding",
+		LessonContains:      lessonHint,
+		Directive:           "Generate error-finding questions. Each stem must display a short worked attempt that contains exactly one plausible student mistake and prints the wrong result that mistake produces; the question asks what is wrong or what the result should be. Put the mistaken arithmetic in flawed_expression and the correct arithmetic in calculation.expression. Set skill to error-finding.",
+		ForceCalc:           true,
+		TargetSkill:         "error-finding",
+		RequiresCalculation: true,
+	}
+	// recall-hard is the tier the single-axis model could not reach. It is a new
+	// case rather than a difficulty added to the existing recall case, so the
+	// recall baseline keeps meaning what it meant.
+	recallHard := benchmarkCase{
+		Name:             "recall-hard",
+		LessonContains:   lessonHint,
+		Directive:        "Generate recall questions at hard level. Each question must ask for one fact, value, or definition stated directly in the passage -- do not ask the student to apply or combine anything. The difficulty must come from the option set and the stem, not from extra steps: every wrong choice must be a neighbouring source claim a student who half-learned the material would genuinely confuse with the answer, and the stem must include one given it does not need. Set difficulty to hard and skill to recall.",
+		TargetSkill:      "recall",
+		TargetDifficulty: "hard",
+	}
 	recall := benchmarkCase{
 		Name:           "recall",
 		LessonContains: lessonHint,
@@ -172,9 +201,13 @@ func genericBenchmarkCases(selection, lessonHint string) ([]benchmarkCase, error
 
 	switch strings.ToLower(strings.TrimSpace(selection)) {
 	case "all":
-		return []benchmarkCase{recall, understanding, applicationEasy, applicationMedium, applicationHard, calculation, analysisEasy, analysisMedium, analysisHard}, nil
+		return []benchmarkCase{recall, recallHard, understanding, applicationEasy, applicationMedium, applicationHard, calculation, errorFinding, analysisEasy, analysisMedium, analysisHard}, nil
 	case "recall":
 		return []benchmarkCase{recall}, nil
+	case "recall-hard", "recall_hard":
+		return []benchmarkCase{recallHard}, nil
+	case "error-finding", "error_finding", "errorfinding":
+		return []benchmarkCase{errorFinding}, nil
 	case "understanding":
 		return []benchmarkCase{understanding}, nil
 	case "application-easy", "application_easy":
@@ -192,7 +225,7 @@ func genericBenchmarkCases(selection, lessonHint string) ([]benchmarkCase, error
 	case "analysis-medium", "analysis_medium":
 		return []benchmarkCase{analysisMedium}, nil
 	default:
-		return nil, fmt.Errorf("--benchmark must be all, recall, understanding, application-easy, application-medium, application-hard, calculation, analysis-easy, analysis-medium, or analysis-hard; got %q", selection)
+		return nil, fmt.Errorf("--benchmark must be all, recall, recall-hard, understanding, application-easy, application-medium, application-hard, calculation, error-finding, analysis-easy, analysis-medium, or analysis-hard; got %q", selection)
 	}
 }
 

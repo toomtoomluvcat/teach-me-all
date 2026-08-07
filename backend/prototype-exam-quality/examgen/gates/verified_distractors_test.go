@@ -140,3 +140,59 @@ func TestGateDecoyRejectsQualitativeDecoyMissingFromStem(t *testing.T) {
 		t.Fatal("a qualitative decoy absent from the stem must fail")
 	}
 }
+
+func flawedWorkQuestion() Question {
+	return Question{
+		Kind:                KindMCQSingle,
+		Stem:                "A student computes the acceleration of a 5.0 kg crate under a 12 N net force as 12 x 5.0 = 60 m/s^2. What is wrong with this work?",
+		Skill:               "error-finding",
+		RequiresCalculation: true,
+		Calculation:         &Calculation{Expression: "12/5.0", Expected: 2.4},
+		FlawedExpression:    "12*5.0",
+		Choices: []Choice{
+			{Content: "force was multiplied by mass instead of divided", IsCorrect: true},
+			{Content: "the net force should have been halved"},
+			{Content: "the mass was converted to grams"},
+			{Content: "the units of acceleration were inverted"},
+		},
+	}
+}
+
+func TestGateFlawedWorkAcceptsAWrongResultShownInTheStem(t *testing.T) {
+	if res := gateFlawedWork(flawedWorkQuestion(), Arith{}); !res.Pass {
+		t.Fatalf("expected pass, got %q", res.Reason)
+	}
+}
+
+func TestGateFlawedWorkPassesWhenNothingDeclared(t *testing.T) {
+	if res := gateFlawedWork(numericQuestion(), Arith{}); !res.Pass {
+		t.Fatalf("undeclared flawed work must pass trivially, got %q", res.Reason)
+	}
+}
+
+// The item only works if the student can see the number they are asked to
+// check. A stem that never prints the wrong result is a recall question.
+func TestGateFlawedWorkRejectsResultMissingFromStem(t *testing.T) {
+	q := flawedWorkQuestion()
+	q.Stem = "A student computes the acceleration of a 5.0 kg crate under a 12 N net force incorrectly. What is wrong with this work?"
+	if res := gateFlawedWork(q, Arith{}); res.Pass {
+		t.Fatal("a flawed result the student never sees cannot be found")
+	}
+}
+
+func TestGateFlawedWorkRejectsWorkThatIsNotActuallyWrong(t *testing.T) {
+	q := flawedWorkQuestion()
+	q.Stem = "A student computes the acceleration of a 5.0 kg crate under a 12 N net force as 24/10 = 2.4 m/s^2. What is wrong with this work?"
+	q.FlawedExpression = "24/10"
+	if res := gateFlawedWork(q, Arith{}); res.Pass {
+		t.Fatal("work that reaches the correct value contains no mistake to find")
+	}
+}
+
+func TestGateFlawedWorkRejectsUnevaluableWork(t *testing.T) {
+	q := flawedWorkQuestion()
+	q.FlawedExpression = "12 times m"
+	if res := gateFlawedWork(q, Arith{}); res.Pass {
+		t.Fatal("flawed work that does not evaluate cannot be proved wrong")
+	}
+}

@@ -521,7 +521,8 @@ func questionSchema(forceCalc bool) map[string]any {
 		"explanation":          str("why the correct choice is correct, in the source language"),
 		"source_quote":         str("an exact contiguous substring copied CHARACTER FOR CHARACTER from the passage that makes the correct answer true; prefer a complete sentence, but a shorter exact span is allowed. Must appear exactly."),
 		"difficulty":           enum("honest reasoning load: easy=one direct inference or operation, medium=one relationship with a meaningful distinction, hard=two linked inferences or competing constraints, or (for analysis) two distinct source ideas combined", "easy", "medium", "hard"),
-		"skill":                enum("honest reasoning mode: recall=fact, understanding=interpretation, application=new situation using a source relationship, analysis=combine two distinct facts or relationships from different parts of the source that neither part answers alone", "recall", "understanding", "application", "analysis"),
+		"skill":                enum("honest reasoning mode: recall=fact, understanding=interpretation, application=new situation using a source relationship, analysis=combine two distinct facts or relationships from different parts of the source that neither part answers alone, error-finding=locate the mistake in a worked attempt the stem displays", "recall", "understanding", "application", "analysis", SkillErrorFinding),
+		"flawed_expression":    str("for an error-finding question only: the arithmetic the mistaken work shown in the stem actually performs. It must evaluate to the wrong result the stem prints and must differ from calculation.expression, which stays the correct arithmetic."),
 		"requires_calculation": map[string]any{"type": "boolean", "description": "true when arithmetic is necessary to answer; false otherwise"},
 		"reasoning_steps": map[string]any{
 			"type": "array", "maxItems": 4,
@@ -603,6 +604,13 @@ definition, named part, label, or unchanged property is recall or
   It is a stricter bar than hard application at the same difficulty: hard
   application can be satisfied by one relationship used twice, analysis
   cannot.
+- error-finding: show the student a short worked attempt inside the stem, with
+  exactly one mistake in it, and ask what is wrong with it or what the result
+  should be. Print the wrong result the flawed work produces. Put the flawed
+  arithmetic in flawed_expression and the correct arithmetic in
+  calculation.expression; both are evaluated independently and must disagree.
+  The mistake must be one a student plausibly makes -- a swapped operand, a
+  dropped factor, a wrong conversion -- not a typo or an invented rule.
 - requires_calculation: set true only when arithmetic is necessary to answer;
   keep skill as recall, understanding, application, or analysis according to
   the cognitive demand. Set false when the item can be answered without

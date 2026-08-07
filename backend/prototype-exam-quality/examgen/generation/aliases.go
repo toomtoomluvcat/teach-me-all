@@ -27,6 +27,7 @@ type CoverageSlot = evidence.CoverageSlot
 const (
 	DiscriminationLow  = evidence.DiscriminationLow
 	DiscriminationHigh = evidence.DiscriminationHigh
+	SkillErrorFinding  = evidence.SkillErrorFinding
 )
 type ConceptNode = evidence.ConceptNode
 type ConceptEdge = evidence.ConceptEdge

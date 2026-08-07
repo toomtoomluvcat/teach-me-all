@@ -93,6 +93,54 @@ func gateDistractorPath(q Question, ev Evaluator) GateResult {
 	return res
 }
 
+// gateFlawedWork checks the mistaken work an error-finding stem shows the
+// student.
+//
+// The whole item rests on the displayed attempt actually being wrong, and on
+// the wrong result actually being on the page — a stem that says "a student
+// calculated 14 N" without ever showing a number the student can check is a
+// recall question wearing a costume. Both halves are decidable here: evaluate
+// the flawed expression, confirm it differs from the key, confirm the stem
+// prints the value it produces.
+func gateFlawedWork(q Question, ev Evaluator) GateResult {
+	res := GateResult{Gate: GateFlawedWork, Deterministic: true}
+	flawed := strings.TrimSpace(q.FlawedExpression)
+	if flawed == "" {
+		res.Pass = true
+		res.Reason = "no flawed work declared"
+		return res
+	}
+	if q.Calculation == nil {
+		res.Reason = "flawed work was declared but the question states no correct calculation to contradict it"
+		return res
+	}
+	if ev == nil {
+		res.Reason = "flawed work declared but no evaluator configured"
+		return res
+	}
+	keyed, err := ev.Eval(q.Calculation.Expression)
+	if err != nil {
+		res.Reason = fmt.Sprintf("cannot judge the flawed work: key expression %q did not evaluate: %v", q.Calculation.Expression, err)
+		return res
+	}
+	got, err := ev.Eval(flawed)
+	if err != nil {
+		res.Reason = fmt.Sprintf("flawed expression %q did not evaluate: %v", flawed, err)
+		return res
+	}
+	if expectedNearlyEqual(got, keyed) {
+		res.Reason = fmt.Sprintf("flawed expression %q evaluates to %g, the same as the correct value — there is no mistake to find", flawed, got)
+		return res
+	}
+	if !model.ChoiceMentionsNumber(q.Stem, got) {
+		res.Reason = fmt.Sprintf("the stem never shows %g, the result of the flawed work %q, so there is nothing for the student to check", got, flawed)
+		return res
+	}
+	res.Pass = true
+	res.Reason = fmt.Sprintf("stem shows the mistaken result %g against a correct %g", got, keyed)
+	return res
+}
+
 // gateDecoy checks the declared irrelevant givens.
 //
 // A numeric decoy is verified both ways: it has to be in the stem, and it has

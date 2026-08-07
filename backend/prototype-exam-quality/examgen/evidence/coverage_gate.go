@@ -86,6 +86,10 @@ func gateSetCoverage(q Question, contract CoverageContract, byChunk map[string]C
 			slot.ID, slot.MinDecoys, len(q.DecoyValues))
 		return res
 	}
+	if canonicalSkill(slot.Skill) == SkillErrorFinding && strings.TrimSpace(q.FlawedExpression) == "" {
+		res.Reason = fmt.Sprintf("error-finding slot %s must state the flawed work its stem shows", slot.ID)
+		return res
+	}
 	if strings.EqualFold(strings.TrimSpace(slot.Discrimination), DiscriminationHigh) {
 		if reason := checkHighDiscrimination(q, slot); reason != "" {
 			res.Reason = reason

@@ -12,7 +12,7 @@ func TestGenericBenchmarkCasesAreSubjectNeutral(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(cases) != 9 || cases[0].LessonContains != "eigenvalues" {
+	if len(cases) != 11 || cases[0].LessonContains != "eigenvalues" {
 		t.Fatalf("generic benchmark cases = %#v", cases)
 	}
 	for _, benchmark := range cases {
