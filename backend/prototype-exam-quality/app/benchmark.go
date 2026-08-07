@@ -182,7 +182,7 @@ func genericBenchmarkCases(selection, lessonHint string) ([]benchmarkCase, error
 	recallHard := benchmarkCase{
 		Name:             "recall-hard",
 		LessonContains:   lessonHint,
-		Directive:        "Generate recall questions at hard level. Each question must ask for one fact, value, or definition stated directly in the passage -- do not ask the student to apply or combine anything. The difficulty must come from the option set and the stem, not from extra steps: every wrong choice must be a neighbouring source claim a student who half-learned the material would genuinely confuse with the answer, and the stem must include one given it does not need. Set difficulty to hard and skill to recall.",
+		Directive:        "Generate recall questions at hard level. Each question must ask for one fact, value, or definition stated directly in the passage -- do not ask the student to apply or combine anything. The difficulty must come from the option set and the stem, not from extra steps: every wrong choice must be a neighbouring source claim a student who half-learned the material would genuinely confuse with the answer, cited by distractor_atom_id, and the stem must include one detail the answer does not need, copied verbatim into decoy_values. The stem must still stand alone -- never refer to the passage, the text, or the material. Set difficulty to hard and skill to recall.",
 		TargetSkill:      "recall",
 		TargetDifficulty: "hard",
 	}

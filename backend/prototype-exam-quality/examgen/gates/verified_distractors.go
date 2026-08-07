@@ -22,6 +22,17 @@ import (
 // to declare them is a contract question and lives in the coverage gate, which
 // is the only place that can see the slot.
 
+// isErrorFinding reports whether the question asks the student to locate a
+// mistake rather than to produce the answer. Spelled out here rather than
+// imported so the gates package keeps deciding questions from the question.
+func isErrorFinding(q Question) bool {
+	switch strings.ToLower(strings.TrimSpace(q.Skill)) {
+	case "error-finding", "error_finding", "error finding", "errorfinding":
+		return true
+	}
+	return strings.TrimSpace(q.FlawedExpression) != ""
+}
+
 // gateDistractorPath checks every declared wrong-answer expression.
 func gateDistractorPath(q Question, ev Evaluator) GateResult {
 	res := GateResult{Gate: GateDistractorPath, Deterministic: true}

@@ -250,7 +250,13 @@ func gateArithmetic(q Question, ev Evaluator) GateResult {
 		res.Reason = "cannot check the answer key: question does not have exactly one correct choice"
 		return res
 	}
-	if !choiceMentionsNumber(q.Choices[idx].Content, got) {
+	// An error-finding item is the one shape where the key is not the computed
+	// number: the student is asked what went wrong, so the correct choice names
+	// the mistake and the arithmetic is the evidence behind it rather than the
+	// answer itself. Requiring the value in the key there rejected correct
+	// items for being correct. The arithmetic is still fully checked above, and
+	// gateFlawedWork separately proves the displayed work disagrees with it.
+	if !isErrorFinding(q) && !choiceMentionsNumber(q.Choices[idx].Content, got) {
 		res.Reason = fmt.Sprintf("expression evaluates to %g but the correct choice reads %q",
 			got, q.Choices[idx].Content)
 		return res

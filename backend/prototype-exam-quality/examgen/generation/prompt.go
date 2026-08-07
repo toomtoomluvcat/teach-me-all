@@ -545,12 +545,19 @@ func questionSchema(forceCalc bool) map[string]any {
 			"type":     "array",
 			"minItems": 4,
 			"maxItems": 4,
+			// Both distractor fields are required with an explicit empty-string
+			// escape rather than left optional. A first live run left them
+			// unset on every choice of every question: an optional field is one
+			// the writer can decline to think about, and the whole point of
+			// them is to make it think about each wrong option before writing
+			// it. Requiring them forces the decision; "" records that neither
+			// route applies, which is a different answer from silence.
 			"items": obj(map[string]any{
 				"content":    str("the choice text"),
 				"is_correct": map[string]any{"type": "boolean"},
-				"distractor_expression": str("for a wrong numeric choice only: the plain arithmetic expression a student who made one specific mistake would evaluate, in the same alphabet as calculation.expression. It must produce exactly the number printed in this choice and must not equal the keyed value. Leave empty on the correct choice and on non-numeric choices."),
-				"distractor_atom_id":    str("for a wrong non-numeric choice: the exact evidence atom ID of the real source claim this option is drawn from. It must be a claim in the supplied context and must not be the slot's own atom. Leave empty on the correct choice and when the option is not taken from a source claim."),
-			}, "content", "is_correct"),
+				"distractor_expression": str("REQUIRED FIELD. For a wrong numeric choice: the plain arithmetic expression a student who made one specific mistake would evaluate, in the same alphabet as calculation.expression. It must produce exactly the number printed in this choice and must NOT equal the correct value. Use the empty string \"\" on the correct choice and when this option is not numeric."),
+				"distractor_atom_id":    str("REQUIRED FIELD. For a wrong non-numeric choice: the exact evidence atom ID of the real source claim this option is drawn from. It must be one of the atoms supplied in the context and must not be the slot's own atom. Use the empty string \"\" on the correct choice and when this option is not taken from a source claim."),
+			}, "content", "is_correct", "distractor_expression", "distractor_atom_id"),
 		},
 	}
 
@@ -607,11 +614,15 @@ definition, named part, label, or unchanged property is recall or
   cannot.
 - error-finding: show the student a short worked attempt inside the stem, with
   exactly one mistake in it, and ask what is wrong with it or what the result
-  should be. Print the wrong result the flawed work produces. Put the flawed
-  arithmetic in flawed_expression and the correct arithmetic in
-  calculation.expression; both are evaluated independently and must disagree.
-  The mistake must be one a student plausibly makes -- a swapped operand, a
-  dropped factor, a wrong conversion -- not a typo or an invented rule.
+  should be. Print the wrong result the flawed work produces. The two
+  expressions are not interchangeable: calculation.expression is what the
+  problem should have been, flawed_expression is what the student in the stem
+  actually typed. Both are evaluated and they must produce different numbers --
+  putting the correct arithmetic in flawed_expression too leaves no mistake to
+  find and is rejected. The correct choice names the mistake rather than
+  restating the right number. The mistake must be one a student plausibly makes
+  -- a swapped operand, a dropped factor, a wrong conversion -- not a typo or
+  an invented rule. requires_calculation stays true: the item is arithmetic.
 - requires_calculation: set true only when arithmetic is necessary to answer;
   keep skill as recall, understanding, application, or analysis according to
   the cognitive demand. Set false when the item can be answered without
@@ -650,9 +661,12 @@ Compact assessment contract:
   never cite the slot's own atom as a distractor. If an option can be traced
   neither way it is a guess, not a distractor — replace it with one that can.
 - decoy_values lists givens the stem supplies that the solution never uses.
-  Each must appear in the stem and must not appear in calculation.expression.
-  Add them only when the slot asks for them, keep them believable for the
-  scenario, and make at least one wrong choice the result of using one.
+  Copy each one as the exact words or number that appear in your own stem, the
+  same way source_quote copies the passage -- "0.80 m" or "a long rainy season"
+  if that is what the stem says, never a summary such as "air resistance" for a
+  stem that never uses those words. A value the solution consumes is a given,
+  not a decoy. Add them only when the slot asks for them, keep them believable
+  for the scenario, and make at least one wrong choice the result of using one.
 - For hard application, include at least two distinct reasoning_steps in order
   and copy every supporting_atom_id assigned to the slot. The steps must be
   necessary to reach the keyed answer; adding connective words to a one-step
