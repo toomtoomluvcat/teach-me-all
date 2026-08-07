@@ -23,6 +23,11 @@ type EvidenceGraph = evidence.EvidenceGraph
 type EvidenceAtom = evidence.EvidenceAtom
 type CoverageContract = evidence.CoverageContract
 type CoverageSlot = evidence.CoverageSlot
+
+const (
+	DiscriminationLow  = evidence.DiscriminationLow
+	DiscriminationHigh = evidence.DiscriminationHigh
+)
 type ConceptNode = evidence.ConceptNode
 type ConceptEdge = evidence.ConceptEdge
 type EdgeKind = evidence.EdgeKind

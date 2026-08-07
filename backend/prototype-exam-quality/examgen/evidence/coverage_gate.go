@@ -67,27 +67,46 @@ func gateSetCoverage(q Question, contract CoverageContract, byChunk map[string]C
 		res.Reason = fmt.Sprintf("slot %s requires operation %s, got %s", slot.ID, slot.Operation, q.Operation)
 		return res
 	}
+	// The three difficulty axes. Each is checked against something the question
+	// carries, never against the difficulty word it reported: depth against the
+	// claims it cites, noise against verified decoys, discrimination against
+	// whether every wrong option is accounted for.
+	//
+	// Depth generalises what used to be an application+hard special case. A slot
+	// that was given a second claim requires the question to use it, whatever
+	// skill the slot carries — that is the only thing separating a two-claim
+	// item from the same claim restated.
+	if len(slot.SupportAtomIDs) > 0 && !coversAll(q.SupportingAtomIDs, slot.SupportAtomIDs) {
+		res.Reason = fmt.Sprintf("slot %s promises depth %d and requires supporting atoms %v, got %v",
+			slot.ID, slot.MinDepth, slot.SupportAtomIDs, q.SupportingAtomIDs)
+		return res
+	}
+	if slot.MinDecoys > 0 && len(q.DecoyValues) < slot.MinDecoys {
+		res.Reason = fmt.Sprintf("slot %s requires %d decoy value(s) the solution does not use, got %d",
+			slot.ID, slot.MinDecoys, len(q.DecoyValues))
+		return res
+	}
+	if strings.EqualFold(strings.TrimSpace(slot.Discrimination), DiscriminationHigh) {
+		if reason := checkHighDiscrimination(q, slot); reason != "" {
+			res.Reason = reason
+			return res
+		}
+	}
 	if strings.EqualFold(slot.Skill, "application") && (strings.EqualFold(slot.Difficulty, "medium") || strings.EqualFold(slot.Difficulty, "hard")) {
 		if strings.TrimSpace(q.ChangedCondition) == "" {
 			res.Reason = fmt.Sprintf("%s application slot %s must state the changed condition", slot.Difficulty, slot.ID)
 			return res
 		}
 	}
+	// The supporting-atom half of both blocks below is now the generic depth
+	// check above; what stays here is what is specific to the skill.
 	if strings.EqualFold(slot.Skill, "application") && strings.EqualFold(slot.Difficulty, "hard") {
-		if !coversAll(q.SupportingAtomIDs, slot.SupportAtomIDs) {
-			res.Reason = fmt.Sprintf("hard application slot %s requires supporting atoms %v, got %v", slot.ID, slot.SupportAtomIDs, q.SupportingAtomIDs)
-			return res
-		}
 		if !validReasoningSteps(q.ReasoningSteps) {
 			res.Reason = fmt.Sprintf("hard application slot %s needs two distinct reasoning steps", slot.ID)
 			return res
 		}
 	}
 	if strings.EqualFold(slot.Skill, "analysis") {
-		if !coversAll(q.SupportingAtomIDs, slot.SupportAtomIDs) {
-			res.Reason = fmt.Sprintf("analysis slot %s requires supporting atoms %v, got %v", slot.ID, slot.SupportAtomIDs, q.SupportingAtomIDs)
-			return res
-		}
 		// The atom-selection step already guaranteed SourceChunkIDs spans more
 		// than one chunk for an analysis slot (analysisSupportAtomIDs refuses a
 		// same-chunk candidate), so this is really re-checking that the slot
@@ -108,6 +127,49 @@ func gateSetCoverage(q Question, contract CoverageContract, byChunk map[string]C
 	res.Pass = true
 	res.Reason = fmt.Sprintf("slot %s uses atom %s from chunk %s", slot.ID, q.EvidenceAtomID, q.EvidenceChunkID)
 	return res
+}
+
+// checkHighDiscrimination is the enforceable half of "every option has to look
+// possible". It returns the reason the question falls short, or "".
+//
+// For a numeric item the bar is the strong one: every wrong option must name
+// the arithmetic a student would have run to land on it, which the distractor
+// path gate has already evaluated and matched to the printed number. Prose
+// items have no such handle, so they fall back to one distinct written reason
+// per wrong option — weaker, but it is the difference between an option set
+// that was thought about and one padded to four.
+func checkHighDiscrimination(q Question, slot *CoverageSlot) string {
+	idx := q.CorrectIndex()
+	if idx < 0 {
+		return fmt.Sprintf("slot %s needs one correct choice before its distractors can be judged", slot.ID)
+	}
+	wrong := len(q.Choices) - 1
+	if wrong < 1 {
+		return fmt.Sprintf("slot %s has no wrong choices to discriminate against", slot.ID)
+	}
+	if q.NeedsCalculation() {
+		for i, choice := range q.Choices {
+			if i == idx {
+				continue
+			}
+			if strings.TrimSpace(choice.DistractorExpression) == "" {
+				return fmt.Sprintf("slot %s asks for close distractors: numeric choice %d states no error path that produces it", slot.ID, i+1)
+			}
+		}
+		return ""
+	}
+	if len(q.DistractorReasons) < wrong {
+		return fmt.Sprintf("slot %s asks for close distractors: %d wrong choices but %d distractor_reasons", slot.ID, wrong, len(q.DistractorReasons))
+	}
+	seen := map[string]bool{}
+	for _, reason := range q.DistractorReasons {
+		key := strings.ToLower(squeeze(reason))
+		if len([]rune(key)) < 8 || seen[key] {
+			return fmt.Sprintf("slot %s asks for close distractors: distractor_reasons repeat or are too short to name a mistake", slot.ID)
+		}
+		seen[key] = true
+	}
+	return ""
 }
 
 // coversAll reports whether have contains every id in required. It deliberately

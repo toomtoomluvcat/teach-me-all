@@ -23,6 +23,86 @@ type CoverageSlot struct {
 	Operation           string   `json:"operation"`
 	Target              string   `json:"target"`
 	EvidenceQuote       string   `json:"evidence_quote"`
+
+	// The three axes difficulty is made of. Difficulty is derived from them by
+	// DifficultyFromAxes and is never assigned directly.
+	//
+	// Collapsing difficulty onto a single label hid two separate things and made
+	// one of them unreachable: with one axis, a recall item could only ever be
+	// easy, because retrieving one fact is one step and there was nothing else
+	// difficulty could be made of. Splitting the axes is what makes a hard recall
+	// item expressible — one retrieval, but between claims a student who only
+	// half-learned the material cannot tell apart.
+	MinDepth int `json:"min_depth,omitempty"`
+	// MinDecoys is how many stem givens the solution must not use.
+	MinDecoys int `json:"min_decoys,omitempty"`
+	// Discrimination is how close the wrong options must sit to the key.
+	Discrimination string `json:"discrimination,omitempty"`
+}
+
+// Discrimination tiers. Only two, because the enforceable difference is binary:
+// either every wrong option traces to a named error a student could make, or
+// the option set is allowed to contain filler.
+const (
+	DiscriminationLow  = "low"
+	DiscriminationHigh = "high"
+)
+
+// DifficultyFromAxes is the single source of truth for what a difficulty label
+// means.
+//
+//	easy   nothing raised
+//	medium any one axis raised
+//	hard   all three raised
+//
+// MinDepth counts distinct source claims the answer must consume, not
+// self-reported reasoning steps: the previous depth signal was a list the
+// writer wrote about its own question, which measured the writer rather than
+// the item. Two claims is the raised tier because it is the smallest depth that
+// cannot be reached by restating one sentence, and it is checkable — the
+// coverage gate already forces a question to cite every support atom.
+func DifficultyFromAxes(minDepth, minDecoys int, discrimination string) string {
+	deep := minDepth >= 2
+	noisy := minDecoys >= 1
+	sharp := strings.EqualFold(strings.TrimSpace(discrimination), DiscriminationHigh)
+	switch {
+	case deep && noisy && sharp:
+		return "hard"
+	case deep || noisy || sharp:
+		return "medium"
+	default:
+		return "easy"
+	}
+}
+
+// axesForDifficulty turns a requested difficulty back into one concrete axis
+// configuration.
+//
+// medium is satisfied by any single raised axis, so a request for it has to
+// pick one; asking for two would quietly make every medium item nearly hard and
+// starve the tier. The choice is per skill because the natural lever differs:
+// there is no second claim to add to a recall item without turning it into
+// something else, so recall and understanding get their difficulty from
+// discrimination, while application and analysis get it from depth.
+func axesForDifficulty(skill, difficulty string) (minDepth, minDecoys int, discrimination string) {
+	retrieval := false
+	switch canonicalSkill(skill) {
+	case "recall", "understanding", "":
+		retrieval = true
+	}
+	switch strings.ToLower(strings.TrimSpace(difficulty)) {
+	case "hard":
+		return 2, 1, DiscriminationHigh
+	case "medium":
+		if retrieval {
+			return 1, 0, DiscriminationHigh
+		}
+		return 2, 0, DiscriminationLow
+	case "easy":
+		return 1, 0, DiscriminationLow
+	default:
+		return 0, 0, ""
+	}
 }
 
 // CoverageContract is the compact set-level contract sent to the writer.
@@ -184,31 +264,28 @@ func buildCoverageContract(lesson Lesson, graph *EvidenceGraph, contextChunks []
 			slotRequiresCalculation = true
 			numericAssigned = true
 		}
-		difficulty := requiredDifficulty
-		if difficulty == "" && skill != "analysis" {
-			if requiredSkill == "" && !requiredCalculation {
-				difficulty = "easy"
-				if skill == "application" {
-					difficulty = "medium"
-				}
+		// The difficulty label is only ever pinned when the run explicitly asked
+		// for one. Left unpinned, the writer reports the difficulty it actually
+		// produced and the gate checks the axes instead of the word — the same
+		// reasoning that kept analysis slots unpinned, now applied to every
+		// skill. Defaulting recall and understanding to "easy" (which is what
+		// this used to do) was not a measurement, it was the single-axis model
+		// leaking into the contract: with nothing but depth to vary, one
+		// retrieval step could only be labelled easy.
+		minDepth, minDecoys, discrimination := axesForDifficulty(skill, requiredDifficulty)
+		if requiredDifficulty == "" {
+			minDepth, minDecoys, discrimination = evidenceAxes(atom, atoms, supportIDs)
+		}
+		// Depth is claims, so a slot that promises depth needs a second claim to
+		// point at. This replaces the old application+hard special case: the
+		// rule is the same for every skill now.
+		if minDepth >= 2 && len(supportIDs) == 0 {
+			supportIDs = supportingAtomIDs(atom, atoms, usedAtoms)
+			if len(supportIDs) == 0 {
+				continue
 			}
 		}
-		// analysis is deliberately left with difficulty == "" (genuinely
-		// unpinned, not defaulted to "easy") here: combining two distinct
-		// source ideas doesn't by itself make a question hard -- two
-		// directly-stated, closely-linked facts can be an easy analysis item,
-		// same as Bloom's "analyze" is a kind of cognitive operation, not a
-		// difficulty tier. Pinning the slot to any one difficulty would let
-		// the coverage gate reject a truthfully-harder or truthfully-easier
-		// question the writer actually produced. The writer reports the real
-		// difficulty; gateDemandContract scales the reasoning_steps floor to
-		// match (2 for easy/medium, 3 for hard).
-		if requiredSkill == "application" && requiredDifficulty == "hard" {
-			supportIDs = supportingAtomIDs(atom, atoms, usedAtoms)
-		}
-		if requiredSkill == "application" && requiredDifficulty == "hard" && len(supportIDs) == 0 {
-			continue
-		}
+		difficulty := requiredDifficulty
 		for _, supportID := range supportIDs {
 			usedAtoms[supportID] = true
 		}
@@ -229,12 +306,51 @@ func buildCoverageContract(lesson Lesson, graph *EvidenceGraph, contextChunks []
 			Skill:               skill,
 			RequiresCalculation: slotRequiresCalculation,
 			Difficulty:          difficulty,
+			MinDepth:            minDepth,
+			MinDecoys:           minDecoys,
+			Discrimination:      discrimination,
 			Operation:           atom.Relation,
 			Target:              atom.Claim,
 			EvidenceQuote:       atom.Quote,
 		})
 	}
 	return contract
+}
+
+// evidenceAxes reads the axes off the material instead of off the slot's
+// position in the set, which is what the old rotation did.
+//
+// Depth is however many claims the slot already commits the question to.
+// Discrimination is raised only when the context actually contains something
+// confusable — an item cannot be made hard to discriminate if the source offers
+// nothing to confuse it with, and demanding it anyway would reject good
+// questions on thin material. Decoys stay at zero: irrelevant givens are a
+// thing a run asks for on purpose, never something to sprinkle on by default.
+func evidenceAxes(atom EvidenceAtom, atoms []EvidenceAtom, supportIDs []string) (minDepth, minDecoys int, discrimination string) {
+	discrimination = DiscriminationLow
+	if hasConfusableSibling(atom, atoms) {
+		discrimination = DiscriminationHigh
+	}
+	return 1 + len(supportIDs), 0, discrimination
+}
+
+// hasConfusableSibling reports whether the context holds another claim a
+// half-learned student could mistake for this one: the same kind of
+// relationship, about a different fact, close enough to be in the same chunk or
+// to share a concept.
+func hasConfusableSibling(atom EvidenceAtom, atoms []EvidenceAtom) bool {
+	for _, other := range atoms {
+		if other.ID == atom.ID || strings.EqualFold(other.Claim, atom.Claim) {
+			continue
+		}
+		if !strings.EqualFold(other.Relation, atom.Relation) {
+			continue
+		}
+		if other.ChunkID == atom.ChunkID || sharesConcept(atom.ConceptIDs, other.ConceptIDs) {
+			return true
+		}
+	}
+	return false
 }
 
 // analysisSupportAtomIDs picks a genuinely distinct second idea to combine

@@ -118,13 +118,15 @@ func TestSetCoverageEnforcesCalculationFlag(t *testing.T) {
 
 func TestHardApplicationRequiresDemandContract(t *testing.T) {
 	contract := CoverageContract{Slots: []CoverageSlot{{ID: "S01", AtomID: "A001", SupportAtomIDs: []string{"A002"}, SourceChunkIDs: []string{"c1", "c2"}, Skill: "application", Difficulty: "hard", Operation: "causal", EvidenceQuote: "source claim"}}}
-	base := Question{CoverageSlotID: "S01", EvidenceAtomID: "A001", EvidenceChunkID: "c1", Skill: "application", Difficulty: "hard", Operation: "causal", SourceQuote: "source claim"}
+	// Supporting atoms are supplied up front so this probes only the missing
+	// changed condition; the generic depth check would otherwise reject the
+	// draft first and the test would stop testing what it names.
+	base := Question{CoverageSlotID: "S01", EvidenceAtomID: "A001", EvidenceChunkID: "c1", Skill: "application", Difficulty: "hard", Operation: "causal", SourceQuote: "source claim", SupportingAtomIDs: []string{"A002"}}
 	got := gateSetCoverage(base, contract, map[string]Chunk{"c1": {ID: "c1", Text: "source claim"}}, map[string]bool{}, map[string]bool{})
 	if got.Pass || !strings.Contains(got.Reason, "changed condition") {
 		t.Fatalf("hard application without changed condition passed: %#v", got)
 	}
 	base.ChangedCondition = "the input value changes from the source case"
-	base.SupportingAtomIDs = []string{"A002"}
 	base.ReasoningSteps = []string{"apply the source condition to the changed value", "compare the resulting outcome with the constraint"}
 	got = gateSetCoverage(base, contract, map[string]Chunk{"c1": {ID: "c1", Text: "source claim"}}, map[string]bool{}, map[string]bool{})
 	if !got.Pass {

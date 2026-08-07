@@ -423,8 +423,9 @@ func QuestionSetPrompt(lesson Lesson, graph *EvidenceGraph, chunks []Chunk, cont
 	}
 	b.WriteString("Coverage contract (one slot per distinct question):\n")
 	for _, slot := range contract.Slots {
-		fmt.Fprintf(&b, "- %s atom=%s support_atoms=%s chunk=%s skill=%s requires_calculation=%t difficulty=%s operation=%s target=%s evidence_quote=%q\n",
-			slot.ID, slot.AtomID, strings.Join(slot.SupportAtomIDs, ","), strings.Join(slot.SourceChunkIDs, ","), slot.Skill, slot.RequiresCalculation, slot.Difficulty, slot.Operation, slot.Target, slot.EvidenceQuote)
+		fmt.Fprintf(&b, "- %s atom=%s support_atoms=%s chunk=%s skill=%s requires_calculation=%t difficulty=%s min_claims=%d min_decoys=%d distractors=%s operation=%s target=%s evidence_quote=%q\n",
+			slot.ID, slot.AtomID, strings.Join(slot.SupportAtomIDs, ","), strings.Join(slot.SourceChunkIDs, ","), slot.Skill, slot.RequiresCalculation, slot.Difficulty,
+			slot.MinDepth, slot.MinDecoys, discriminationLabel(slot), slot.Operation, slot.Target, slot.EvidenceQuote)
 	}
 	if atoms := contractEvidenceAtoms(graph, contract); len(atoms) > 0 {
 		b.WriteString("\nEvidence packet for the assigned slots:\n")
@@ -446,7 +447,8 @@ func QuestionSetPrompt(lesson Lesson, graph *EvidenceGraph, chunks []Chunk, cont
 	b.WriteString("Slot execution protocol:\n")
 	b.WriteString("1. Work through the slots in order; use one output object for one slot.\n")
 	b.WriteString("2. Copy the exact slot/atom/chunk ID tuple from that row; never invent or mix IDs.\n")
-	b.WriteString("3. Copy the row skill, difficulty, and requires_calculation flag exactly. If the row is unsupported, omit only that row.\n")
+	b.WriteString("3. Copy the row skill and requires_calculation flag exactly. Copy difficulty when the row names one; when it is blank, report the difficulty the finished question honestly has. If the row is unsupported, omit only that row.\n")
+	b.WriteString("3a. Satisfy the row's three demand columns: min_claims is how many distinct source claims the answer must genuinely need (copy every support atom when it is 2 or more); min_decoys is how many stem givens the solution must not use (list them in decoy_values); distractors=close means every wrong option must be one a student could actually land on -- on a numeric question give each one a distractor_expression, otherwise give each one its own distinct distractor_reason.\n")
 	b.WriteString("4. For medium or hard application, fill changed_condition; for hard application, copy every support atom ID and provide at least two distinct reasoning_steps. For medium and hard questions, provide one short distractor_reason per wrong choice, each naming a distinct mistake -- never repeat the same distractor_reason text twice in one question.\n")
 	if forceCalc {
 		b.WriteString("5. For a slot whose skill is not fixed above, choose skill by what solving the calculation demands: understanding if the numbers plug straight into a formula the source already states solved for the unknown; application if you must isolate an unknown by rearranging or chaining the relationship first.\n")
@@ -461,6 +463,16 @@ func QuestionSetPrompt(lesson Lesson, graph *EvidenceGraph, chunks []Chunk, cont
 		b.WriteString("For slots marked requires_calculation=true, calculation.expression and calculation.expected are mandatory. Use the calculation object exactly when the flag is true.")
 	}
 	return b.String()
+}
+
+// discriminationLabel words the discrimination axis for the writer. "close" and
+// "ordinary" say what the option set has to look like; the internal tier names
+// would only invite the model to echo them back as a label.
+func discriminationLabel(slot CoverageSlot) string {
+	if strings.EqualFold(strings.TrimSpace(slot.Discrimination), DiscriminationHigh) {
+		return "close"
+	}
+	return "ordinary"
 }
 
 // contractEvidenceAtoms keeps the writer's claim vocabulary local to the
