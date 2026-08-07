@@ -1,5 +1,102 @@
 # Handoff — exam-quality prototype
 
+## Session 2026-08-08 — difficulty เป็น 3 แกน + distractor ที่ตรวจได้
+
+### แก้ความเข้าใจผิดใน "สิ่งที่ยังค้าง" ข้อ 14
+
+ข้อ 14 เขียนว่า calculation preset ปล่อย `slot.Skill` ว่าง **ผิด** ความจริงคือ
+`buildCoverageContract` แจก skill ด้วย rotation `preferred[len(slots)%3]` แล้ว
+`coverage_gate.go` บังคับให้โมเดล copy ตาม โมเดลเบี่ยง = ข้อโดน reject
+
+หลักฐาน: 4 run บน physics เดียวกัน (`.scratch/e0312e3e107a1953/`) ได้ skill
+sequence เหมือนกันเป๊ะ (S01 analysis, S02 application, S03 recall, S04 recall,
+S05 understanding) ขณะที่ expression และ difficulty เปลี่ยน — skill ถูกกำหนดโดย
+ตำแหน่ง slot ไม่ใช่เนื้อหา
+
+`prompt.go` step 5 ("for a slot whose skill is not fixed above") จึงเป็น dead
+instruction — ไม่มี calc slot ไหน unfixed เลย นี่คือเหตุผลจริงที่ prompt
+experiment 2 รอบไม่ขยับ ไม่ใช่ "โมเดล map เกณฑ์ไม่ได้"
+
+### สิ่งที่เปลี่ยน
+
+`CoverageSlot` มี 3 แกน difficulty เป็นค่า derive ไม่ใช่ค่าที่พิมพ์เอง:
+
+```text
+MinDepth        จำนวน source claim ที่คำตอบต้องใช้จริง (ไม่ใช่ reasoning_steps ที่โมเดลเขียนเอง)
+MinDecoys       ค่าใน stem ที่วิธีทำไม่ใช้
+Discrimination  low | high — ตัวลวงต้องใกล้เฉลยแค่ไหน
+
+easy   = ไม่ยกแกนไหนเลย
+medium = ยกแกนใดแกนหนึ่ง
+hard   = ยกทั้งสามแกน
+```
+
+`difficulty` ถูก pin เฉพาะเมื่อ run สั่ง ไม่งั้นปล่อยว่างให้โมเดลรายงานจริงแล้ว
+gate เช็คแกนแทนคำ (กติกาเดิมของ analysis ขยายไปทุก skill) `difficulty="easy"`
+ที่ hardcode ให้ recall/understanding **ถูกลบ**
+
+field ใหม่ที่ประกาศแล้ว Go ตรวจ (ท่าเดียวกับ `Calculation`):
+
+- `choices[].distractor_expression` — เลขผิดที่ eval ได้จริง ต้องตรงกับตัวเลขใน
+  ช้อยและต่างจากเฉลย
+- `choices[].distractor_atom_id` — สำหรับวิชาไม่มีเลข: ช้อยผิดคือ claim จริงจาก
+  ที่อื่นในเนื้อหา ต้อง resolve ได้และห้ามเป็น atom ของ slot เอง
+- `decoy_values` — ต้องอยู่ใน stem จริงและไม่อยู่ใน expression
+- `flawed_expression` — skill `error-finding` ใหม่: stem โชว์วิธีทำผิด Go พิสูจน์ว่าผิดจริง
+- gate ใหม่: `distractor_path`, `decoy_values`, `flawed_work`
+
+candidate selection ตัดสินด้วย `AxisTally` (ของที่ Go ตรวจแล้ว) **ก่อน** เรียก
+LLM grader — grader ถูกเรียกเฉพาะตอนเสมอทั้ง acceptance และ axis
+
+### ผลวัดจริง (DeepSeek, `--set-candidates 3 --budget 5`)
+
+physics `openstax-physics.pdf 140-220` / economics `economics-3e.pdf 60-150`
+
+| case | baseline เดิม | run แรก | run สุดท้าย |
+|---|---|---|---|
+| physics calculation | 5/5 (100%) | 2/8 (25%) | 3/7 (43%) |
+| physics error-finding | — | 2/10 | 2/9 |
+| physics recall-hard | — | 1/10 (10%) | **5/5 (100%)** |
+| econ recall | 5/5 (100%) | 5/6 (83%) | 5/6 (83%) |
+| econ recall-hard | — | 2/8 (25%) | 4/7 (57%) |
+| econ understanding | — | 5/5 (100%) | 5/6 (83%) |
+
+axis tally ของ run สุดท้าย: physics recall-hard = atom-backed 15, decoys 5,
+multi-claim 5 · econ recall-hard = atom-backed 12, decoys 5, multi-claim 4 ·
+physics calculation = error-paths 9 · physics error-finding = flawed-work 2
+
+**recall-hard เจนได้จริงทั้งสองวิชา** คือสิ่งที่ single-axis model ทำไม่ได้
+**calculation ยัง regress** (100% → 43%): บาร์สูงขึ้นจริง (ทุกช้อยผิดต้อง trace
+ได้) แต่ยังไม่คุ้มค่า yield ต้องดูต่อ
+
+### บทเรียนที่แพงที่สุดของ session นี้
+
+`OpenAIClient.ChatJSON` **รับ schema แล้วไม่ส่ง** — ตั้งแค่
+`response_format={"type":"json_object"}` บน DeepSeek (และ OpenAI-compatible
+ทุกเจ้า) schema ไม่ constrain อะไรเลย ทำ field เป็น `required` ในนั้น = ไม่มีผล
+(วัดแล้ว 2 รอบ ได้ 0 ทั้งคู่)
+
+สิ่งที่โมเดลตามจริงคือ **JSON template ท้าย `questionSystem`** — ย้าย field ไป
+ใส่ใน template รอบเดียว: verified error paths 0 → 9, atom-backed 0 → 15
+
+ผลข้างเคียงที่ตามมาทันที: template ที่ลืมใส่ `calculation` object ทำให้โมเดล
+เลิกส่ง calculation ทั้งชุด — **template คือ contract จริง ไม่ใช่ตัวอย่าง**
+
+### ที่ยังไม่ได้ทำ / รู้แล้วว่าเป็นปัญหา
+
+- `distractor_atom_id` ที่ชี้ atom ของ slot เอง: prompt แก้แล้วไม่หาย จึงใช้
+  `RepairDistractorAtoms` ตัด citation ทิ้งแทน reject ทั้งข้อ (defect อยู่ที่
+  label ไม่ใช่ตัวคำถาม) — แก้แล้ว econ recall 5/10 → 5/6
+- `"according to the passage"` ยังหลุดประปราย 1 ข้อ/run
+- prompt dedupe (bonus ที่ขอ) **ยังไม่ทำโดยตั้งใจ** — เปลี่ยน feature กับ prompt
+  พร้อมกันแล้ว attribute ผลไม่ได้ ตัวเลข: system prompt ≈ 3,200 token
+  (`questionSystem` 2,830 + set suffix 380) ส่วน schema description ทั้งหมด
+  **ไม่คิด token บน DeepSeek** เพราะไม่ได้ส่ง — ที่ตัดได้จริงมีแค่ prose ใน
+  `questionSystem` และ suffix ที่พูดซ้ำ slot protocol ใน user prompt
+- `error-finding` yield ต่ำ (2/9) — โมเดลยังใส่ expression ที่ถูกต้องลง
+  `flawed_expression` และผูก distractor_expression ผิดช้อยอยู่บ้าง
+
+
 อัปเดต 2026-08-07 บน branch `prototype/exam-quality`, working tree clean — ทุกโค้ด
 commit แล้ว รวม extraction diagnostics (`f81309e`) และ prompt skill-choice/
 distractor-dedup experiment (commit ถัดจากนี้ ดู `git log --oneline -5` สำหรับ
