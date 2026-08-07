@@ -123,6 +123,9 @@ type ExamResult struct {
 	SetCandidates      int `json:"set_candidates,omitempty"`
 	SetContractRetries int `json:"set_contract_retries,omitempty"`
 	SelectedSetScore   int `json:"selected_set_score,omitempty"`
+	// Axes is what the accepted questions demonstrably do, counted from the
+	// fields Go verified rather than from anything the writer said about them.
+	Axes AxisTally `json:"axes"`
 	// Quality is advisory semantic review for the selected set. It is not a
 	// hard acceptance gate and may be nil when the grader was unavailable.
 	Quality *QualityReport `json:"quality,omitempty"`
@@ -255,8 +258,27 @@ func selectSetCandidate(ctx context.Context, lesson Lesson, graph *EvidenceGraph
 			contenders = append(contenders, candidate)
 		}
 	}
+	// Verified demand decides before the grader is asked anything. It costs no
+	// call, and where it separates two candidates it separates them on
+	// evaluated arithmetic rather than on a second model's opinion — so paying
+	// for the opinion first would be paying to be told something less reliable.
 	if len(contenders) > 1 {
-		d.Log.report("quality", len(contenders), len(drafted), "grading only the candidates tied on acceptance")
+		sharpest := contenders[:1]
+		for _, candidate := range contenders[1:] {
+			switch {
+			case candidate.Axes.Total() > sharpest[0].Axes.Total():
+				sharpest = []*ExamResult{candidate}
+			case candidate.Axes.Total() == sharpest[0].Axes.Total():
+				sharpest = append(sharpest, candidate)
+			}
+		}
+		if len(sharpest) < len(contenders) {
+			d.Log.report("set-axes", len(sharpest), len(contenders), fmt.Sprintf("verified demand %d broke the acceptance tie", sharpest[0].Axes.Total()))
+		}
+		contenders = sharpest
+	}
+	if len(contenders) > 1 {
+		d.Log.report("quality", len(contenders), len(drafted), "grading only the candidates still tied on acceptance and verified demand")
 	}
 
 	best := contenders[0]
@@ -367,14 +389,76 @@ func evaluateSetCandidate(ctx context.Context, lesson Lesson, graph *EvidenceGra
 		}
 		d.Log.report("set-gate", len(res.Passed), contract.Budget, gateNote(rep))
 	}
+	res.Axes = tallyAxes(res.Passed)
 	res.Ceiling = len(res.Passed) < contract.Budget
 	return res
 }
 
-// setCandidateScore is intentionally acceptance-first. Semantic quality is a
-// normalized tie-break after deterministic acceptance, then diversity prefers
-// candidates that cover more atoms, skills, relations, and chunks. The grader
-// is advisory: a missing or malformed report contributes nothing.
+// AxisTally counts the demand a set actually carries. Every field is read off
+// something a gate already evaluated — an expression that ran, a decoy checked
+// against the stem, a supporting atom the question cited — so two candidates
+// can be compared on demand without asking a model which one it likes.
+type AxisTally struct {
+	// VerifiedErrorPaths is wrong options whose arithmetic was evaluated and
+	// matched to the number printed in the option.
+	VerifiedErrorPaths int `json:"verified_error_paths"`
+	// AtomBackedDistractors is wrong options that name a real claim from
+	// elsewhere in the source. It is the non-numeric counterpart of
+	// VerifiedErrorPaths and is what lets a prose subject register demand here
+	// at all.
+	AtomBackedDistractors int `json:"atom_backed_distractors"`
+	// VerifiedDecoys is stem givens confirmed present and unused.
+	VerifiedDecoys int `json:"verified_decoys"`
+	// MultiClaim is accepted questions that had to cite a second source claim.
+	MultiClaim int `json:"multi_claim"`
+	// VerifiedFlawedWork is error-finding items whose displayed mistake was
+	// evaluated and shown to differ from the correct value.
+	VerifiedFlawedWork int `json:"verified_flawed_work"`
+}
+
+// Total is the single number the candidate selector compares.
+func (a AxisTally) Total() int {
+	return a.VerifiedErrorPaths + a.AtomBackedDistractors + a.VerifiedDecoys + a.MultiClaim + a.VerifiedFlawedWork
+}
+
+func tallyAxes(accepted []Question) AxisTally {
+	var out AxisTally
+	for _, q := range accepted {
+		idx := q.CorrectIndex()
+		for i, choice := range q.Choices {
+			if i == idx {
+				continue
+			}
+			// One option counts once. A numeric distractor that also names the
+			// claim it came from is better written, not twice as much demand.
+			switch {
+			case strings.TrimSpace(choice.DistractorExpression) != "":
+				out.VerifiedErrorPaths++
+			case strings.TrimSpace(choice.DistractorAtomID) != "":
+				out.AtomBackedDistractors++
+			}
+		}
+		out.VerifiedDecoys += len(q.DecoyValues)
+		if len(q.SupportingAtomIDs) > 0 {
+			out.MultiClaim++
+		}
+		if strings.TrimSpace(q.FlawedExpression) != "" {
+			out.VerifiedFlawedWork++
+		}
+	}
+	return out
+}
+
+// setCandidateScore is intentionally acceptance-first. Below acceptance sits the
+// verified demand tally, then advisory semantic quality, then diversity.
+//
+// The axis tally is weighted to beat the entire semantic band rather than to
+// interleave with it. Both are tie-breaks under acceptance, but they are not
+// the same kind of evidence: the tally counts expressions that were evaluated
+// and decoys that were checked against the stem, while the grader is one model
+// asked for an opinion about another model's output. Letting a large enough
+// swing in the opinion outrank a candidate that demonstrably carries more
+// verified demand would put the softer signal in charge of the harder one.
 func setCandidateScore(res *ExamResult, graph *EvidenceGraph) int {
 	if res == nil {
 		return -1
@@ -401,12 +485,14 @@ func setCandidateScore(res *ExamResult, graph *EvidenceGraph) int {
 	if res.Quality != nil && res.Quality.CompleteFor(len(res.Passed)) {
 		semantic = res.Quality.TotalScore * 1000 / res.Quality.MaxScore
 	}
-	// The acceptance weight is an order of magnitude above the semantic band on
-	// purpose. semantic maxes out at 1000, so at the old 1_000_000 weight a
-	// perfectly-graded set could tie a set that accepted one more question —
-	// which contradicts "acceptance-first" and would make the selector's answer
-	// depend on which candidates happened to be graded.
-	return len(res.Passed)*10_000_000 + semantic*1_000 + len(seenAtoms)*500 + len(seenSkills)*100 + len(seenRelations)*75 + len(seenChunks)*25 - len(res.FailuresByGate())*10
+	// The acceptance weight stays far above every tie-break on purpose. semantic
+	// maxes out at 1000 and the axis tally is bounded by the budget, so at the
+	// old 1_000_000 weight a perfectly-graded set could tie a set that accepted
+	// one more question — which contradicts "acceptance-first" and would make
+	// the selector's answer depend on which candidates happened to be graded.
+	return len(res.Passed)*1_000_000_000 + res.Axes.Total()*1_100_000 + semantic*1_000 +
+		len(seenAtoms)*500 + len(seenSkills)*100 + len(seenRelations)*75 + len(seenChunks)*25 -
+		len(res.FailuresByGate())*10
 }
 
 const maxRejectedDrafts = 4

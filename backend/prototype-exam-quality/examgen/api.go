@@ -48,6 +48,7 @@ type Progress = generation.Progress
 type Deps = generation.Deps
 type ExamOptions = generation.ExamOptions
 type ExamResult = generation.ExamResult
+type AxisTally = generation.AxisTally
 type Evaluator = gates.Evaluator
 type Arith = model.Arith
 

@@ -448,7 +448,7 @@ func QuestionSetPrompt(lesson Lesson, graph *EvidenceGraph, chunks []Chunk, cont
 	b.WriteString("1. Work through the slots in order; use one output object for one slot.\n")
 	b.WriteString("2. Copy the exact slot/atom/chunk ID tuple from that row; never invent or mix IDs.\n")
 	b.WriteString("3. Copy the row skill and requires_calculation flag exactly. Copy difficulty when the row names one; when it is blank, report the difficulty the finished question honestly has. If the row is unsupported, omit only that row.\n")
-	b.WriteString("3a. Satisfy the row's three demand columns: min_claims is how many distinct source claims the answer must genuinely need (copy every support atom when it is 2 or more); min_decoys is how many stem givens the solution must not use (list them in decoy_values); distractors=close means every wrong option must be one a student could actually land on -- on a numeric question give each one a distractor_expression, otherwise give each one its own distinct distractor_reason.\n")
+	b.WriteString("3a. Satisfy the row's three demand columns: min_claims is how many distinct source claims the answer must genuinely need (copy every support atom when it is 2 or more); min_decoys is how many stem givens the solution must not use (list them in decoy_values); distractors=close means every wrong option must be one a student could actually land on -- on a numeric question give each one a distractor_expression, on a question without arithmetic give each one a distractor_atom_id naming the real source claim it comes from, and failing both give each one its own distinct distractor_reason.\n")
 	b.WriteString("4. For medium or hard application, fill changed_condition; for hard application, copy every support atom ID and provide at least two distinct reasoning_steps. For medium and hard questions, provide one short distractor_reason per wrong choice, each naming a distinct mistake -- never repeat the same distractor_reason text twice in one question.\n")
 	if forceCalc {
 		b.WriteString("5. For a slot whose skill is not fixed above, choose skill by what solving the calculation demands: understanding if the numbers plug straight into a formula the source already states solved for the unknown; application if you must isolate an unknown by rearranging or chaining the relationship first.\n")
@@ -549,6 +549,7 @@ func questionSchema(forceCalc bool) map[string]any {
 				"content":    str("the choice text"),
 				"is_correct": map[string]any{"type": "boolean"},
 				"distractor_expression": str("for a wrong numeric choice only: the plain arithmetic expression a student who made one specific mistake would evaluate, in the same alphabet as calculation.expression. It must produce exactly the number printed in this choice and must not equal the keyed value. Leave empty on the correct choice and on non-numeric choices."),
+				"distractor_atom_id":    str("for a wrong non-numeric choice: the exact evidence atom ID of the real source claim this option is drawn from. It must be a claim in the supplied context and must not be the slot's own atom. Leave empty on the correct choice and when the option is not taken from a source claim."),
 			}, "content", "is_correct"),
 		},
 	}
@@ -639,12 +640,15 @@ Compact assessment contract:
   needs its own distinct misconception, even when two choices are wrong for a
   related reason (e.g. one direction-confusion and one axis-confusion are
   different mistakes, not the same one twice).
-- On a numeric question, give every wrong choice a distractor_expression: the
-  arithmetic a student who made one specific mistake would actually evaluate.
-  It must produce the exact number printed in that choice and must differ from
-  the keyed value. Do not attach one to the correct choice. If you cannot name
-  the mistake as arithmetic, the option is a guess, not a distractor — replace
-  it with one you can.
+- Every wrong choice must be traceable, by whichever route the subject allows.
+  On a numeric question give it a distractor_expression: the arithmetic a
+  student who made one specific mistake would actually evaluate, producing the
+  exact number printed in that choice and differing from the keyed value. On a
+  question with no arithmetic give it a distractor_atom_id: the real source
+  claim the option is drawn from, so the wrong answers are true statements that
+  do not answer this question. Never attach either to the correct choice, and
+  never cite the slot's own atom as a distractor. If an option can be traced
+  neither way it is a guess, not a distractor — replace it with one that can.
 - decoy_values lists givens the stem supplies that the solution never uses.
   Each must appear in the stem and must not appear in calculation.expression.
   Add them only when the slot asks for them, keep them believable for the

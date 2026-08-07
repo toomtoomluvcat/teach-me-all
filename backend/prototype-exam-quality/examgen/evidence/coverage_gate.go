@@ -86,12 +86,19 @@ func gateSetCoverage(q Question, contract CoverageContract, byChunk map[string]C
 			slot.ID, slot.MinDecoys, len(q.DecoyValues))
 		return res
 	}
+	// Checked whether or not the slot asked for close distractors: an atom ID
+	// that resolves to nothing is a defect on its own, and leaving it unchecked
+	// would let a question look atom-backed without being it.
+	if reason := checkDistractorAtoms(q, slot, contract); reason != "" {
+		res.Reason = reason
+		return res
+	}
 	if canonicalSkill(slot.Skill) == SkillErrorFinding && strings.TrimSpace(q.FlawedExpression) == "" {
 		res.Reason = fmt.Sprintf("error-finding slot %s must state the flawed work its stem shows", slot.ID)
 		return res
 	}
 	if strings.EqualFold(strings.TrimSpace(slot.Discrimination), DiscriminationHigh) {
-		if reason := checkHighDiscrimination(q, slot); reason != "" {
+		if reason := checkHighDiscrimination(q, slot, contract); reason != "" {
 			res.Reason = reason
 			return res
 		}
@@ -133,6 +140,35 @@ func gateSetCoverage(q Question, contract CoverageContract, byChunk map[string]C
 	return res
 }
 
+// checkDistractorAtoms validates any wrong option that claims to be a real
+// neighbouring claim from the source. It returns the reason it is not, or "".
+//
+// This is the non-numeric half of the distractor check. A history, biology, or
+// civics item has no arithmetic to be wrong about, so the equivalent evidence
+// that a distractor was chosen rather than invented is that it names something
+// the source actually says — somewhere other than where the answer lives.
+func checkDistractorAtoms(q Question, slot *CoverageSlot, contract CoverageContract) string {
+	idx := q.CorrectIndex()
+	for i, choice := range q.Choices {
+		id := strings.TrimSpace(choice.DistractorAtomID)
+		if id == "" {
+			continue
+		}
+		if i == idx {
+			return fmt.Sprintf("slot %s: the correct choice cites distractor claim %s; the key is not a distractor", slot.ID, id)
+		}
+		if id == slot.AtomID {
+			return fmt.Sprintf("slot %s: wrong choice %d cites the answer's own claim %s, which makes it the answer again", slot.ID, i+1, id)
+		}
+		// An empty vocabulary means the caller could not supply one, and
+		// rejecting on evidence that was never available is not a check.
+		if len(contract.GraphAtomIDs) > 0 && !contract.KnowsAtom(id) {
+			return fmt.Sprintf("slot %s: wrong choice %d cites distractor claim %s, which is not in the set context", slot.ID, i+1, id)
+		}
+	}
+	return ""
+}
+
 // checkHighDiscrimination is the enforceable half of "every option has to look
 // possible". It returns the reason the question falls short, or "".
 //
@@ -142,7 +178,7 @@ func gateSetCoverage(q Question, contract CoverageContract, byChunk map[string]C
 // items have no such handle, so they fall back to one distinct written reason
 // per wrong option — weaker, but it is the difference between an option set
 // that was thought about and one padded to four.
-func checkHighDiscrimination(q Question, slot *CoverageSlot) string {
+func checkHighDiscrimination(q Question, slot *CoverageSlot, contract CoverageContract) string {
 	idx := q.CorrectIndex()
 	if idx < 0 {
 		return fmt.Sprintf("slot %s needs one correct choice before its distractors can be judged", slot.ID)
@@ -160,6 +196,20 @@ func checkHighDiscrimination(q Question, slot *CoverageSlot) string {
 				return fmt.Sprintf("slot %s asks for close distractors: numeric choice %d states no error path that produces it", slot.ID, i+1)
 			}
 		}
+		return ""
+	}
+	// A source with no arithmetic in it has a stronger option than prose: every
+	// wrong choice can be a real claim from elsewhere in the material, named by
+	// atom. When the question takes that option it is held to it — a made-up
+	// atom ID is worse than no ID at all — and otherwise it falls back to one
+	// distinct written reason per wrong option.
+	atomBacked := 0
+	for i, choice := range q.Choices {
+		if i != idx && strings.TrimSpace(choice.DistractorAtomID) != "" {
+			atomBacked++
+		}
+	}
+	if atomBacked == wrong {
 		return ""
 	}
 	if len(q.DistractorReasons) < wrong {

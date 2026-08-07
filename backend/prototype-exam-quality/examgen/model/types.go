@@ -193,6 +193,17 @@ type Choice struct {
 	// made-up number cannot survive that, and one that is the result of a real
 	// error path passes without the model being asked to argue for it.
 	DistractorExpression string `json:"distractor_expression,omitempty"`
+	// DistractorAtomID is the same idea for a source with no arithmetic in it:
+	// the wrong option is a real claim from elsewhere in the material, named by
+	// its graph atom, rather than something invented to fill a fourth line.
+	//
+	// A history or biology item cannot declare an error path, so without this
+	// the strongest distractor check would only ever apply to numeric subjects.
+	// Pointing at a neighbouring atom is checkable the same way supporting atoms
+	// already are — the ID either resolves against the compiled graph or it does
+	// not — and it is also the oldest distractor-writing technique there is:
+	// the wrong answers are true statements that do not answer the question.
+	DistractorAtomID string `json:"distractor_atom_id,omitempty"`
 }
 
 // Calculation is present only on questions whose answer is arithmetic.

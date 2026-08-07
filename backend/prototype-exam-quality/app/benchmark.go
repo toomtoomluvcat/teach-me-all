@@ -272,6 +272,10 @@ type benchmarkCaseResult struct {
 	SetCandidates       int                    `json:"set_candidates"`
 	LengthBiasPassed    int                    `json:"length_bias_passed"`
 	LengthBiasTotal     int                    `json:"length_bias_total"`
+	// Axes is the verified-demand tally of the shipped set: how much of the
+	// three-axis contract the accepted questions actually carry, counted from
+	// evaluated expressions and checked decoys rather than from labels.
+	Axes examgen.AxisTally `json:"axes"`
 	Quality             *examgen.QualityReport `json:"quality,omitempty"`
 	Questions           []benchmarkQuestion    `json:"questions"`
 }
@@ -344,6 +348,13 @@ func runBenchmark(ctx context.Context, cfg config, outline *examgen.Outline, chu
 			caseResult.CalculationAccepted, caseResult.CalculationDrafts,
 			caseResult.DemandPassed, caseResult.ChangedCondition, caseResult.NumericVerified, caseResult.ContractRetries,
 			caseResult.LengthBiasPassed, caseResult.LengthBiasTotal, reset)
+		// Printed separately from the pass-rate line: these count what the shipped
+		// questions demonstrably do, which is a different question from how many
+		// of them survived the gates.
+		axes := caseResult.Axes
+		fmt.Printf("%s%s axes: error-paths %d, atom-backed %d, decoys %d, multi-claim %d, flawed-work %d%s\n",
+			dim, benchmark.Name, axes.VerifiedErrorPaths, axes.AtomBackedDistractors,
+			axes.VerifiedDecoys, axes.MultiClaim, axes.VerifiedFlawedWork, reset)
 	}
 
 	dir := scratchDir(cfg)
@@ -369,6 +380,7 @@ func makeBenchmarkCaseResult(benchmark benchmarkCase, res *examgen.ExamResult) b
 		Budget:          res.Budget,
 		Quality:         res.Quality,
 		Drafts:          len(res.Questions),
+		Axes:            res.Axes,
 		ContractRetries: res.SetContractRetries,
 		// How many candidate sets the run actually generated, which
 		// --stop-on-full-set and a failed candidate both make differ from the

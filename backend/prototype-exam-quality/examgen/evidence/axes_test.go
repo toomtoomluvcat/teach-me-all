@@ -173,3 +173,59 @@ func TestCoverageEnforcesDepthForEverySkill(t *testing.T) {
 		t.Fatalf("a two-claim recall question was rejected: %#v", got)
 	}
 }
+
+// The non-numeric route to a verified distractor. A source with no arithmetic
+// in it must still be able to satisfy the discrimination axis, or the axis only
+// ever applies to numeric subjects.
+func TestCoverageHighDiscriminationAcceptsAtomBackedDistractors(t *testing.T) {
+	contract := slotWithAxes(1, 0, DiscriminationHigh)
+	contract.GraphAtomIDs = []string{"A001", "A002", "A003", "A004"}
+	q := axisQuestion()
+	q.Choices[1].DistractorAtomID = "A002"
+	q.Choices[2].DistractorAtomID = "A003"
+	q.Choices[3].DistractorAtomID = "A004"
+	if got := runCoverage(q, contract); !got.Pass {
+		t.Fatalf("atom-backed distractors were rejected: %#v", got)
+	}
+}
+
+func TestCoverageRejectsInventedDistractorAtom(t *testing.T) {
+	contract := slotWithAxes(1, 0, DiscriminationLow)
+	contract.GraphAtomIDs = []string{"A001", "A002"}
+	q := axisQuestion()
+	q.Choices[1].DistractorAtomID = "A999"
+	if got := runCoverage(q, contract); got.Pass {
+		t.Fatal("a distractor citing a claim that is not in the context must fail")
+	}
+}
+
+// A wrong option that cites the answer's own claim is the answer written twice.
+func TestCoverageRejectsDistractorCitingTheSlotAtom(t *testing.T) {
+	contract := slotWithAxes(1, 0, DiscriminationLow)
+	contract.GraphAtomIDs = []string{"A001", "A002"}
+	q := axisQuestion()
+	q.Choices[1].DistractorAtomID = "A001"
+	if got := runCoverage(q, contract); got.Pass {
+		t.Fatal("a wrong choice must not cite the slot's own atom")
+	}
+}
+
+func TestCoverageRejectsDistractorAtomOnTheKey(t *testing.T) {
+	contract := slotWithAxes(1, 0, DiscriminationLow)
+	contract.GraphAtomIDs = []string{"A001", "A002"}
+	q := axisQuestion()
+	q.Choices[0].DistractorAtomID = "A002"
+	if got := runCoverage(q, contract); got.Pass {
+		t.Fatal("the key must not be labelled a distractor")
+	}
+}
+
+// Without a compiled vocabulary there is nothing to check against, and
+// rejecting on evidence that was never supplied is not a check.
+func TestCoverageSkipsAtomVocabularyCheckWhenContextHasNone(t *testing.T) {
+	q := axisQuestion()
+	q.Choices[1].DistractorAtomID = "A999"
+	if got := runCoverage(q, slotWithAxes(1, 0, DiscriminationLow)); !got.Pass {
+		t.Fatalf("no vocabulary means no verdict, got %#v", got)
+	}
+}

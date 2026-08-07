@@ -126,6 +126,16 @@ type CoverageContract struct {
 	// RequiredCalculation is an internal run target. It makes arithmetic an
 	// orthogonal requirement rather than a fake skill value.
 	RequiredCalculation bool `json:"-"`
+	// GraphAtomIDs is every claim compiled from the set context. The coverage
+	// gate needs it to tell a distractor that points at a real neighbouring
+	// claim from one that points at an ID the model made up, and the gate is
+	// deliberately given no access to the graph itself.
+	GraphAtomIDs []string `json:"-"`
+}
+
+// KnowsAtom reports whether id is a claim compiled from this run's context.
+func (c CoverageContract) KnowsAtom(id string) bool {
+	return containsString(c.GraphAtomIDs, strings.TrimSpace(id))
 }
 
 // PreflightCoverageContract repairs only deterministic contract defects before
@@ -198,6 +208,7 @@ func buildCoverageContract(lesson Lesson, graph *EvidenceGraph, contextChunks []
 			continue
 		}
 		atoms = append(atoms, atom)
+		contract.GraphAtomIDs = append(contract.GraphAtomIDs, atom.ID)
 	}
 	if requiredSkill == "application" && requiredDifficulty == "hard" {
 		withSupport := make([]EvidenceAtom, 0, len(atoms))
