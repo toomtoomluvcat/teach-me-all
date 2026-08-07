@@ -23,6 +23,9 @@ const (
 	GateCoverage   = model.GateCoverage
 	GateDemand     = model.GateDemand
 
+	GateDecoy          = model.GateDecoy
+	GateDistractorPath = model.GateDistractorPath
+
 	SourceRoleUnknown          = model.SourceRoleUnknown
 	SourceRoleCore             = model.SourceRoleCore
 	SourceRolePrelearningCheck = model.SourceRolePrelearningCheck

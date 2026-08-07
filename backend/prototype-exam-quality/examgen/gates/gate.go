@@ -64,6 +64,8 @@ func RunCheapGates(q Question, chunk Chunk, ev Evaluator) *GateReport {
 	rep.Results = append(rep.Results, gateArithmetic(q, ev))
 	rep.Results = append(rep.Results, gateUnitCheck(q))
 	rep.Results = append(rep.Results, gateDemandContract(q))
+	rep.Results = append(rep.Results, gateDistractorPath(q, ev))
+	rep.Results = append(rep.Results, gateDecoy(q))
 	return rep
 }
 

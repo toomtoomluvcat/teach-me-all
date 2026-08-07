@@ -524,6 +524,10 @@ func questionSchema(forceCalc bool) map[string]any {
 			"type": "array", "maxItems": 3,
 			"items": str("exact support atom ID from the assigned hard slot"),
 		},
+		"decoy_values": map[string]any{
+			"type": "array", "maxItems": 3,
+			"items": str("a quantity or condition the stem supplies that the correct solution never uses; it must appear in the stem and must not appear in calculation.expression"),
+		},
 		"choices": map[string]any{
 			"type":     "array",
 			"minItems": 4,
@@ -531,6 +535,7 @@ func questionSchema(forceCalc bool) map[string]any {
 			"items": obj(map[string]any{
 				"content":    str("the choice text"),
 				"is_correct": map[string]any{"type": "boolean"},
+				"distractor_expression": str("for a wrong numeric choice only: the plain arithmetic expression a student who made one specific mistake would evaluate, in the same alphabet as calculation.expression. It must produce exactly the number printed in this choice and must not equal the keyed value. Leave empty on the correct choice and on non-numeric choices."),
 			}, "content", "is_correct"),
 		},
 	}
@@ -614,6 +619,16 @@ Compact assessment contract:
   needs its own distinct misconception, even when two choices are wrong for a
   related reason (e.g. one direction-confusion and one axis-confusion are
   different mistakes, not the same one twice).
+- On a numeric question, give every wrong choice a distractor_expression: the
+  arithmetic a student who made one specific mistake would actually evaluate.
+  It must produce the exact number printed in that choice and must differ from
+  the keyed value. Do not attach one to the correct choice. If you cannot name
+  the mistake as arithmetic, the option is a guess, not a distractor — replace
+  it with one you can.
+- decoy_values lists givens the stem supplies that the solution never uses.
+  Each must appear in the stem and must not appear in calculation.expression.
+  Add them only when the slot asks for them, keep them believable for the
+  scenario, and make at least one wrong choice the result of using one.
 - For hard application, include at least two distinct reasoning_steps in order
   and copy every supporting_atom_id assigned to the slot. The steps must be
   necessary to reach the keyed answer; adding connective words to a one-step

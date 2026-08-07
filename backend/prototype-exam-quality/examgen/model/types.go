@@ -182,6 +182,17 @@ const (
 type Choice struct {
 	Content   string `json:"content"`
 	IsCorrect bool   `json:"is_correct"`
+	// DistractorExpression is the arithmetic a student who made one specific
+	// mistake would actually evaluate, present only on wrong numeric choices.
+	//
+	// It exists because "why is this wrong" written as prose is unfalsifiable:
+	// distractor_reasons already claimed every wrong option came from a real
+	// misconception and nothing could check the claim. An expression can be
+	// checked — Go evaluates it, compares it to the number printed in the
+	// choice, and confirms it differs from the key. A distractor that is a
+	// made-up number cannot survive that, and one that is the result of a real
+	// error path passes without the model being asked to argue for it.
+	DistractorExpression string `json:"distractor_expression,omitempty"`
 }
 
 // Calculation is present only on questions whose answer is arithmetic.
@@ -258,6 +269,16 @@ type Question struct {
 	ReasoningSteps    []string `json:"reasoning_steps,omitempty"`
 	ChangedCondition  string   `json:"changed_condition,omitempty"`
 	DistractorReasons []string `json:"distractor_reasons,omitempty"`
+	// DecoyValues are the quantities the stem supplies that the correct
+	// solution never uses. They are the "irrelevant information" axis: a
+	// student who cannot tell which givens matter has to decide, instead of
+	// feeding every number in the stem into the one formula available.
+	//
+	// Declared rather than inferred, for the same reason Calculation is: a Go
+	// diff of stem numbers against expression operands cannot tell a decoy from
+	// a unit conversion ("20 cm" in the stem, 0.2 in the expression). The model
+	// declares, Go verifies each value is really in the stem and really unused.
+	DecoyValues []string `json:"decoy_values,omitempty"`
 
 	// Set-generation provenance. The per-chunk path leaves these empty; the
 	// set path requires them so a question can be traced to one graph atom and
@@ -424,6 +445,13 @@ const (
 	GateDistinct   GateName = "not_a_duplicate"
 	GateCoverage   GateName = "coverage_contract"
 	GateDemand     GateName = "demand_contract"
+	// GateDecoy checks declared decoy values are genuinely in the stem and
+	// genuinely unused by the solution.
+	GateDecoy GateName = "decoy_values"
+	// GateDistractorPath checks each declared wrong-answer expression really
+	// evaluates to the number printed in that choice, and really differs from
+	// the key.
+	GateDistractorPath GateName = "distractor_path"
 )
 
 // GateResult is the outcome of one check.
