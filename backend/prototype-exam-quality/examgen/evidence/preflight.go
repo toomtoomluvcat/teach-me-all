@@ -179,6 +179,46 @@ func RepairQuestionProvenance(q Question, contract CoverageContract, graph *Evid
 	return q
 }
 
+// RepairDistractorAtoms strips a distractor citation that cannot be true.
+//
+// Measured across two subjects and four runs: the writer routinely tags a wrong
+// choice with the slot's own atom, which claims the wrong choice is the answer.
+// Rejecting the question for it costs a whole item over a label, and the option
+// text is usually fine — the defect is in the metadata, not in the question. So
+// this drops the bad citation and lets the remaining evidence decide: a slot
+// that asked for close distractors now falls back to needing one distinct
+// written reason per wrong option, and fails on that if the reasons are absent.
+// Nothing is invented, which is the line the whole preflight pass holds.
+func RepairDistractorAtoms(q Question, contract CoverageContract) Question {
+	var slot *CoverageSlot
+	for i := range contract.Slots {
+		if contract.Slots[i].ID == q.CoverageSlotID {
+			slot = &contract.Slots[i]
+			break
+		}
+	}
+	repaired := append([]Choice(nil), q.Choices...)
+	changed := false
+	correct := q.CorrectIndex()
+	for i := range repaired {
+		id := strings.TrimSpace(repaired[i].DistractorAtomID)
+		if id == "" {
+			continue
+		}
+		bogus := i == correct ||
+			(slot != nil && id == slot.AtomID) ||
+			(len(contract.GraphAtomIDs) > 0 && !contract.KnowsAtom(id))
+		if bogus {
+			repaired[i].DistractorAtomID = ""
+			changed = true
+		}
+	}
+	if changed {
+		q.Choices = repaired
+	}
+	return q
+}
+
 func quoteMatchesChunk(quote string, chunk Chunk) bool {
 	return strings.Contains(squeeze(chunk.Text), squeeze(quote))
 }

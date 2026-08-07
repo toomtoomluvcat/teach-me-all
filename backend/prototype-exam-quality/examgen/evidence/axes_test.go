@@ -229,3 +229,40 @@ func TestCoverageSkipsAtomVocabularyCheckWhenContextHasNone(t *testing.T) {
 		t.Fatalf("no vocabulary means no verdict, got %#v", got)
 	}
 }
+
+// A self-referential citation is a labelling defect, not a broken question, so
+// it is repaired away rather than costing the whole item.
+func TestRepairDistractorAtomsStripsCitationsThatCannotBeTrue(t *testing.T) {
+	contract := slotWithAxes(1, 0, DiscriminationHigh)
+	contract.GraphAtomIDs = []string{"A001", "A002"}
+	q := axisQuestion()
+	q.Choices[0].DistractorAtomID = "A002" // on the key
+	q.Choices[1].DistractorAtomID = "A001" // the slot's own atom
+	q.Choices[2].DistractorAtomID = "A404" // not in the context
+	q.Choices[3].DistractorAtomID = "A002" // legitimate
+	q = RepairDistractorAtoms(q, contract)
+	for i, want := range []string{"", "", "", "A002"} {
+		if got := q.Choices[i].DistractorAtomID; got != want {
+			t.Errorf("choice %d distractor atom = %q, want %q", i+1, got, want)
+		}
+	}
+}
+
+// After repair the question is judged on what is left, not on the label that
+// was removed: a slot asking for close distractors falls back to reasons.
+func TestRepairedQuestionStillFacesTheDiscriminationBar(t *testing.T) {
+	contract := slotWithAxes(1, 0, DiscriminationHigh)
+	contract.GraphAtomIDs = []string{"A001", "A002"}
+	q := axisQuestion()
+	for i := 1; i < len(q.Choices); i++ {
+		q.Choices[i].DistractorAtomID = "A001"
+	}
+	q = RepairDistractorAtoms(q, contract)
+	if got := runCoverage(q, contract); got.Pass {
+		t.Fatal("stripping the citations must not also strip the requirement")
+	}
+	q.DistractorReasons = []string{"confuses the ceiling with the floor", "reverses who benefits", "applies it to the wrong market"}
+	if got := runCoverage(q, contract); !got.Pass {
+		t.Fatalf("the written-reason fallback was rejected: %#v", got)
+	}
+}

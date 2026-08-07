@@ -74,6 +74,10 @@ func PreflightCoverageContract(contract CoverageContract, graph *EvidenceGraph, 
 func RepairQuestionProvenance(q Question, contract CoverageContract, graph *EvidenceGraph, chunks []Chunk) Question {
 	return evidence.RepairQuestionProvenance(q, contract, graph, chunks)
 }
+
+func RepairDistractorAtoms(q Question, contract CoverageContract) Question {
+	return evidence.RepairDistractorAtoms(q, contract)
+}
 func gateSetCoverage(q Question, contract CoverageContract, byChunk map[string]Chunk, usedSlots, usedAtoms map[string]bool) GateResult {
 	return evidence.GateSetCoverage(q, contract, byChunk, usedSlots, usedAtoms)
 }

@@ -357,6 +357,7 @@ func evaluateSetCandidate(ctx context.Context, lesson Lesson, graph *EvidenceGra
 	cheap := make([]*GateReport, len(qs))
 	for i, q := range qs {
 		q = RepairQuestionProvenance(q, contract, graph, contextChunks)
+		q = RepairDistractorAtoms(q, contract)
 		qs[i] = q
 		chunk := byChunk[q.EvidenceChunkID]
 		q.ChunkID = q.EvidenceChunkID

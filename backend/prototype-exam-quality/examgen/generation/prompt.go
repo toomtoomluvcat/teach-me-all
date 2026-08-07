@@ -295,6 +295,14 @@ a slot whose flag is false. Never duplicate choice text.`
 // contract. Ollama can enforce these through its grammar; providers that only
 // support JSON mode still get the same contract in the prompt and deterministic
 // gates remain authoritative.
+//
+// Read that second sentence literally before treating this schema as a lever:
+// OpenAIClient.ChatJSON takes the schema and never sends it, setting only
+// response_format={"type":"json_object"}. On DeepSeek and every other
+// OpenAI-compatible provider, nothing here constrains generation at all.
+// Marking a field required in this map was measured and changed nothing — what
+// the writer actually follows is the JSON template at the end of
+// questionSystem, so a field that must be emitted has to appear there.
 func QuestionSetSchemaForContract(forceCalc bool, contract CoverageContract) map[string]any {
 	return questionSetSchema(forceCalc, &contract)
 }
@@ -657,9 +665,12 @@ Compact assessment contract:
   exact number printed in that choice and differing from the keyed value. On a
   question with no arithmetic give it a distractor_atom_id: the real source
   claim the option is drawn from, so the wrong answers are true statements that
-  do not answer this question. Never attach either to the correct choice, and
-  never cite the slot's own atom as a distractor. If an option can be traced
-  neither way it is a guess, not a distractor — replace it with one that can.
+  do not answer this question. A distractor_atom_id must be a DIFFERENT atom
+  from the slot's own atom_id: that atom is where the correct answer comes
+  from, so citing it on a wrong choice claims the wrong choice is the answer.
+  Pick a neighbouring claim from the evidence packet instead. Never attach
+  either field to the correct choice. If an option can be traced neither way it
+  is a guess, not a distractor — replace it with one that can.
 - decoy_values lists givens the stem supplies that the solution never uses.
   Copy each one as the exact words or number that appear in your own stem, the
   same way source_quote copies the passage -- "0.80 m" or "a long rainy season"
@@ -724,8 +735,13 @@ When requires_calculation=true:
   constants, conversions, or assumptions.
 
 Write fewer, better questions. If the passage supports fewer good questions,
-return fewer. Return exactly this JSON shape:
-{"questions":[{"kind":"mcq_single","stem":"...","choices":[{"content":"...","is_correct":true},{"content":"...","is_correct":false},{"content":"...","is_correct":false},{"content":"...","is_correct":false}],"explanation":"...","source_quote":"...","difficulty":"easy","skill":"recall","requires_calculation":false}]}`
+return fewer. Return exactly this JSON shape. Every field below is present on
+every question and every choice; use "" or [] where one does not apply. This
+template is the shape, not a suggestion -- a field left out entirely is a
+missing answer, not a blank one:
+{"questions":[{"kind":"mcq_single","stem":"...","choices":[{"content":"...","is_correct":true,"distractor_expression":"","distractor_atom_id":""},{"content":"...","is_correct":false,"distractor_expression":"12*5.0","distractor_atom_id":""},{"content":"...","is_correct":false,"distractor_expression":"","distractor_atom_id":"A042"},{"content":"...","is_correct":false,"distractor_expression":"","distractor_atom_id":"A017"}],"explanation":"...","source_quote":"...","difficulty":"easy","skill":"recall","requires_calculation":false,"calculation":{"expression":"12/5.0","expected":2.4,"unit":"m/s^2"},"supporting_atom_ids":[],"decoy_values":[],"flawed_expression":"","reasoning_steps":[],"changed_condition":"","distractor_reasons":[]}]}
+Omit the calculation object only when requires_calculation is false; when it is
+true the object is mandatory and the item is rejected without it.`
 
 func rejectionMemoryBlock(feedback []RejectedDraft) string {
 	var b strings.Builder
