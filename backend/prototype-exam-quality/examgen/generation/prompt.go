@@ -447,8 +447,13 @@ func QuestionSetPrompt(lesson Lesson, graph *EvidenceGraph, chunks []Chunk, cont
 	b.WriteString("1. Work through the slots in order; use one output object for one slot.\n")
 	b.WriteString("2. Copy the exact slot/atom/chunk ID tuple from that row; never invent or mix IDs.\n")
 	b.WriteString("3. Copy the row skill, difficulty, and requires_calculation flag exactly. If the row is unsupported, omit only that row.\n")
-	b.WriteString("4. For medium or hard application, fill changed_condition; for hard application, copy every support atom ID and provide at least two distinct reasoning_steps. For medium and hard questions, provide one short distractor_reason per wrong choice.\n")
-	b.WriteString("5. Before returning, verify every source_quote is verbatim in its cited chunk and every ID is non-empty.\n\n")
+	b.WriteString("4. For medium or hard application, fill changed_condition; for hard application, copy every support atom ID and provide at least two distinct reasoning_steps. For medium and hard questions, provide one short distractor_reason per wrong choice, each naming a distinct mistake -- never repeat the same distractor_reason text twice in one question.\n")
+	if forceCalc {
+		b.WriteString("5. For a slot whose skill is not fixed above, choose skill by what solving the calculation demands: understanding if the numbers plug straight into a formula the source already states solved for the unknown; application if you must isolate an unknown by rearranging or chaining the relationship first.\n")
+		b.WriteString("6. Before returning, verify every source_quote is verbatim in its cited chunk and every ID is non-empty.\n\n")
+	} else {
+		b.WriteString("5. Before returning, verify every source_quote is verbatim in its cited chunk and every ID is non-empty.\n\n")
+	}
 	fmt.Fprintf(&b, "Write up to %d questions, one for each supported slot. Keep the set varied and return empty only for an unsupported slot. ", len(contract.Slots))
 	if forceCalc {
 		b.WriteString("Every returned question must set requires_calculation=true and include a valid calculation expression.")
@@ -604,7 +609,11 @@ Compact assessment contract:
   of the two ideas necessary rather than generic.
 - For medium, hard, and analysis, include one concise distractor_reason for
   each wrong choice. Each reason must name a plausible but wrong assumption,
-  not merely say "incorrect".
+  not merely say "incorrect". No two distractor_reasons in the same question
+  may be the same text or paraphrase the same mistake -- each wrong choice
+  needs its own distinct misconception, even when two choices are wrong for a
+  related reason (e.g. one direction-confusion and one axis-confusion are
+  different mistakes, not the same one twice).
 - For hard application, include at least two distinct reasoning_steps in order
   and copy every supporting_atom_id assigned to the slot. The steps must be
   necessary to reach the keyed answer; adding connective words to a one-step

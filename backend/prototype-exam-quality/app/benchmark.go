@@ -77,7 +77,7 @@ func benchmarkCases(selection string, lessonHint string) ([]benchmarkCase, error
 	calculation := benchmarkCase{
 		Name:                "calculation",
 		LessonContains:      "newton",
-		Directive:           "Generate questions that require arithmetic. Use explicit numerical values that appear in the passage or stem and show a solvable expression in calculation.expression. Set requires_calculation=true and keep skill honest as understanding or application; never use calculation as a skill. The correct choice must be a decimal/integer numeric answer, never a radical, variable, or symbolic identity. Prefer applied physics scenarios over definition questions.",
+		Directive:           "Generate questions that require arithmetic. Use explicit numerical values that appear in the passage or stem and show a solvable expression in calculation.expression. Set requires_calculation=true; never use calculation as a skill. The correct choice must be a decimal/integer numeric answer, never a radical, variable, or symbolic identity. Prefer applied physics scenarios over definition questions.",
 		ForceCalc:           true,
 		RequiresCalculation: true,
 	}
@@ -132,7 +132,7 @@ func genericBenchmarkCases(selection, lessonHint string) ([]benchmarkCase, error
 	calculation := benchmarkCase{
 		Name:                "calculation",
 		LessonContains:      lessonHint,
-		Directive:           "Generate questions that require arithmetic. Use explicit numerical values that appear in the passage or stem and show a solvable expression in calculation.expression. Set requires_calculation=true and keep skill honest as understanding or application; never use calculation as a skill. The correct choice must be a decimal/integer numeric answer, never a radical, variable, or symbolic identity. Prefer an applied scenario over a definition question.",
+		Directive:           "Generate questions that require arithmetic. Use explicit numerical values that appear in the passage or stem and show a solvable expression in calculation.expression. Set requires_calculation=true; never use calculation as a skill. The correct choice must be a decimal/integer numeric answer, never a radical, variable, or symbolic identity. Prefer an applied scenario over a definition question.",
 		ForceCalc:           true,
 		RequiresCalculation: true,
 	}

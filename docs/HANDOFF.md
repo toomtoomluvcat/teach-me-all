@@ -1,237 +1,30 @@
 # Handoff — exam-quality prototype
 
-> **อ่านก่อน (2026-08-07, session optimize/refactor):** CLI เปลี่ยนไปแล้ว
-> คำสั่งเก่าในเอกสารนี้จะขึ้น `flag provided but not defined`
->
-> - `--set-generation` / `--graph-compile` / `--question-plan` / `--per-chunk`
->   **ถูกลบ** — graph-backed set generation เป็นเส้นทางเดียวแล้ว ไม่ต้องเปิดเอง
-> - `--deepseek-host` / `--deepseek-api-key` **ถูกลบ** → `--base-url` /
->   `--api-key` (`LLM_API_KEY`). `--provider deepseek` ยังใช้ได้ในฐานะ preset
->   และยังอ่าน `DEEPSEEK_API_KEY` เหมือนเดิม
-> - เพิ่ม `--stop-on-full-set` (default off) และ `--provider openai --base-url`
->   สำหรับ provider ใดก็ได้ที่พูด OpenAI wire format รวม local server
-> - outline cache pin ที่ `outline-v4` — cache เก่าไม่มี atom รันต่อไม่ได้
->   รอบแรกหลัง pull จะจ่าย pass 1 ใหม่หนึ่งครั้ง (ไม่ใช่ regression)
->
-> คำสั่ง benchmark ที่ถูกต้องตอนนี้:
-> `protoexam.exe --provider deepseek --pdf <pdf> --pages <range> --benchmark all --set-candidates 3 --parallel 1`
+อัปเดต 2026-08-07 บน branch `prototype/exam-quality`, working tree clean — ทุกโค้ด
+commit แล้ว รวม extraction diagnostics (`f81309e`) และ prompt skill-choice/
+distractor-dedup experiment (commit ถัดจากนี้ ดู `git log --oneline -5` สำหรับ
+hash ล่าสุด)
 
-อัปเดต 2026-08-06 บน branch `prototype/exam-quality` — สอง session ต่อเนื่องกันวันเดียว
+## CLI ปัจจุบัน
 
-session แรกจบที่ commit `0d7985c` (`refactor: make calculation an orthogonal
-flag`) session ที่สอง (เอกสารนี้ครอบคลุมด้วย) แก้บั๊ก 4 ตัวใน calc/coverage
-gate และเพิ่ม skill tier ใหม่ `analysis` — **โค้ดของ session ที่สองยังไม่ commit**
-ดู `git status`/`git diff` ใน `backend/prototype-exam-quality/` ก่อนทำงานต่อ
-ไฟล์ที่แก้ (9 ไฟล์): `app/benchmark.go` (+`benchmark_test.go`),
-`examgen/evidence/evidence.go` (+`evidence_test.go`), `examgen/gates/gate.go`
-(+`gate_test.go`), `examgen/generation/prompt.go` (ไม่มี test ไฟล์คู่ — แก้แค่
-prompt/schema text), `examgen/model/calc.go` (+`calc_test.go`)
+- `--set-generation` / `--graph-compile` / `--question-plan` / `--per-chunk`
+  **ถูกลบ** — graph-backed set generation เป็นเส้นทางเดียว
+- `--deepseek-host` / `--deepseek-api-key` **ถูกลบ** → `--base-url` / `--api-key`
+  (`LLM_API_KEY`). `--provider deepseek` ยังใช้ได้เป็น preset, ยังอ่าน
+  `DEEPSEEK_API_KEY`
+- `--stop-on-full-set` (default off), `--provider openai --base-url` สำหรับ
+  provider ใดก็ได้ที่พูด OpenAI wire format รวม local server
+- `--benchmark` รองรับ comma-list (`"recall,understanding,application-hard"`)
+  เพื่อข้าม case ที่ไม่เหมาะกับ source
+- outline cache pin ที่ `outline-v4` — cache เก่าไม่มี atom รันต่อไม่ได้ (รอบแรก
+  หลัง pull จ่าย pass 1 ใหม่หนึ่งครั้ง ไม่ใช่ regression)
 
-เอกสารนี้เป็นสถานะปัจจุบันสำหรับทำงานต่อ ผลทดลองเก่าที่ไม่ใช่ runtime path
-ปัจจุบันถูกเอาออกจาก handoff แล้ว; รายละเอียดเชิงประวัติยังอยู่ใน artifact และ
-`backend/prototype-exam-quality/VERDICT.md`.
-
-## ผลวัด optimize (session 2026-08-07, physics 140-220, DeepSeek, candidate 3, parallel 1)
-
-`--benchmark "calculation,analysis"` รันสองรอบบนโค้ดหลัง optimize
-(pass 1 hit cache `outline-v4` ทั้งสองรอบ ตัวเลขข้างล่างจึงเป็น pass 2 ล้วน):
-
-| | calls | in tok | out tok | wall | calculation | analysis |
-|---|---:|---:|---:|---:|---:|---:|
-| default | 18 | 61,884 + 8,792 + 5,617 | 23,805 | 2m48s | 5/5 | 4/10 |
-| `--stop-on-full-set` | 11 | 43,125 + 4,076 + 4,093 | 15,548 | 1m54s | 5/5 | 4/6 |
-
-แยกตาม label (default → stop-on-full-set): `generate-set` 10 → 7,
-`quality/set` 4 → 2, `calc-tool` 4 → 2. รวม **−39% calls, −38% input token,
-−32% wall** โดย accepted ไม่ลด (calculation 5/5 เท่ากัน, analysis ได้ 4 ข้อ
-เท่ากันทั้งสองรอบ ต่างที่จำนวน draft)
-
-สิ่งที่ยืนยันจากตัวเลขนี้:
-
-- **calc-tool memoization ทำงาน**: 4 calls สำหรับ 10 `generate-set` calls
-  (เดิมคือ 1 tool loop ต่อ 1 generate-set call). ที่ยังไม่เป็น 1 ต่อ lesson
-  เพราะ retry contract มี slot น้อยกว่า → chunk ID set ต่าง → cache key คนละอัน
-  ยังเหลือช่องให้บีบอีกถ้าคิดคีย์จาก lesson แทน slot subset
-- **lazy quality grading ทำงาน**: analysis รอบ default เจน 3 candidate แต่
-  grade แค่ 1 (candidate 2/3 ได้ 0/10 แพ้ตั้งแต่ acceptance) ประหยัด 2 calls
-- **analysis variance สูงตามเดิม ไม่ใช่ regression**: candidate 1 ของทั้งสอง
-  รอบใช้ prompt/contract เดียวกันเป๊ะ (prompt string ไม่ถูกแก้ในงานนี้) และ
-  ผลที่เลือกได้ 4 ข้อเท่ากัน ส่วน 4/10 vs 5/5 ใน matrix เก่าอยู่ในช่วงแกว่ง
-  เดิมของ physics analysis (เคยได้ 4/9 มาก่อน) — ตัวที่ตกคือ `demand_contract`
-  ซึ่งเป็น gate ที่ไม่มีอะไรในงาน optimize นี้ไปแตะ
-
-### physics suite เต็มบนโค้ดใหม่ (`--benchmark all`, 5 case, candidate 3)
-
-| case | ผล | baseline HANDOFF เดิม |
-|---|---:|---:|
-| application-easy | 5/5 | 5/5 |
-| application-medium | 5/5 | 5/5 |
-| application-hard | 5/5 | 5/7 |
-| calculation | 5/5 | 5/5 |
-| analysis | 5/5 | 5/5 |
-
-44 calls รวม (`generate-set` 21, `quality/set` 10, `calc-tool` 13), 5m19s
-
-รอบ subset ก่อนหน้าที่ analysis ได้ 4/10 คือ variance ของโมเดลจริง ๆ ไม่ใช่
-regression — เนื้อหา/prompt/contract เดิมทุกอย่าง รอบนี้ได้ 5/5
-
-### อ่านเทียบข้อสอบ ก่อน/หลัง refactor (apples-to-apples)
-
-รันซ้ำ 3 case เดิม (`application-easy,application-hard,calculation`) บน physics
-140-220 ด้วย directive และ lesson ชุดเดียวกับ artifact ที่ commit ไว้
-(`comparisons/benchmark-all.json`) เพื่อให้ต่างกันแค่ตัวโค้ด
-
-**acceptance เท่ากันเป๊ะ**: 5/5 ทั้งสามเคส ทั้งก่อนและหลัง
-
-**stem ไม่ซ้ำกันเลยสักข้อ** (0/5 ทุกเคส) — โมเดลเจนใหม่หมดทุกรอบที่ temp 0.35
-เทียบด้วย diff ไม่ได้ ต้องอ่าน
-
-**ผลอ่าน application-hard:**
-
-- เดิม 2 ใน 5 ข้อเป็น one-step ทั้งที่ติดป้าย hard ("2.0 kg ตกอิสระ แรงลัพธ์?"
-  = W=mg ขั้นเดียว, "F=12N m=3kg a=?" = ขั้นเดียว)
-- ใหม่ 5 ใน 5 ข้อต้องใช้สองอินพุตขึ้นไปหรือสองความคิดรวบยอด และตัวลวงแต่ละตัว
-  เข้ารหัส misconception ที่มีชื่อจริง ("friction always determines direction",
-  "weight same because mass doesn't change", "friction < applied force เพราะมันกำลังเคลื่อนที่")
-
-**แต่เครดิตไม่ใช่ของ refactor**: `comparisons/benchmark-all.json` commit วันที่
-2026-08-06 ซึ่ง**ก่อน** prompt length-bias fix (`b76c51e`) ที่อยู่ใน HEAD
-ตั้งแต่ก่อนเริ่ม session นี้ งาน optimize/refactor ไม่ได้แก้ถ้อยคำ prompt เลย
-(`questionSystem`/`questionSchema` เหมือนเดิมทุก byte) ข้อสรุปที่ยืนยันได้คือ
-**คุณภาพไม่ตก** ส่วนที่ดีขึ้นน่าจะมาจาก prompt fix รอบก่อน
-
-**arithmetic ตรวจแล้วถูกทุกข้อ**: 19.6/2=9.8, 3.0×1.67=5.01, 5×0.225=1.125,
-2×0.225=0.45, 2000×20+5000=45000
-
-**จุดอ่อนที่เจอจากการอ่าน (ยังไม่แก้)**: calculation Q3 กับ Q4 เป็นการแปลงหน่วย
-N→lb แบบเดียวกันสองข้อ (5×0.225 กับ 2×0.225) `gateDistinct` ปล่อยผ่านเพราะ
-เทียบ stem ที่ต่างกันจริง แต่ในเชิงการวัดผลมันคือข้อเดียวกันคนละตัวเลข —
-duplicate ระดับ operation ที่ gate ปัจจุบันมองไม่เห็น
-
-**ยังไม่ได้ verify สด** (โค้ด compile + unit test ผ่าน แต่ยังไม่มี live run):
-
-- อีก 4 วิชา (เคมี/เศรษฐศาสตร์/US history/ชีววิทยา) — session นี้ผู้ใช้เลือกรัน
-  physics อย่างเดียวก่อน physics รันครบทั้ง 5-case suite และ generic 9-case
-- **ผลของ commit `b547be9` วัดแล้ว (session 2026-08-07, physics 140-220,
-  calculation, DeepSeek, candidate 3, parallel 1)**: 8 calls (generate-set 3,
-  quality/set 3, calc-tool 2), 55.8s, calculation 5/5 (quality 20/20),
-  `contract_retries` 0
-
-  | call | count | in tok | cached in | out tok |
-  |---|---|---:|---:|---:|
-  | generate-set | 3 | 17,964 | 17,664 | 6,457 |
-  | quality/set | 3 | 6,898 | 4,608 | 1,232 |
-  | calc-tool | 2 | 4,093 | 3,968 | 215 |
-
-  - **prefix cache ติด (ยืนยัน)**: `generate-set` cached in 17,664/17,964 ≈
-    98% — candidate marker ที่ย้ายลงใต้ source context ทำงานจริง (ก่อน
-    `b547be9` ตัว marker อยู่ต้น prompt ทำให้ทุกบล็อกใต้มัน cache ข้าม candidate
-    ไม่ได้ ≈ 0)
-  - **calc-tool key ใหม่: ยืนยันบางส่วน** — calc-tool 2 calls = 1 ครั้ง
-    `ComputeFacts` (tool loop 2 รอบ: เสนอ expression → DONE) แชร์ข้าม 3
-    generate-set calls หมายถึง memoization ทำงานจริง แต่รอบนี้
-    `contract_retries` = 0 ไม่มี bounded repair มา exercise เส้นทางที่ key ใหม่
-    (lesson+packet) ต่างจาก key เก่า (slot chunk set) — ตอนไม่มี retry ทั้งสอง
-    key ให้ผลเท่ากันเพราะ slot set เหมือนเดิมทุก candidate ต้องรันเคสที่ repair
-    เกิดจริง (เช่น analysis-hard หรือวิชาที่พลาดบ่อย) เพื่อแยกผลของ key ใหม่
-    จริง ๆ (มี unit test ปักหมุดไว้แล้วใน `calctool_test.go`)
-- interactive path (`renderSummary`, `writeRun`) — session นี้รันแต่ทาง
-  `--benchmark`
-- `--provider ollama` ซึ่งเป็น default — ตอนนี้ต้อง compile evidence เสมอ
-  (เดิมเป็น opt-in ผ่าน `--graph-compile`) ยังไม่ได้รันสดหลังแก้
-- `ExamResult.SetCandidates` ที่แก้ให้รายงานจำนวนจริง — ยืนยันจาก log
-  (`contract fully covered; skipping the remaining candidates`) แต่ field
-  เพิ่งถูกใส่ลง benchmark JSON รอบนี้ ยังไม่มี artifact ที่มีค่านี้
-
-## เลเวอร์ที่ทำแล้ว (session 2026-08-07, ยังไม่ commit)
-
-**1. ย้าย source context ขึ้นบนสุดของ `QuestionSetPrompt`** (`prompt.go`)
-
-เรียงใหม่: Lesson → source context → directive → coverage contract →
-evidence packet → rejection memory → candidate marker → slot protocol
-(เดิม: lesson → directive → contract → packet → source context) source
-context เป็นบล็อกที่ byte-identical ข้าม candidate และข้าม case ของ lesson
-เดียวกัน จึงต้องอยู่เหนือทุกบล็อกที่เปลี่ยนต่อ case เพื่ออยู่ใน provider prefix
-cache (~45-50% ของ prompt; รอบ 9-case เคยจ่ายซ้ำ 37 รอบ)
-
-- unit test `TestQuestionSetPromptOrdersSourceContextForCaching` ปักหมุดลำดับ
-  source context < coverage contract < candidate marker
-- verify สด (physics 140-220, DeepSeek, candidate 3, parallel 1):
-  - 2 case ไม่ pin lesson (calculation + application-easy, lesson คนละอัน):
-    5/5 + 5/5, generate-set cached in 36,096/55,464 ≈ 65% — มี cold start 2
-    ครั้ง (lesson ใหม่ 2 อัน + layout ใหม่ทำให้ prefix cache ของรอบก่อนใช้ไม่ได้)
-  - 2 case pin lesson เดียวกัน (`--benchmark-lesson "Newton"`): 5/5 + 5/5,
-    generate-set cached in 34,560/50,390 ≈ 69% — case 2 candidate แรกได้
-    lesson+source context จาก cache ข้าม case
-  - cross-candidate caching ยังทำงานครบ (candidate 2-3 warm ต่อ case)
-  - ยังไม่ได้ตัวเลขเต็มของ cross-case: aggregate 2-case แยก delta ไม่ได้ชัด
-    ต้องรัน 9-case บน lesson เดียว (37 generate-set calls ตามที่วัดเดิม) ถึงจะ
-    เห็นผลรวม ถ้าต้องการ
-
-**2. `gateDistinct` จับ duplicate ระดับ operation** (`wellformed.go`)
-
-`sameCalculationOperation`: normalize `calculation.expression` (ตัวเลข → `N`)
-เทียบโครงสร้าง operator; ถ้าโครงสร้างเท่ากันและ operand ตำแหน่งเดียวกันเป็น
-constant เดียวกัน (มีทศนิยม/exponent หรือ |n| ≥ 100 เช่น 0.225, 9.8, 6.02e23)
-→ reject เป็น duplicate ของข้อที่ผ่านไปแล้ว
-
-- จับ `5*0.225` vs `2*0.225` (N→lb เหมือนกัน) แต่ไม่จับ `5*0.225` vs `3*9.8`
-  (N→lb vs W=mg ต่างกันจริง — คนละ constant) และไม่จับ `19.6/2` vs `2/19.6`
-  (กลับ operand — ต่าง operation)
-- unit tests: reject same-op 2 ตัว, allow different-op same-shape, allow
-  operand reversal
-- verify สด: calculation case ได้ 5 operation ต่างกันครบ (`2.0*1.67`,
-  `5*0.225`, `10/2`, `1000*45/4`, `1/0.225`) — `2*0.225` ที่เคยซ้ำหายไป;
-  `5*0.225` vs `1/0.225` (N*N vs N/N) ไม่ถูก flag อย่างถูกต้อง; ทั้งสอง case
-  ยัง 5/5 ไม่มี yield regression
-
-**Blob `protoexam.exe~` (session 2026-08-07)**: ตรวจแล้ว commit ที่มี blob
-ถูก push ไปแล้วจริง (origin/prototype/exam-quality = bfdf084 = HEAD; blob เก่า
-ยังอยู่ใน origin/main + `refs/pull/*/head`) — เลือก **ไม่ rewrite history**
-(ผู้ใช้ตัดสินใจ) เพราะ blob อยู่บน GitHub อยู่แล้วและ gitignore ที่ `c84678e`
-ใส่ไว้กันไม่ให้กลับมาอีกก็เพียงพอ
-
-## สถานะสั้น ๆ
-
-prototype รันครบตั้งแต่ PDF ถึงข้อสอบ และมี provenance/contract QC ที่แน่นขึ้น
-แล้ว แต่ยังไม่มีหลักฐานพอจะสรุปว่า “ชนะ NotebookLM” ใน semantic quality
-เพราะการอ่านความยากจริงและคุณภาพตัวลวงยังต้องมี reviewer อิสระหรือ human sample
-บน source เดียวกัน
-
-```text
-PDF
-  → extraction diagnostics + content chunks
-  → graph/outline compile
-  → lesson + coverage contract
-  → contract preflight
-  → slot-local evidence packet
-  → set generation
-  → deterministic QC
-  → optional advisory semantic/set review
-  → report: drafts / ship-ready / review
-```
-
-## สิ่งที่ runtime ใช้อยู่ตอนนี้
-
-- Graph compile ส่งเฉพาะ content chunks ในโหมดปกติ; มีโหมด `KeepAllTopics` สำหรับ
-  regression/audit และมี fallback เมื่อผล compile ใช้ไม่ได้
-- ก่อน generate จะเลือก evidence แบบ slot-local: atom หลัก, quote/chunk ที่ atom
-  อ้างถึง และ neighbor ที่จำเป็น ไม่ส่ง evidence pool ทั้งบทเข้า writer
-- Context จัดอันดับตาม slot/atom ก่อน document order และจำกัด context ที่ส่งให้
-  writer เพื่อกัน evidence drift
-- Contract preflight ซ่อมได้เฉพาะ defect ที่ deterministic เช่น atom/quote/chunk
-  ไม่ตรงกัน; ไม่สร้าง evidence ใหม่แทนโมเดล
-- Application/medium/hard ต้องมีสัญญาณการเปลี่ยนเงื่อนไขหรือ linked operation;
-  hard ต้องมี support evidence และ reasoning อย่างน้อยสองขั้นเมื่อ source รองรับ
-- `Operation` ต้องตรงกับ slot และข้อจะต้องอ้าง evidence ที่อยู่ใน packet ของมัน
-- Calculator ถูกเรียกตาม slot ที่ต้องคำนวณ ไม่รวมทุก calculation/application chunk
-  เป็นก้อนเดียว
-- มี bounded retry เฉพาะ missing/failed slots; ไม่มี per-question judge call ใหม่
+คำสั่ง benchmark:
+`protoexam.exe --provider deepseek --pdf <pdf> --pages <range> --benchmark all --set-candidates 3 --parallel 1`
 
 ## Contract ปัจจุบัน
 
-`calculation` ไม่ใช่ค่าใน `skill` เพราะเป็นวิธีดำเนินการ ไม่ใช่ cognitive demand
-ของข้อสอบ:
+`calculation` ไม่ใช่ค่าใน `skill` (เป็นวิธีดำเนินการ ไม่ใช่ cognitive demand):
 
 ```text
 skill: recall | understanding | application | analysis
@@ -240,340 +33,181 @@ requires_calculation: true | false
 calculation: { expression, expected, unit }  # ต้องมีเมื่อ flag เป็น true
 ```
 
-ดังนั้น `application + hard + requires_calculation=true` เป็นรูปแบบที่ถูกต้อง
-และ `understanding + easy + requires_calculation=true` ก็ถูกต้องเช่นกัน
-`--force-calc` บังคับเฉพาะ flag ไม่ได้บังคับ skill หรือ difficulty
+`application + hard + requires_calculation=true` และ
+`understanding + easy + requires_calculation=true` ทั้งคู่ถูกต้อง `--force-calc`
+บังคับเฉพาะ flag ไม่ใช่ skill/difficulty JSON เก่า (`skill: calculation`) ยังอ่านได้
+เป็น compat alias → canonicalize อัตโนมัติ ไม่ควรสร้างใหม่ด้วยรูปแบบเก่า
 
-JSON เก่าที่มี `skill: calculation` ยังอ่านได้เป็น compatibility alias แล้วถูก
-canonicalize เป็น skill ปกติพร้อม `requires_calculation=true`; ไม่ควรสร้าง artifact
-ใหม่ด้วยรูปแบบเก่านี้
+### `analysis` (skill)
 
-### `analysis` (skill ใหม่, session 2026-08-06)
+`easy`/`medium` ต้องการ `reasoning_steps` ≥ 2 ขั้น, `hard` ≥ 3 ขั้น
+supporting atom ต้องมาจาก chunk คนละก้อน + relation type คนละแบบกับ atom หลัก
+(`analysisSupportAtomIDs`, `examgen/evidence/evidence.go`) coverage contract
+**ไม่ pin difficulty ของ analysis slot** — ปล่อยให้โมเดลรายงานความยากจริงเอง
+(pin ทางใดทางหนึ่งทำให้ gate reject โจทย์ที่เขียนถูกแต่ยากไม่ตรง pin)
 
-เพิ่มเพื่อแก้ปัญหาที่ `application + hard` เดิมผ่านได้ด้วยสูตรเดียวใช้ซ้ำสองครั้ง
-ไม่เคยบังคับว่าต้องรวมความคิดสองก้อนจริง `analysis` บังคับว่า supporting atom
-ต้องมาจาก **chunk คนละก้อน** และ **relation type คนละแบบ** กับ atom หลัก
-(`analysisSupportAtomIDs` ใน `examgen/evidence/evidence.go`)
+`analysis` ไม่ผูกกับ `hard` เสมอ (แก้จาก hardcode เดิมตามคำท้วงของผู้ใช้ว่าไม่มี
+เหตุผลรองรับ Bloom's — analyze เป็นประเภทการคิด ไม่ใช่ระดับความยาก)
 
-**สำคัญ**: `analysis` **ไม่ผูกกับ difficulty=hard เสมอไป** — รอบแรกของ session
-นี้ hardcode ไว้ว่า analysis ต้อง hard เท่านั้น (ทั้ง code และ system prompt เขียนว่า
-"Analysis is always hard") ผู้ใช้ทักท้วงว่าไม่มีเหตุผลรองรับ Bloom's taxonomy
-ถือว่า "analyze" เป็น*ประเภท*การคิด ไม่ใช่ระดับความยาก แก้แล้ว:
+Preset: `--benchmark recall|understanding|analysis-easy|analysis-medium|analysis-hard`
+(`analysis` alias ของ `analysis-hard`) `--benchmark all` ครบ 9 case
 
-- `easy`/`medium` ต้องการ `reasoning_steps` อย่างน้อย 2 ขั้น (แค่รวม 2 ข้อเท็จจริง
-  ที่เชื่อมกันตรงไปตรงมา)
-- `hard` ต้องการอย่างน้อย 3 ขั้น (ต้องประนีประนอมข้อมูลที่ขัดแย้งหรือหลายขั้นจริง)
-- ใน `buildCoverageContract` slot ของ analysis **ไม่ pin difficulty เลย**
-  (ปล่อยว่าง ไม่ default เป็น easy ด้วย) ให้โมเดลรายงานความยากจริงเอง — pin ทาง
-  ใดทางหนึ่งจะทำให้ coverage gate reject โจทย์ที่โมเดลเขียนถูกแต่ความยากไม่ตรง
-  กับที่ pin ไว้
+## Pipeline
 
-เทสยืนยันสด (live, Thai biology, เนื้อหาเดียวกัน): analysis-easy 3/3,
-analysis-medium 3/3, analysis-hard 3/6 (ยิ่งยากยิ่งผ่านยาก ตามที่ตั้งใจ)
+```text
+PDF → extraction diagnostics + content chunks → graph/outline compile
+  → lesson + coverage contract → contract preflight → slot-local evidence packet
+  → set generation → deterministic QC → optional advisory semantic/set review
+  → report: drafts / ship-ready / review
+```
 
-benchmark preset ใหม่: `--benchmark recall|understanding|analysis-easy|analysis-medium|analysis-hard`
-(`analysis` เดิมยังใช้ได้ เป็น alias ของ `analysis-hard`) `--benchmark all`
-รันครบ 9 case แล้ว
+## สิ่งที่ runtime ใช้อยู่ตอนนี้
 
-## บั๊กที่เจอและแก้ (session 2026-08-06 ต่อเนื่อง)
-
-เจอทั้งหมดจาก live benchmark ข้ามวิชา (physics/algebra/economics/chemistry/
-Thai biology) ไม่ใช่จาก code review เฉย ๆ — ทุกตัวมี unit test ปักหมุดพฤติกรรม
-ที่ผิดไว้แล้ว:
-
-1. **rounding tolerance เป็น absolute ไม่ใช่ relative**
-   (`examgen/model/calc.go`, `choiceMentionsNumber`/`isLosslessRounding`)
-   epsilon เดิม `5e-4` แบบ absolute ใช้ได้แค่ magnitude ~1-10 — ปัดเลข
-   `1.67→"1.7"` หยาบเกินไปแต่ผ่าน ในขณะที่ `69.9%` จาก `69.914778` (3 sig fig
-   ปกติ) กลับไม่ผ่านเพราะ scale ต่างกัน แก้เป็น relative tolerance `1e-3`
-   (~3 sig figs) สม่ำเสมอทุก magnitude ปัดหยาบกว่านั้นต้องมีคำว่า "≈"/"about"/
-   "ประมาณ" กำกับในตัวเลือกเอง
-2. **superscript exponent parser พังเงียบ** (`examgen/model/calc.go`,
-   `parseExponent`) เลขยกกำลัง superscript ¹²³ อยู่ Unicode block Latin-1
-   Supplement (U+00B9/B2/B3) ส่วน ⁰⁴⁵⁶⁷⁸⁹ อยู่ block Superscripts-and-
-   Subscripts (U+2070, U+2074-9) — โค้ดเดิมทำเลขคณิต `rune - '⁰'` สมมติว่าอยู่
-   block เดียวกัน ผลคือ `²` คำนวณออกมาเป็นเลขชี้กำลัง **-8126** แบบเงียบ ๆ
-   (ไม่ error, return ok=true) เจอจากคำตอบ titration เคมีที่เขียน
-   `9.6 × 10⁻³ M` แก้ด้วย lookup table ตรง ๆ กระทบทุกวิชาที่ใช้ scientific
-   notation ไม่ใช่แค่เคมี
-3. **`coverage_contract` gate ลงโทษ draft ที่ตรวจสอบได้มากกว่า**
-   (`examgen/evidence/evidence.go`, `gateSetCoverage`) เดิมเช็ค
-   `slot.RequiresCalculation != q.NeedsCalculation()` แบบสมมาตรสองทาง —
-   draft ที่อาสาคำนวณเกินที่ slot ขอ (คำนวณถูก ตรวจสอบได้) ถูก reject เพราะขัด
-   contract ในขณะที่ draft พี่น้องที่หลบไม่ประกาศ calc เลย (ไม่มีใครตรวจเลขให้)
-   กลับผ่าน แก้ให้ reject แค่ทิศทางที่ซ่อนการตรวจสอบที่จำเป็น (slot ต้องการ
-   calc แต่โจทย์ไม่ให้)
-4. **calc-slot เลือกไม่ฉลาดสำหรับ topic ที่คำตอบเป็นสัญลักษณ์**
-   (`examgen/evidence/evidence.go`, `shouldDowngradeCalculation`) เดิมเช็คแค่
-   "claim มีตัวเลขมั้ย" — กฎ exponent อย่าง `b^-7` หรือ `θ^-7` มีตัวเลข (เลขชี้
-   กำลัง) แต่คำตอบธรรมชาติเป็นสัญลักษณ์ ไม่ใช่ตัวเลข นี่คือสาเหตุที่พีชคณิต
-   calculation case เคยได้แค่ ~33% เพิ่ม `algebraicVariableExponentPattern`
-   (regex จับ `\p{L}` + `^`/`**` + เลข และ superscript unicode ตรง ๆ) กัน atom
-   แบบนี้ไม่ให้ถูกนับว่า calc-eligible
-
-ผลหลังแก้ (เคมี titration, calculation case, เนื้อหาเดิมทุกรอบ):
-11.1% → 25.0% (แก้ superscript) → 50.0% (แก้ rounding tolerance) ที่เหลือ 50%
-ตอนนี้เป็นความผิดพลาดจริงของโมเดลเอง (คำนวณ multi-step titration ผิด) ไม่ใช่
-gate หรือ code bug แล้ว
-
-**ยังไม่ live-verify ซ้ำ**: bug 1 (rounding) กับ bug 3 (coverage_contract
-asymmetry) มี unit test ครบแต่ยังไม่เจอ live run ที่ exercise เส้นทางนั้นตรง ๆ
-อีกครั้งหลังแก้ (รอบ physics rerun หลังแก้บังเอิญไม่มี draft ไหนอาสา calc เกิน
-slot เลย)
+- Graph compile ส่งเฉพาะ content chunks ปกติ; `KeepAllTopics` สำหรับ regression/audit
+- Evidence เลือกแบบ slot-local (atom หลัก + quote/chunk ที่อ้างถึง + neighbor
+  ที่จำเป็น) ไม่ส่ง evidence pool ทั้งบทเข้า writer
+- Context จัดอันดับตาม slot/atom ก่อน document order, จำกัดขนาดกัน evidence drift
+- Contract preflight ซ่อมได้เฉพาะ defect ที่ deterministic (atom/quote/chunk
+  ไม่ตรงกัน) ไม่สร้าง evidence ใหม่แทนโมเดล
+- Application/medium/hard ต้องมีสัญญาณเปลี่ยนเงื่อนไขหรือ linked operation;
+  hard ต้องมี support evidence + reasoning ≥ 2 ขั้นเมื่อ source รองรับ
+- `Operation` ต้องตรงกับ slot, ข้อต้องอ้าง evidence ในแพ็กเก็ตของมันเอง
+- Calculator ถูกเรียกตาม slot ที่ต้องคำนวณเท่านั้น
+- Bounded retry เฉพาะ missing/failed slots; ไม่มี per-question judge call ใหม่
+- `QuestionSetPrompt`: lesson → source context (byte-identical ข้าม candidate/case
+  ของ lesson เดียวกัน) → directive → coverage contract → evidence packet →
+  rejection memory → candidate marker → slot protocol — เรียงแบบนี้เพื่อให้ตรง
+  provider prefix cache (ยืนยัน generate-set cached-input ~65-98% ใน live run)
+- `gateDistinct` จับ duplicate ระดับ operation (normalize expression, เทียบ
+  operator/operand structure) ไม่ใช่แค่เทียบ stem text — จับ `5*0.225` vs
+  `2*0.225` แต่ไม่จับข้าม operation จริง (`5*0.225` vs `3*9.8`)
 
 ## Gate กับ semantic quality
 
-Deterministic gate ตรวจสิ่งที่เครื่องยืนยันได้:
+Deterministic gate ตรวจ: schema, source role, exact quote, atom/chunk
+provenance, slot coverage, skill/difficulty/operation/calculation flag,
+arithmetic/unit, duplicate, heuristic ขั้นต่ำของ application/hard
 
-- schema, source role, exact quote, atom/chunk provenance
-- slot coverage, skill/difficulty/operation และ calculation flag
-- arithmetic/unit เมื่อข้อมี calculation payload
-- duplicate และ heuristic ขั้นต่ำของ application/hard
+Gate **ไม่ตอบ** ว่าโจทย์ยากจริง/ตัวลวงสมจริง/reasoning หนักพอ `QualityGrader`
+เป็น semantic reviewer ระดับชุดแบบ advisory ช่วยเลือก candidate เท่านั้น
+ไม่ใช่หลักฐานอิสระ ไม่นับเป็น gate pass
 
-Gate ไม่ได้ตอบว่าโจทย์ “ยากจริง”, ตัวลวงสมจริง หรือใช้ reasoning หนักพอหรือไม่
-ส่วน `QualityGrader` เป็น semantic reviewer ระดับชุดแบบ advisory ใช้ช่วยเลือก
-candidate เมื่อมีหลายชุด ไม่ใช่หลักฐานอิสระและไม่ควรถูกนับเป็น gate pass
+รายงานแยกสามชั้นเสมอ: `drafts` (ทุก attempt) → `ship-ready` (ผ่าน deterministic
+QC) → `semantic review` (groundedness/correctness/distractor/difficulty fit
+จาก reviewer อิสระหรือ human sample — ยังไม่มี)
 
-รายงานต้องแยกสามชั้นเสมอ:
+## Graph compile batching
 
-1. `drafts` — output ทุก first attempt และ bounded repair
-2. `ship-ready` — ข้อที่ผ่าน deterministic QC และ contract
-3. `semantic review` — groundedness, correctness, distractor quality และ
-   difficulty fit จาก reviewer อิสระหรือ human sample
+Default: ≤4 chunks หรือ ~8,000 runes ต่อ compile request, `max_tokens=4,096`
+(DeepSeek) 8 chunks/16k ลด calls (53→33) แต่เสีย atom (687→413) และ chunk
+coverage (191→139) มาก โดยเวลาแทบไม่ลด → ยังไม่ promote เป็น default, ยังไม่ลอง
+12 chunks
 
-## ผล smoke ล่าสุดหลังแยก calculation flag
-
-เป็นการตรวจ schema + runtime ด้วย DeepSeek, candidate เดียว, parallel 1 ไม่ใช่
-benchmark สำหรับอ้างชัยชนะเหนือ NotebookLM:
-
-| ชุด | ผล | calls | เวลา |
-|---|---:|---:|---:|
-| Scientific Notation, numeric | 2/4 ship-ready; 2/4 numeric verified | 15 | 1m43s |
-| The Social Construction of Health, application-hard | 3/4 ship-ready; 0/0 ต้องคำนวณ | 7 | 29.5s |
-
-ข้อสรุปที่เชื่อถือได้จากรอบนี้คือ schema ใหม่ทำงานและ gate กัน arithmetic ที่ผิด
-ได้ ไม่ใช่ข้อสรุปว่าคุณภาพ semantic สูงพอแล้ว
-
-### ผล smoke ข้ามวิชา (session 2026-08-06 ต่อเนื่อง, หลังแก้บั๊กทั้ง 4)
-
-`--benchmark all` บน Thai biology (บทกระเพาะอาหาร, เนื้อหาเดียวกันทุก case,
-DeepSeek, candidate 3, parallel 1):
-
-| skill × difficulty | ผล |
-|---|---:|
-| recall | 2/2 (100%) |
-| understanding | 5/5 (100%) |
-| application easy/medium/hard | 4/4, 4/4, 3/3 (100% ทั้งหมด) |
-| analysis easy/medium | 3/3, 3/3 (100% ทั้งคู่) |
-| analysis hard | 3/6 (50%) |
-| calculation | skip ถูกต้อง (บทนี้ไม่มีเนื้อหาตัวเลข) |
-
-วิชาอื่นที่ทดสอบรอบนี้ (แยก run ไม่ใช่ matrix เดียวกัน):
-
-| วิชา | case | ผล |
-|---|---|---:|
-| ฟิสิกส์ (EN) | application-hard rerun หลังแก้ bug 3 | 5/5 (100%) |
-| เศรษฐศาสตร์ (EN, elasticity, วิชาใหม่) | calculation | 5/5 (100%) |
-| เคมี (EN, titration, วิชาใหม่) | calculation | 50% (ดูหัวข้อบั๊กด้านบน) |
-| ฟิสิกส์ (EN) | analysis-hard (skill ใหม่) | 5/5 (100%) |
-
-**ยังไม่ได้ทดสอบเลย**: US History (`samples/openstax-us-history.pdf`,
-130MB, ดาวน์โหลดไว้แล้วแต่ outline ไม่เคย compile) — เป็นตัวแทน pure-qualitative
-humanities ตัวเดียวที่ session นี้หาไว้ และ sociology (
-`.scratch/university-sources/sociology-3e.pdf`) ก็ไม่ได้รันเช่นกัน ทั้งสองไม่มี
-หลักฐานอะไรเลย ไม่ใช่ "ผ่านแล้วลืมบันทึก"
-
-### Live-verify ข้ามวิชา (session 2026-08-06 ต่อเนื่อง 2, หลัง commit `97e6587`)
-
-ผู้ใช้สั่ง live-verify ทุกวิชา (pending #10) — รัน `--benchmark all` แบบเดียวกับ
-Thai biology รอบก่อน (DeepSeek, candidate 3, parallel 1; ตอนนั้นต้องใส่ `--set-generation`, ตอนนี้เป็น default).
-เจอ findings ใหม่ 4 ตัวที่แก้แล้ว (commit `623018c`) แล้ว rerun:
-physics application-hard 0/6 → 5/5, chemistry calc 50% → 66.7% → 80%.
-จากนั้นรันวิชาที่เหลือครบทุกวิชา
-
-**ผลสุดท้าย (หลัง commit `623018c`, ทุกวิชา DeepSeek candidate 3 parallel 1)**:
-
-| วิชา (pages) | recall | under. | app-e | app-m | app-h | calc | ana-e | ana-m | ana-h |
-|---|---|---|---|---|---|---|---|---|---|
-| ฟิสิกส์ (140-220, Newton) | 5/5 | 5/5 | 5/5 | 5/5 | 5/5 | 5/5 | 5/5 | 4/9 | 4/9 |
-| เคมี (200-280, Titration) | — | — | — | — | — | 4/5 (80%) | — | — | — |
-| เศรษฐศาสตร์ (60-150, Elasticity) | 5/5 | 5/5 | 5/5 | 5/5 | 5/8 | 5/5 | 5/5 | 5/5 | 5/5 |
-| US History (460-489, Westward) | 5/5 | 5/5 | 5/5 | 5/5 | 5/5 | 2/4 | 4/9 | 3/10 | 5/6 |
-| ชีววิทยา (210-237, Cell Resp) | 5/5 | 5/5 | 5/6 | 5/5 | 5/5 | skip | 4/7 | 5/5 | 3/7 |
-
-ข้อสังเกตข้ามวิชา:
-
-- **application ผ่านเกือบหมดทุกวิชา** (ยกเว้น economics app-hard 5/8 และ biology
-  app-easy 5/6) — gate + superset fix ทำให้ draft ไม่อาสาเกินถูกทิ้ง
-- **economics เป็นวิชาเดียวที่ analysis ผ่านครบทุก level (5/5,5/5,5/5)** —
-  เนื้อหามี causal/quantitative structure ชัดจึงหา "สองความจริงคนละ chunk คนละ
-  relation" ได้
-- **analysis มี variance สูงตาม content-fit**: physics ana-m/h 4/9, US history
-  ana-e 4/9 ana-m 3/10, biology ana-h 3/7 — บท narrative/numeric ที่ atom
-  ส่วนใหญ่เป็น rule/fact เดียวหา analysis pair ยาก เป็น content-fit ไม่ใช่
-  gate bug (ยืนยันโดย ana-hard US history กลับได้ 5/6 เพราะ directive ยืดหยุ่นกว่า)
-- **calculation skip ถูกต้อง** ในบทที่ไม่มี numeric content (biology cellular
-  respiration) และ US history ได้ 2/4 (บทนี้แทบไม่มีตัวเลข โมเดลฝืนสร้าง)
-
-### Rerun หลัง prompt fix (session 2026-08-07, หลัง commit `b76c51e`)
-
-rerun ทั้ง 5 วิชาหลัง prompt length-bias fix เพื่อดู pass rate + `lenbias` ใหม่
-(DeepSeek candidate 3 parallel 1 เดิม). US history ข้าม calculation เพราะบทนี้
-ฝืนสร้างแล้วติดหล่ม (เพิ่ม `--benchmark "case1,case2,..."` comma-list ให้ข้าม
-case ที่ไม่เหมาะได้):
-
-| วิชา | recall | under. | app-e | app-m | app-h | calc | ana-e | ana-m | ana-h |
-|---|---|---|---|---|---|---|---|---|---|
-| ฟิสิกส์ | 5/6 | 5/5 | 5/5 | 5/5 | 5/7 | 5/5 | 5/5 | 5/5 | 5/5 |
-| เคมี | — | — | — | — | — | 4/6 | — | — | — |
-| เศรษฐศาสตร์ | 5/5 | 5/5 | 5/5 | 5/5 | 5/5 | 5/7 | 5/10 | 5/5 | 5/10 |
-| US History | 5/5 | 5/5 | 5/5 | 5/5 | 5/5 | (ข้าม) | 5/6 | 5/5 | 5/10 |
-| ชีววิทยา | 5/5 | 5/6 | 5/7 | 5/5 | 5/5 | skip | 5/5 | 4/6 | 5/10 |
-
-`lenbias` (passed/total, เฉพาะ case ที่มี): physics understanding 3/3,
-economics app-easy 2/2 ana-hard 2/4, US history ana-easy 5/6 ana-hard 4/8
-app-hard 3/3 — **humanities/narrative ยัง bias สูง** เพราะ correct ต้องอธิบาย
-ยาวบ่อย; STEM เกือบ 0/0
-
-ข้อสังเกต rerun:
-
-- **fix ช่วย analysis/app-hard จริง**: physics app-hard 0/6→5/7, ana-m/h 4/9→5/5;
-  US history ana-medium 3/10→5/5; economics app-hard 5/8→5/5 — แต่บาง case
-  กลับลง (stochastic): economics ana-e/h 5/5→5/10, biology ana-h 3/7→5/10
-- **prompt length fix ครอบคลุมไม่ถึงข้อที่ต้องอธิบาย "ทำไม" สั้นๆ** (understanding
-  physics lenbias 3/3) — เป็น advisory ไม่ reject ตามที่ตกลง; ตัวเลขรวม 206 ข้อ
-  173 ผ่าน (84%) ยังยืนยัน "ข้อ fail ยาวกว่าข้อผ่าน" (stem 194 vs 159) = draft
-  ที่ยาวมักพัง ไม่ใช่ข้อยาวผ่าน
-- US history report อยู่ใน `benchmark-recallunderstandingapplicationeasyapplic.json`
-  (comma-list เก่าตั้งชื่อ suite ยาว; หลังแก้ suite เป็น "first-et-al" แล้ว)
-
-### Findings ใหม่ที่เจอ live (แก้แล้วใน commit `623018c`, มี unit test ปักหมุด)
-
-1. **`distractor_reasons` schema mismatch** — DeepSeek ส่ง array of objects
-   (`[{"reason":"...","choice":"B"},...]` หรือ `[{"A":"reason"},...]`) แทน
-   array of strings ที่ schema สั่ง → `decodeDemandStringList` ล้มทั้งสอง branch
-   ([]string และ map) → candidate ล้มทิ้งทั้งชุดซ้ำทุกวิชา. แก้: prefer
-   reason-named key ต่อ object, รองรับ single-key object, fallback เก็บทุกค่า
-2. **`supporting_atom_ids` exact match เกินไป** — `sameIDs` บังคับ len+set เท่ากัน
-   แต่ draft ที่เพิ่ม atom เสริม (ยังครบทุกตัวที่ slot ต้องการ) ถูกทิ้งทั้งชุด
-   (physics app-hard 5/6 draft ล้มด้วยเหตุนี้). แก้เป็น `coversAll`: reject เฉพาะ
-   ทิศทางที่ซ่อนหลักฐาน (ขาด atom ที่จำเป็น) — หลักเดียวกับ bug 3 fix
-3. **`calculation.expected` tolerance เข้มเกิน** — `nearlyEqual` ใช้ 1e-6 relative
-   แต่ choice-text matcher ใช้ 1e-3 → "0.2648" จาก 0.26473265 (error 2.5e-4)
-   ล้มทั้งที่ choice ผ่าน. แก้ `expectedNearlyEqual` ใช้ 1e-3 เดียวกับ choice
-4. **`choiceMentionsNumber` พลาด writer's rounding** — Sprintf candidates
-   สร้าง "0.2647"/"0.265" จาก 0.26473265 แต่ writer เขียน "0.2648" (4 sig fig
-   ปัดขึ้น) → ไม่ match. แก้: สแกน numeric tokens ใน choice เอง (`decimalTokens`)
-   แล้ว accept ถ้า rounding อยู่ใน 1e-3
-
-### Answer-length bias (session 2026-08-06 ต่อเนื่อง 2, แผน C ตามที่ผู้ใช้ปรับ)
-
-ผู้ใช้จับได้จาก HTML เปรียบเทียบว่า "ข้อที่ยาวมักถูก" — วัดจาก 126 ข้อที่ผ่าน
-(4 วิชา) พบ: **67% มี correct ยาวกว่าตัวลวงเฉลี่ย, 30% ยาวกว่า 1.3x, worst 2.0x**
-(analysis-hard). นี่คือ answer-length heuristic: อ่านความยาว choice ก็เดาคำตอบ
-ได้โดยไม่ต้องรู้เนื้อหา
-
-การตัดสินใจ (ผู้ใช้ชี้): **ไม่ทำ gate A แบบ hard-reject** เพราะ "ข้อยาวเฟื้อยก็
-ทำเป็นข้อลวงได้" — ความยาวไม่ใช่สัญญาณ deterministic ที่ reliable และจะ
-false-positive กับข้อที่ correct ต้องอธิบายยาวจริง. แผน C ที่ทำ:
-
-- **Revert gate A** (ร่าง `checkCorrectChoiceLengthBias` ที่ค้างถูกถอน ไม่ commit)
-- **B: prompt fix** (`examgen/generation/prompt.go`) — สั่งชัดว่าเหตุผลที่
-  justify ต้องไป `explanation` field ไม่ใช่ correct choice text และตัวลวงต้อง
-  มี clause ความยาวเทียบเท่า "a student who reads only the option lengths must
-  not be able to pick the answer"
-- **Advisory flag `lenbias`** (`app/benchmark.go`) — ไม่ reject แต่บันทึกต่อข้อ
-  (`length_bias`) + counter (`lenbias_passed/total`) ใน report และ summary print
-
-**ผลพิสูจน์ (economics analysis-hard, เนื้อหาเดิม, candidate 1)**:
-ข้อที่เคย correct 152 ตัวอักษร vs ตัวลวง 74 (ratio 2.04) หลัง prompt fix กลายเป็น
-115 vs 100 (ratio 1.15); ข้อ second-worst 1.44 → 1.15. `lenbias 0/0` — ไม่มีข้อ
-ที่เดาได้ด้วยความยาวอีกแล้ว. recall case ก็ `lenbias 0/0` เช่นกัน
-
-เครื่องมือวิเคราะห์: `tools/analyze_length_bias.py` (สถิติข้ามวิชา) +
-`tools/show_lenbias_examples.py` (ต่อข้อ) + `tools/render_liveverify_html.py`
-(HTML เปรียบเทียบ tab ต่อวิชา, output `tools/liveverify-all-subjects.html`)
-
-Logs อยู่ที่ `backend/prototype-exam-quality/.scratch/liveverify-*.log` และ
-reports อยู่ใน scratch dir ของแต่ละวิชา (`benchmark-all.json` /
-`benchmark-applicationhard.json` / `benchmark-calculation.json`)
-
-## Graph compile และ batching
-
-ค่า default ปัจจุบันคือไม่เกิน 4 chunks หรือประมาณ 8,000 runes ต่อ compile request
-และ `max_tokens=4,096` สำหรับ DeepSeek
-
-ผล A/B จาก source เดียวกัน:
-
-| profile | calls | input tokens | output tokens | atoms | chunks ที่มี atom | เวลา |
-|---|---:|---:|---:|---:|---:|---:|
-| 4 chunks / 8k | 53 | 162,010 | 103,339 | 687 | 191 | 554.7s |
-| 8 chunks / 16k | 33 | 131,073 | 106,930 | 413 | 139 | 558.0s |
-
-8 chunks ลด calls แต่สูญเสีย atom และ chunk coverage มาก โดยเวลาแทบไม่ลด จึงยัง
-ไม่ promote เป็น default และยังไม่ลอง 12 chunks. รอบถัดไปควรวัด output truncation,
-retry, atom recall และ grounded quality ก่อนเปลี่ยน batching
-
-**เพิ่ม auto-widen retry (session 2026-08-06 ต่อเนื่อง, `llm/generation/generator.go`)**:
-bisection ลง chunk เดียวเดิมมีอยู่แล้วแต่ retry ภายใน (ทั้งใน bisection และใน
-DeepSeek client เอง) ยิง token budget เท่าเดิมซ้ำ — ถ้า chunk เดียวความหนาแน่น
-สูงพอที่จะ fail ที่ budget ปกติ (4,096) มันจะ fail ซ้ำเหมือนเดิมจนกู้ไม่กลับ (นี่
-คือสาเหตุที่พีชคณิต 70 หน้าเคย fail แบบกู้ไม่ได้) เพิ่ม fallback: chunk เดียวที่
-fail ที่ budget ปกติ ลองอีกทีที่ budget กว้างขึ้น (8,192, context window ขยาย
-12,288→20,480) ก่อนยอมแพ้จริง ยืนยันแล้วว่า path นี้ยิงจริงใน production (เจอ
-error message ระบุ `(widened retry)` ตรง ๆ ตอนเคมี 224 chunks ล้มเพราะ DNS
-ชั่วคราว ไม่ใช่ truncation — งบประมาณกว้างขึ้นทำงานตามที่ตั้งใจ ปัญหาที่แท้จริง
-รอบนั้นเป็น network blip ภายนอก)
+Auto-widen retry (`llm/generation/generator.go`): chunk เดียวที่ fail ที่ budget
+ปกติ ลองอีกทีที่ budget กว้างขึ้น (8,192, context 12,288→20,480) ก่อนยอมแพ้ —
+ยืนยันแล้วว่ายิงจริงใน production
 
 ## สิ่งที่ยังค้าง
 
-1. ทำ extraction diagnostics ให้เห็น table/figure/scanned-page failure ก่อน
-   ปล่อยให้ graph หรือ writer แก้ปัญหาที่ต้นเหตุผิดชั้น
-2. ลด draft waste ด้วย prompt ที่บังคับ well-formed output, operation และ quote
-   ให้ครบตั้งแต่ครั้งแรก; ใช้ repair เฉพาะ failure ที่ deterministic
-3. อ่านข้อ easy/medium/hard จริงข้ามวิชา และเทียบกับ NotebookLM จาก source เดียวกัน
-   โดยแยก provenance, correctness, reasoning depth และ distractor quality
-4. ทำ semantic calibration กับ reviewer/model ที่ไม่ใช่ generator หรือ human sample
-   ขนาดเล็ก ก่อนประกาศ pass rate เป็นคุณภาพ
-5. วัด token/call ต่อ stage ทุก benchmark; ยังไม่เพิ่ม planner หรือ per-question
-   judge จนกว่าจะพิสูจน์ว่าคุณภาพต่อ token ดีขึ้นจริง
-6. ~~commit code ของ session 2026-08-06 ต่อเนื่อง~~ — **เสร็จแล้ว** commit
-   `8320cf8` (bug fix) + `97e6587` (analysis tier + preset)
-7. ทดสอบ US History (`samples/openstax-us-history.pdf`) และ sociology
-   (`.scratch/university-sources/sociology-3e.pdf`) — ดาวน์โหลด/มีไฟล์แล้วแต่
-   ไม่เคยรัน US History คือตัวแทน pure-qualitative humanities ตัวเดียวที่ยังไม่
-   มีหลักฐานว่า `analysis`/gate อื่น ๆ ทำงานเมื่อไม่มี causal/quantitative
-   content แบบ STEM เลย
-8. แก้ `--scope` ให้ route ไปถึง `GenerationDirective` จริง — ตอนนี้ผ่านได้แค่
-   `--benchmark <preset>` เท่านั้น ผู้ใช้ทั่วไปสั่ง "ขอ hard application" ผ่าน
-   `--scope` เฉย ๆ ยังทำไม่ได้ (เจอ bug นี้ตั้งแต่ session ก่อน ยังไม่แก้)
-9. วัด cost tradeoff ของ `analysisSupportAtomIDs` ที่ข้าม atom ที่
-   `supportsForm(atom,"calculation")` โดยตั้งใจ (กัน numeric-slot assignment
-   แย่ง atom เดียวกัน) — ยังไม่วัดว่ากระทบ yield ของ analysis slot บนวิชาที่
-   คำนวณเยอะ (ฟิสิกส์/เคมี) มากกว่าวิชาที่ไม่ค่อยมีเลข (ชีวะ/สังคม) แค่ไหน
-10. live-verify ซ้ำ bug 1 (rounding tolerance) กับ bug 3 (coverage_contract
-    asymmetry) — **ส่วนใหญ่เสร็จ (session 2026-08-06/07)**: physics/chemistry/
-    economics/US history/biology rerun แล้ว post-fix; bug 1/3 พิสูจน์แล้วว่าไม่มี
-    ผลใน live (numeric 4/4, app-hard 5/7) — เหลือ rerun algebra หลัง fix
-    (รอบแรกหยุดกลางคัน) ถ้าต้องการ matrix ครบทุกวิชา
+1. ~~Extraction diagnostics ให้เห็น scanned-page/figure/table failure~~ —
+   **เสร็จ code-level** (session 2026-08-07, ยังไม่ commit):
+   - `checkExtraction` (`app/app.go`) list เลขหน้าจริงที่ text อ่อนแทนนับรวม
+   - `ExtractDocling` (`pdfx/extract/docling.go`) เทียบจำนวน `![...]` ใน
+     markdown กับ asset ที่ดึงได้จริงต่อหน้า → warn เมื่อรูปหาย
+   - `raggedTableWarnings` (`docling.go`) เช็ค markdown table block ที่จำนวน
+     cell ต่อแถวไม่เท่ากัน (รวม header-separator row) → warn ว่า table
+     extraction อาจพัง (Docling แปลง table เป็น markdown text ตรง ๆ ไม่ใช่
+     asset แยก จึงต้องเช็คจาก structure ของ text เอง)
+   - ทั้งหมดพิมพ์ก่อน `confirm()` เสมอ ไม่ใช่แค่ `--extract-only`
+   - unit test ครบทั้ง 3 สัญญาณ (`main_test.go`, `auto_test.go`), `go vet` +
+     `go test ./...` ผ่านหมด, build clean
 
-11. **`--benchmark` รองรับ comma-list แล้ว** (`--benchmark "recall,understanding,
-    application-hard"`) — เพิ่ม session 2026-08-07 เพื่อข้าม case ที่ไม่เหมาะกับ
-    source (เช่น US history ข้าม calculation ที่ฝืนสร้างแล้วติดหล่ม). report
-    suite ตั้งชื่อเป็น "first-et-al" เมื่อ list ยาวเกิน 2 ตัว
+   **ยังไม่ live-verify กับ Docling จริง**: environment นี้ไม่มี
+   `.scratch/docling-venv` (ต้องรัน `setup-docling.ps1` ซึ่งโหลด OCR model
+   หลาย GB) เทสทั้งหมดอิง JSON payload จำลองผ่าน `stubDoclingRunner` ไม่ใช่
+   Docling ตัวจริง — ยังไม่ยืนยันว่า heuristic เหล่านี้ trigger ถูกจังหวะกับ
+   PDF ที่มีรูป/ตารางเสียจริง
+2. ลด draft waste ด้วย prompt ที่บังคับ well-formed output/operation/quote ครบ
+   ตั้งแต่ครั้งแรก; ใช้ repair เฉพาะ failure ที่ deterministic
+3. อ่านข้อ easy/medium/hard จริงข้ามวิชา เทียบ NotebookLM จาก source เดียวกัน —
+   แยก provenance, correctness, reasoning depth, distractor quality
+4. Semantic calibration กับ reviewer/model ที่ไม่ใช่ generator หรือ human sample
+   ขนาดเล็ก ก่อนประกาศ pass rate เป็นคุณภาพ
+5. วัด token/call ต่อ stage ทุก benchmark; ยังไม่เพิ่ม planner/per-question judge
+   จนกว่าจะพิสูจน์คุณภาพต่อ token ดีขึ้นจริง
+6. **US History + sociology ยังไม่เคยรันเลย** — `samples/openstax-us-history.pdf`
+   และ `.scratch/university-sources/sociology-3e.pdf` มีไฟล์แล้วแต่ไม่เคย compile
+   outline เป็นตัวแทน pure-qualitative humanities เดียวที่ยังไม่มีหลักฐานว่า
+   analysis/gate ทำงานเมื่อไม่มี causal/quantitative content แบบ STEM
+7. `--scope` ไม่ route ไปถึง `GenerationDirective` จริง — ผู้ใช้สั่ง "ขอ hard
+   application" ผ่าน `--scope` เฉย ๆ ยังทำไม่ได้ (มีมาตั้งแต่ก่อน session นี้)
+8. ยังไม่วัด cost tradeoff ของ `analysisSupportAtomIDs` ที่ข้าม atom ที่
+   `supportsForm(atom,"calculation")` โดยตั้งใจ — ไม่รู้กระทบ yield ของ analysis
+   slot บนวิชาคำนวณเยอะ (ฟิสิกส์/เคมี) มากกว่าวิชาไม่มีเลข (ชีวะ/สังคม) แค่ไหน
+9. Interactive path (`renderSummary`, `writeRun`) — session ล่าสุดรันแต่ทาง
+   `--benchmark`, ยังไม่ live-verify
+10. `--provider ollama` (default) ตอนนี้ต้อง compile evidence เสมอ (เดิม opt-in)
+    ยังไม่ได้รันสดหลังแก้
+11. calc-tool memoization key ใหม่ (lesson+packet แทน slot chunk set) ยืนยันแค่
+    บางส่วน — ยังไม่มี live run ที่ exercise bounded repair path จริง (ต้องเป็น
+    เคสที่ retry เกิดจริง เช่น analysis-hard หรือวิชาที่พลาดบ่อย) unit test
+    ปักหมุดไว้แล้วใน `calctool_test.go`
+12. `gateDistinct` operation-level duplicate ตรวจแล้วไม่ครอบคลุม cross-operation
+    ที่จริงเป็นการวัดผลเดียวกัน (เช่น `5*0.225` vs `1/0.225` ไม่ถูก flag) —
+    ยัง 5/5 ไม่มี yield regression แต่ไม่ครอบคลุม
+13. Cross-case prefix-cache benefit ของการย้าย source context ยังไม่มีตัวเลข
+    aggregate เต็ม (ต้องรัน 9-case บน lesson เดียวถึงจะเห็นผลรวม ~37
+    generate-set calls ตามที่วัดเดิม)
+14. **Independent semantic review ของข้อสอบจริง (session 2026-08-07)** — อ่าน
+    314 ข้อจาก 12 benchmark run ล่าสุด (5 วิชา) เอง (ไม่ใช่ generator
+    self-grade) เจอ 2 pattern เป็นระบบ:
+    - `calculation` preset (ไม่มี `TargetSkill` — `slot.Skill` ปล่อยว่างโดย
+      ตั้งใจ, `coverage_gate.go:62` ไม่บังคับ skill match เมื่อว่าง) ได้ skill
+      ไม่สัมพันธ์กับความซับซ้อนจริงของสมการ (rocket-sled thrust แก้สมการหา
+      ตัวแปร 3 ขั้น vs single-formula plug-in ได้ skill เดียวกันบ่อยครั้ง)
+    - `analysis+easy+requires_calculation` บาง slot (physics F=ma) ผ่าน
+      `demand_contract` ด้วย reasoning_steps ที่เป็นแค่ "rearrange formula" +
+      "substitute" — โครงสร้างตื้นกว่า analysis slot อื่นในวิชาเดียวกัน
+      (ไม่ถึงกับผิด gate ที่มีอยู่ แต่ semantic quality ไม่แน่นเท่า)
+    - แก้ prompt 2 จุด (`distractor_reasons` ต้องไม่ซ้ำกันเองในข้อเดียวกัน,
+      เกณฑ์ understanding-vs-application สำหรับ calc) แล้วรันเทียบ **สองรอบ**
+      (physics `calculation,application-easy`, DeepSeek candidate 3): ผลไม่
+      ขยับทั้งสองรอบ แม้ย้าย instruction จาก buried clause ในพารากราฟยาว
+      (`benchmark.go`) ไปเป็น bullet เดี่ยวใกล้จุดตัดสินใจ (`prompt.go`
+      slot execution protocol step 5) — สรุปได้ว่า **ไม่ใช่ปัญหาความยาว/
+      ตำแหน่งของ prompt** โมเดลดูเหมือนไม่ map เกณฑ์ "plug-in vs isolate
+      unknown" เข้ากับคำ understanding/application ตามที่ตั้งใจ ไม่ว่าจะวาง
+      ตรงไหน
+    - `not_a_duplicate` (N→lb cross-operation dedup, commit `d52b819`) ทำงาน
+      เสถียรทั้ง 3 รอบวัด ไม่ใช่ regression จากการแก้วันนี้
+    - `distractor_reasons` ซ้ำคำเป๊ะในข้อเดียวกัน: พบแค่ 2/314 ข้อ (ไฟล์เดียว)
+      ก่อนแก้ — rare ไม่ใช่ systemic, แก้ prompt ไปแล้วแต่ sample เล็กเกินจะ
+      ยืนยัน/ปฏิเสธว่าหายจริง
+    - **แนะนำต่อ**: อย่าไล่แก้ skill-label ทาง prompt-only ต่อ (พิสูจน์แล้วว่า
+      ไม่นิ่ง 2 รอบ) ทางที่ได้ผลจริงคือ deterministic post-hoc classify จาก
+      `calculation.expression` operator count ฝั่ง Go แทนให้โมเดลเลือก
+      (ปลอดภัยเพราะ `slot.Skill==""` ไม่ถูก gate บังคับอยู่แล้ว) —
+      **ยังไม่ implement**: ต้องเช็คก่อนว่า non-benchmark path
+      (`evidence.go`'s `buildCoverageContractForRun`) ปล่อย `slot.Skill` ว่าง
+      สำหรับ calc-flagged atom เหมือน benchmark preset มั้ย ก่อนเขียนจริง
 
 ## เกณฑ์รอบถัดไป
 
-ห้ามตัดสินจาก gate summary อย่างเดียว ให้เก็บอย่างน้อย:
+ห้ามตัดสินจาก gate summary อย่างเดียว เก็บอย่างน้อย:
 
-- first-attempt drafts, bounded repairs และ ship-ready
-- provider calls, input/output tokens และ latency แยก graph/generation/review
+- first-attempt drafts, bounded repairs, ship-ready
+- provider calls, input/output tokens, latency แยก graph/generation/review
 - quote/coverage/operation/calculation failures
 - สัดส่วน application ที่ changed condition จริง
 - สัดส่วน hard ที่มี linked steps และตัวลวงที่ไม่หลุดด้วยการแทนค่าตรง ๆ
 
-ไฟล์อ้างอิง:
+## ไฟล์อ้างอิง
 
 - `backend/prototype-exam-quality/VERDICT.md` — verdict และผลวัดประวัติศาสตร์
+  (ไม่รวมผลวัด session 2026-08-07 — ดู `git log -p -- docs/HANDOFF.md` สำหรับ
+  ตัวเลขเต็มของ optimize session ถ้าต้องอ้างอิงย้อนหลัง)
 - `docs/research/exam-quality-research-2026-08.md` — research/เหตุผลของ design
 - `backend/prototype-exam-quality/README.md` — วิธีรันและ option ปัจจุบัน
+- `tools/analyze_length_bias.py`, `tools/show_lenbias_examples.py`,
+  `tools/render_liveverify_html.py` — เครื่องมือวิเคราะห์ length-bias/liveverify
+- logs: `backend/prototype-exam-quality/.scratch/liveverify-*.log`
