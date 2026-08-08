@@ -97,7 +97,17 @@ baseline 5/5 คือ acceptance ต่ำลงแต่ของที่ผ�
 |---|---|---|
 | `"according to the passage"` | 1 ข้อ/run ทุก run 6+ รอบ | **0** ทั้งสองวิชา 3 run ติด |
 | error-finding copy สมการถูก | 2-3 ข้อ/run | **0** — flawed-work verified 4/6 |
-| econ recall-hard decoy ไม่อยู่ใน stem | 4 fail, accepted 3/9 | 2 fail, accepted 4/7 |
+| econ recall-hard decoy ไม่อยู่ใน stem | 4 fail, accepted 3/9 | **0 fail**, accepted 4/6 |
+
+decoy ปิดจ๊อบด้วยสองส่วน (fail 4 → 2 → **0** สาม run):
+- `RepairDecoyValues` — decoy ที่ verify ไม่ผ่านถูกตัดทิ้งแทนฆ่าทั้งข้อ สำคัญสุด
+  ตอน slot **ไม่ได้ขอ** decoy แต่โมเดลแถมมาผิด (เกิดกับ recall/calculation ด้วย)
+  ถ้า slot ขอจริงก็ไปตายที่ coverage gate พร้อม reason ที่ถูกต้องว่า stem บาง
+- `CoverageSlot.DecoyAtomID` — contract เลือก claim ข้างเคียงที่คำตอบไม่ต้องใช้
+  (กัน primary + support atom ออกไปแล้ว) ส่งให้เป็น `decoy_from` พร้อม quote ใน
+  evidence packet → โมเดล**ปลูก** fact ที่ระบุมา ไม่ต้อง**คิด**รายละเอียดขึ้นเอง
+  ท่าเดียวกับที่ `distractor_atom_id` สำเร็จ
+- physics recall-hard 5/5 ไม่ regress · econ recall 5/5 · econ understanding 5/5
 
 ทั้งสามใช้ท่าเดียวกัน: **บอกลำดับการทำ ไม่ใช่บอกข้อห้าม**
 - ห้าม "according to the passage" เฉย ๆ = โมเดลไม่มีทางออกเมื่อ stem ขาดข้อมูล
