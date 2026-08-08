@@ -123,6 +123,28 @@ decoy ปิดจ๊อบด้วยสองส่วน (fail 4 → 2 → *
 ยืนได้เอง — วลีที่ฝังกลางประโยค ("the value in this table") ยัง fail ต่อ เพราะ
 stem นั้นพึ่งของที่นักเรียนมองไม่เห็นจริง ๆ
 
+### econ สะอาดหมด — recall 5/5 · recall-hard 5/5 · understanding 5/5 ไม่มี fail เลย
+
+สองอันสุดท้ายที่ปิด:
+
+**`unknown coverage slot ""`** — draft กลับมาไม่มี ID เลย พ่วง
+`quote_verbatim: chunk "" (page 0)` สองอันนี้บอกเรื่องผิดทั้งคู่: quote เป็น
+verbatim จริง resolve ไป claim เดียวชัดเจน (A037) แต่ **ไม่มี slot ไหนถาม
+claim นั้น** — โมเดลตอบประโยคข้างเคียง `RepairQuestionProvenance` เลยผูกไม่ได้
+และ chunk ID ว่างทำให้ `gateQuote` ไปหา quote ใน chunk เปล่า แล้วรายงานว่า
+"ไม่พบ" ซึ่งอ่านเหมือนโมเดลกุ quote ขึ้นมา — คนละเรื่องและน่ากลัวกว่าของจริงเยอะ
+แก้: repair บันทึก atom/chunk ที่ resolve ได้แม้ไม่มี slot รับ + coverage reason
+บอกว่าใช้ claim ไหนและ slot ที่เปิดอยู่มีอะไร ข้อยัง fail (ถูกแล้ว) แต่ message
+บอกความจริง — รอบถัดมาได้ข้อความยืนยัน diagnosis ตรง ๆ:
+`its quote resolves to claim A037, which no slot asks about (slots: S01=A035 ...)`
+
+**`"according to the passage"` กลางประโยค** — repair เดิมตัดแค่ตอนขึ้นต้น
+สองรูปแบบที่เหลือเป็นวลีกลางประโยคที่ไม่แบกข้อมูลอะไร แยก `bannedPhrases` เป็น
+attribution (ตัดได้ทุกตำแหน่ง) กับที่เหลือ (ตัดได้เฉพาะขึ้นต้น เพราะอาจ govern
+คำนาม — "the value in the text above" ตัดแล้วเหลือ "the value")
+guard 2 ชั้น: วลีที่จบ clause บอกเล่าคือ object ของ clause นั้น (`after` ขึ้นต้น
+ด้วย `.`/`!` → ไม่ตัด) และวลีที่ขึ้นต้นประโยคทำให้คำถัดไปต้อง capitalise ใหม่
+
 ### ที่ยังไม่ได้ทำ / รู้แล้วว่าเป็นปัญหา
 
 - `distractor_atom_id` ที่ชี้ atom ของ slot เอง: prompt แก้แล้วไม่หาย จึงใช้
