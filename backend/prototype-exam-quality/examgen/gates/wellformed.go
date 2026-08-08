@@ -521,6 +521,16 @@ func excerpt(s string, max int) string {
 // that one still fails, which is why the prompt asks for the information rather
 // than for the phrase to be avoided.
 func RepairStemSelfContainment(q Question) Question {
+	if repaired, ok := stripLeadingPointer(q); ok {
+		q = repaired
+	}
+	if repaired, ok := stripBuriedAttribution(q); ok {
+		q = repaired
+	}
+	return q
+}
+
+func stripLeadingPointer(q Question) (Question, bool) {
 	stem := strings.TrimSpace(q.Stem)
 	lower := strings.ToLower(stem)
 	for _, phrase := range bannedPhrases {
@@ -530,16 +540,92 @@ func RepairStemSelfContainment(q Question) Question {
 		trimmed := strings.TrimSpace(string([]rune(stem)[len([]rune(phrase)):]))
 		trimmed = strings.TrimSpace(strings.TrimLeft(trimmed, ",:;-—–"))
 		if trimmed == "" {
-			return q
+			return q, false
 		}
-		candidate := q
-		candidate.Stem = capitaliseLatinLead(trimmed)
-		if checkStemIsAQuestion(candidate) != "" || checkNoBannedPhrase(candidate) != "" {
-			return q
-		}
-		return candidate
+		return acceptRepairedStem(q, capitaliseLatinLead(trimmed))
 	}
-	return q
+	return q, false
+}
+
+// attributionPhrases are the banned phrases that only say where the fact came
+// from. They carry no information the stem needs, so they can be cut out of the
+// middle of a sentence as well as off the front — "what is the next step
+// according to the passage?" is a whole question with four dead words in it.
+//
+// The rest of bannedPhrases stay leading-only because they can point at a
+// specific thing: "the value in the text above" loses its subject if the
+// pointer is removed, and that stem really is broken.
+var attributionPhrases = map[string]bool{
+	"according to the passage": true, "according to the text": true,
+	"based on the passage": true, "as mentioned in the text": true,
+	"the passage states": true, "the passage describes": true,
+	"in the passage": true, "in this passage": true, "in the given text": true,
+	"described in the passage": true, "described in the text": true,
+	"ตามข้อความในหนังสือ": true, "ในข้อความต้นฉบับ": true, "ตามข้อความข้างต้น": true,
+	"จากข้อความข้างต้น": true, "ตามเนื้อหาข้างต้น": true, "ในเนื้อหาข้างต้น": true,
+	"ตามที่กล่าวไว้ข้างต้น": true, "ในบทความนี้": true,
+}
+
+// danglingIfCut are words that would be left governing nothing. "the value in
+// the passage" reads as a pointer at a particular value; cutting the phrase
+// after "in" leaves "the value", which is no better and no longer detectable.
+var danglingIfCut = map[string]bool{
+	"the": true, "a": true, "an": true, "in": true, "of": true, "on": true,
+	"from": true, "with": true, "to": true, "for": true, "at": true, "by": true,
+}
+
+func stripBuriedAttribution(q Question) (Question, bool) {
+	stem := strings.TrimSpace(q.Stem)
+	lower := strings.ToLower(stem)
+	for phrase := range attributionPhrases {
+		at := strings.Index(lower, phrase)
+		if at <= 0 {
+			continue
+		}
+		before := strings.TrimSpace(stem[:at])
+		if fields := strings.Fields(strings.ToLower(before)); len(fields) > 0 && danglingIfCut[fields[len(fields)-1]] {
+			continue
+		}
+		after := strings.TrimSpace(stem[at+len(phrase):])
+		after = strings.TrimSpace(strings.TrimLeft(after, ",:;-—–"))
+		// A phrase that ends a declarative clause was that clause's object:
+		// "the rate given in the passage." leaves "the rate given." Cutting a
+		// phrase that trails the question itself is safe, so "?" is allowed
+		// through and "." and "!" are not.
+		if strings.HasPrefix(after, ".") || strings.HasPrefix(after, "!") {
+			continue
+		}
+		// The cut can promote the following word to the start of a sentence.
+		if endsSentence(before) {
+			after = capitaliseLatinLead(after)
+		}
+		joined := strings.TrimSpace(before + " " + after)
+		joined = strings.ReplaceAll(joined, " ,", ",")
+		joined = strings.ReplaceAll(joined, " ?", "?")
+		if joined == "" {
+			continue
+		}
+		if repaired, ok := acceptRepairedStem(q, joined); ok {
+			return repaired, true
+		}
+	}
+	return q, false
+}
+
+// acceptRepairedStem keeps a rewrite only if it is still a question and still
+// free of every pointer. A repair that trades one defect for another is not one.
+func acceptRepairedStem(q Question, stem string) (Question, bool) {
+	candidate := q
+	candidate.Stem = stem
+	if checkStemIsAQuestion(candidate) != "" || checkNoBannedPhrase(candidate) != "" {
+		return q, false
+	}
+	return candidate, true
+}
+
+func endsSentence(s string) bool {
+	s = strings.TrimSpace(s)
+	return strings.HasSuffix(s, ".") || strings.HasSuffix(s, "?") || strings.HasSuffix(s, "!")
 }
 
 // capitaliseLatinLead restores sentence case after a lead-in is cut. Scripts

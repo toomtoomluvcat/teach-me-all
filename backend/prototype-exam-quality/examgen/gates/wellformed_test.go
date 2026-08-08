@@ -147,3 +147,35 @@ func TestRepairStemSelfContainmentLeavesCleanStemsAlone(t *testing.T) {
 		t.Fatalf("a clean stem was rewritten to %q", got)
 	}
 }
+
+// Attribution buried mid-sentence carries nothing. These two shapes both came
+// back from live runs on economics.
+func TestRepairStemSelfContainmentStripsBuriedAttribution(t *testing.T) {
+	for _, tc := range []struct{ in, want string }{
+		{
+			"The law of demand describes the inverse relationship between price and quantity demanded. According to the passage, what does the law of demand assume about other variables?",
+			"The law of demand describes the inverse relationship between price and quantity demanded. What does the law of demand assume about other variables?",
+		},
+		{
+			"In the four-step process for analyzing changes in equilibrium, what is the next step according to the passage?",
+			"In the four-step process for analyzing changes in equilibrium, what is the next step?",
+		},
+	} {
+		if got := RepairStemSelfContainment(Question{Stem: tc.in}).Stem; got != tc.want {
+			t.Errorf("stem =\n  %q\nwant\n  %q", got, tc.want)
+		}
+	}
+}
+
+// A pointer that governs a noun is load-bearing: cutting it leaves "the value",
+// which is no better and no longer detectable.
+func TestRepairStemSelfContainmentLeavesAGoverningPointerAlone(t *testing.T) {
+	stem := "A crate accelerates at the rate in the passage. What is the net force?"
+	got := RepairStemSelfContainment(Question{Stem: stem})
+	if got.Stem != stem {
+		t.Fatalf("stem was rewritten to %q", got.Stem)
+	}
+	if checkNoBannedPhrase(got) == "" {
+		t.Fatal("a governing pointer must still fail the gate")
+	}
+}
