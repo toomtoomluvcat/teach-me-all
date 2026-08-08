@@ -52,14 +52,19 @@ LLM grader — grader ถูกเรียกเฉพาะตอนเสม�
 
 physics `openstax-physics.pdf 140-220` / economics `economics-3e.pdf 60-150`
 
-| case | baseline เดิม | run แรก | run สุดท้าย (หลัง dedupe) |
+| case | baseline เดิม | run แรก | สอง sample สุดท้าย (โค้ดเดียวกัน) |
 |---|---|---|---|
-| physics calculation | 5/5 (100%) | 2/8 (25%) | 3/9 (33%) |
-| physics error-finding | — | 2/10 | 2/9 |
-| physics recall-hard | — | 1/10 (10%) | **5/6 (83%)** |
-| econ recall | 5/5 (100%) | 5/6 (83%) | 5/6 (83%) |
-| econ recall-hard | — | 2/8 (25%) | 4/10 (40%) |
-| econ understanding | — | 5/5 (100%) | 5/6 (83%) |
+| physics calculation | 5/5 (100%) | 2/8 (25%) | 3/8, 4/6 |
+| physics error-finding | — | 2/10 | 4/7, **5/7** |
+| physics recall-hard | — | 1/10 (10%) | 5/6, 5/7 |
+| econ recall | 5/5 (100%) | 5/6 (83%) | 5/6, 5/6 |
+| econ recall-hard | — | 2/8 (25%) | 4/10, 5/9 |
+| econ understanding | — | 5/5 (100%) | 5/6, 5/5 |
+
+**อ่าน pass rate ผิดมาตลอด** — ตัวที่นิ่งคือ **accepted count** ไม่ใช่ accepted/drafts
+budget=5 และ accepted ลงที่ 4-5 แทบทุก case ทุก run ส่วน drafts แกว่ง 5-10 เพราะ
+retry ยิงบ้างไม่ยิงบ้าง pass rate จึงแกว่งตาม denominator ไม่ใช่ตามคุณภาพ
+ควรรายงานเป็น **accepted/budget** (คลุม contract ได้แค่ไหน) คู่กับ **drafts** (ราคา)
 
 axis tally ของ run สุดท้าย: physics recall-hard = atom-backed 15, decoys 5,
 multi-claim 5 · econ recall-hard = atom-backed 9, decoys 4, multi-claim 4 ·
