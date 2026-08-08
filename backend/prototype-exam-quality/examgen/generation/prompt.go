@@ -434,9 +434,9 @@ func QuestionSetPrompt(lesson Lesson, graph *EvidenceGraph, chunks []Chunk, cont
 	}
 	b.WriteString("Coverage contract (one slot per distinct question):\n")
 	for _, slot := range contract.Slots {
-		fmt.Fprintf(&b, "- %s atom=%s support_atoms=%s chunk=%s skill=%s requires_calculation=%t difficulty=%s min_claims=%d min_decoys=%d distractors=%s operation=%s target=%s evidence_quote=%q\n",
+		fmt.Fprintf(&b, "- %s atom=%s support_atoms=%s chunk=%s skill=%s requires_calculation=%t difficulty=%s min_claims=%d min_decoys=%d decoy_from=%s distractors=%s operation=%s target=%s evidence_quote=%q\n",
 			slot.ID, slot.AtomID, strings.Join(slot.SupportAtomIDs, ","), strings.Join(slot.SourceChunkIDs, ","), slot.Skill, slot.RequiresCalculation, slot.Difficulty,
-			slot.MinDepth, slot.MinDecoys, discriminationLabel(slot), slot.Operation, slot.Target, slot.EvidenceQuote)
+			slot.MinDepth, slot.MinDecoys, decoySourceLabel(slot), discriminationLabel(slot), slot.Operation, slot.Target, slot.EvidenceQuote)
 	}
 	if atoms := contractEvidenceAtoms(graph, contract); len(atoms) > 0 {
 		b.WriteString("\nEvidence packet for the assigned slots:\n")
@@ -459,7 +459,7 @@ func QuestionSetPrompt(lesson Lesson, graph *EvidenceGraph, chunks []Chunk, cont
 	b.WriteString("1. Work through the slots in order; use one output object for one slot.\n")
 	b.WriteString("2. Copy the exact slot/atom/chunk ID tuple from that row; never invent or mix IDs.\n")
 	b.WriteString("3. Copy the row skill and requires_calculation flag exactly. Copy difficulty when the row names one; when it is blank, report the difficulty the finished question honestly has. If the row is unsupported, omit only that row.\n")
-	b.WriteString("3a. Satisfy the row's three demand columns: min_claims is how many distinct source claims the answer must genuinely need (copy every support atom when it is 2 or more); min_decoys is how many stem givens the solution must not use (list them in decoy_values); distractors=close means every wrong option must be one a student could actually land on -- on a numeric question give each one a distractor_expression, on a question without arithmetic give each one a distractor_atom_id naming the real source claim it comes from, and failing both give each one its own distinct distractor_reason.\n")
+	b.WriteString("3a. Satisfy the row's three demand columns: min_claims is how many distinct source claims the answer must genuinely need (copy every support atom when it is 2 or more); min_decoys is how many stem givens the solution must not use -- write the claim named by decoy_from into your stem as part of the scenario, then copy those words into decoy_values; distractors=close means every wrong option must be one a student could actually land on -- on a numeric question give each one a distractor_expression, on a question without arithmetic give each one a distractor_atom_id naming the real source claim it comes from, and failing both give each one its own distinct distractor_reason.\n")
 	b.WriteString("4. For medium or hard application, fill changed_condition; for hard application, copy every support atom ID and provide at least two distinct reasoning_steps. For medium and hard questions, provide one short distractor_reason per wrong choice, each naming a distinct mistake -- never repeat the same distractor_reason text twice in one question.\n")
 	if forceCalc {
 		b.WriteString("5. For a slot whose skill is not fixed above, choose skill by what solving the calculation demands: understanding if the numbers plug straight into a formula the source already states solved for the unknown; application if you must isolate an unknown by rearranging or chaining the relationship first.\n")
@@ -474,6 +474,17 @@ func QuestionSetPrompt(lesson Lesson, graph *EvidenceGraph, chunks []Chunk, cont
 		b.WriteString("For slots marked requires_calculation=true, calculation.expression and calculation.expected are mandatory. Use the calculation object exactly when the flag is true.")
 	}
 	return b.String()
+}
+
+// decoySourceLabel names the claim this slot's decoy should be planted from,
+// or "none" when the run did not ask for one. Spelled rather than left blank so
+// a row cannot be misread as asking for a decoy out of nowhere — which is what
+// the writer was doing before it was handed a specific claim.
+func decoySourceLabel(slot CoverageSlot) string {
+	if slot.MinDecoys <= 0 || strings.TrimSpace(slot.DecoyAtomID) == "" {
+		return "none"
+	}
+	return slot.DecoyAtomID
 }
 
 // discriminationLabel words the discrimination axis for the writer. "close" and
@@ -501,7 +512,12 @@ func contractEvidenceAtoms(graph *EvidenceGraph, contract CoverageContract) []Ev
 	seen := map[string]bool{}
 	atoms := make([]EvidenceAtom, 0, len(contract.Slots))
 	for _, slot := range contract.Slots {
+		// The decoy source rides along: naming a claim the writer cannot read
+		// would be no better than asking it to invent one.
 		ids := append([]string{slot.AtomID}, slot.SupportAtomIDs...)
+		if slot.MinDecoys > 0 && slot.DecoyAtomID != "" {
+			ids = append(ids, slot.DecoyAtomID)
+		}
 		for _, id := range ids {
 			atom, ok := byID[id]
 			if !ok || seen[atom.ID] {
@@ -688,14 +704,13 @@ Compact assessment contract:
   stem that never uses those words. A value the solution consumes is a given,
   not a decoy. Add them only when the slot asks for them, keep them believable
   for the scenario, and make at least one wrong choice the result of using one.
-  A slot with min_decoys of 1 or more is not satisfiable by a bare definitional
-  stem, and the order matters. Do not pick a decoy from the source and then
-  hope the stem mentions it -- that is what produces a decoy_values entry no
-  stem ever contained. Instead: write the stem, deliberately putting one extra
-  true detail into it that the answer does not need (a magnitude, a date, a
-  named neighbouring term, a second condition), then read the decoy back out of
-  the stem you just wrote and copy those words. If the stem you wrote does not
-  contain the words, they are not a decoy.
+  A slot with min_decoys of 1 or more names its decoy_from claim, and you do
+  not have to invent anything: that claim is a true statement from the same
+  material which this answer does not need. Write it into your stem as part of
+  the scenario, then copy the words you wrote into decoy_values. Do not pick
+  some other detail out of the source and hope the stem mentions it -- that is
+  what produces a decoy_values entry no stem ever contained. If the stem you
+  wrote does not contain the words, they are not a decoy.
   "In economic terminology, what is the difference between demand and quantity
   demanded?" has nothing spare in it and cannot carry a decoy. "A market for
   gasoline is described by both a demand curve and a demand schedule. In

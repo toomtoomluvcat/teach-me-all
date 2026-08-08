@@ -88,6 +88,20 @@ func PreflightCoverageContract(contract CoverageContract, graph *EvidenceGraph, 
 		if slot.Operation == "" {
 			slot.Operation = atom.Relation
 		}
+		// A decoy the writer cannot see is worse than none: it would leave the
+		// slot demanding a spare detail with nothing named to supply it, which
+		// is the state that produced invented decoys in the first place.
+		if slot.DecoyAtomID != "" {
+			decoy, ok := atomByID[slot.DecoyAtomID]
+			switch {
+			case !ok || decoy.ID == atom.ID || containsString(slot.SupportAtomIDs, decoy.ID):
+				contract.PreflightChanges = append(contract.PreflightChanges, fmt.Sprintf("drop decoy source %s from %s: unknown, primary, or already load-bearing", slot.DecoyAtomID, slot.ID))
+				slot.DecoyAtomID = ""
+			case !contextIDs[decoy.ChunkID]:
+				contract.PreflightChanges = append(contract.PreflightChanges, fmt.Sprintf("drop decoy source %s from %s: atom is outside set context", slot.DecoyAtomID, slot.ID))
+				slot.DecoyAtomID = ""
+			}
+		}
 		clean = append(clean, slot)
 	}
 	contract.Slots = clean

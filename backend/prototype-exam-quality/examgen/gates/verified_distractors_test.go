@@ -327,3 +327,40 @@ func TestNormalizeExpressionsLeavesValidExpressionsUntouched(t *testing.T) {
 		t.Fatalf("a valid expression was rewritten to %q", got)
 	}
 }
+
+func TestRepairDecoyValuesDropsOnlyTheUnverifiableOnes(t *testing.T) {
+	q := decoyQuestion()
+	q.DecoyValues = []string{"0.80", "5.0", "31.7", "0.80"}
+	q = RepairDecoyValues(q)
+	if len(q.DecoyValues) != 1 || q.DecoyValues[0] != "0.80" {
+		t.Fatalf("kept %v, want only the decoy that is in the stem and unused", q.DecoyValues)
+	}
+	if res := gateDecoy(q); !res.Pass {
+		t.Fatalf("repaired decoys did not survive the gate: %q", res.Reason)
+	}
+}
+
+// A volunteered decoy nobody asked for used to take the whole question down.
+func TestRepairDecoyValuesRescuesAQuestionThatNeverNeededADecoy(t *testing.T) {
+	q := numericQuestion()
+	q.DecoyValues = []string{"a summary the stem never says"}
+	if res := gateDecoy(q); res.Pass {
+		t.Fatal("precondition: the bad decoy should fail before repair")
+	}
+	q = RepairDecoyValues(q)
+	if len(q.DecoyValues) != 0 {
+		t.Fatalf("decoys = %v, want none left", q.DecoyValues)
+	}
+	if res := gateDecoy(q); !res.Pass {
+		t.Fatalf("question still fails after repair: %q", res.Reason)
+	}
+}
+
+func TestRepairDecoyValuesLeavesGoodDeclarationsAlone(t *testing.T) {
+	q := decoyQuestion()
+	before := append([]string(nil), q.DecoyValues...)
+	q = RepairDecoyValues(q)
+	if len(q.DecoyValues) != len(before) || q.DecoyValues[0] != before[0] {
+		t.Fatalf("decoys = %v, want %v untouched", q.DecoyValues, before)
+	}
+}

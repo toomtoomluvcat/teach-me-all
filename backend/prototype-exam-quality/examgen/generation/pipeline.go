@@ -361,6 +361,7 @@ func evaluateSetCandidate(ctx context.Context, lesson Lesson, graph *EvidenceGra
 		q = RepairStemSelfContainment(q)
 		q = NormalizeExpressions(q, d.Eval)
 		q = RepairErrorFinding(q, d.Eval)
+		q = RepairDecoyValues(q)
 		qs[i] = q
 		chunk := byChunk[q.EvidenceChunkID]
 		q.ChunkID = q.EvidenceChunkID

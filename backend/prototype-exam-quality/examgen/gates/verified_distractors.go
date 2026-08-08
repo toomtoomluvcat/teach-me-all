@@ -375,41 +375,91 @@ func gateDecoy(q Question) GateResult {
 	used := solutionOperands(q)
 	for _, raw := range q.DecoyValues {
 		decoy := strings.TrimSpace(raw)
-		if decoy == "" {
-			res.Reason = "a declared decoy value is empty"
-			return res
-		}
 		key := strings.ToLower(decoy)
-		if seen[key] {
+		if decoy != "" && seen[key] {
 			res.Reason = fmt.Sprintf("decoy %q is declared twice; one distraction counts once", decoy)
 			return res
 		}
 		seen[key] = true
-
-		value, numeric := parseDecoy(decoy)
-		if !numeric {
-			if !strings.Contains(squeeze(strings.ToLower(q.Stem)), squeeze(key)) {
-				res.Reason = fmt.Sprintf("declared decoy %q does not appear in the stem", decoy)
-				return res
-			}
-			continue
-		}
-		if !model.ChoiceMentionsNumber(q.Stem, value) {
-			res.Reason = fmt.Sprintf("declared decoy %s is not present in the stem, so it distracts nobody", decoy)
+		if fault := decoyFault(q, decoy, used); fault != "" {
+			res.Reason = fault
 			return res
-		}
-		for _, operand := range used {
-			if expectedNearlyEqual(operand, value) {
-				res.Reason = fmt.Sprintf("declared decoy %s is used by the solution %q, so it is a given, not a distraction",
-					decoy, q.Calculation.Expression)
-				return res
-			}
 		}
 	}
 
 	res.Pass = true
 	res.Reason = fmt.Sprintf("%d declared decoy value(s) are in the stem and unused by the solution", len(q.DecoyValues))
 	return res
+}
+
+// decoyFault returns why this single declared decoy is not one, or "".
+//
+// Split out from the gate so the repair pass can ask the same question about
+// one decoy at a time without duplicating the rules.
+func decoyFault(q Question, decoy string, used []float64) string {
+	decoy = strings.TrimSpace(decoy)
+	if decoy == "" {
+		return "a declared decoy value is empty"
+	}
+	value, numeric := parseDecoy(decoy)
+	if !numeric {
+		if !strings.Contains(squeeze(strings.ToLower(q.Stem)), squeeze(strings.ToLower(decoy))) {
+			return fmt.Sprintf("declared decoy %q does not appear in the stem", decoy)
+		}
+		return ""
+	}
+	if !model.ChoiceMentionsNumber(q.Stem, value) {
+		return fmt.Sprintf("declared decoy %s is not present in the stem, so it distracts nobody", decoy)
+	}
+	for _, operand := range used {
+		if expectedNearlyEqual(operand, value) {
+			return fmt.Sprintf("declared decoy %s is used by the solution %q, so it is a given, not a distraction",
+				decoy, q.Calculation.Expression)
+		}
+	}
+	return ""
+}
+
+// RepairDecoyValues drops a declared decoy that is not one, instead of letting
+// it take the question down with it.
+//
+// A decoy is a claim about the stem — "this given is here and the answer does
+// not need it" — and a wrong claim about the stem is a labelling defect, the
+// same shape as a distractor citing the wrong atom. Failing the whole item over
+// it costs a question to punish a field, and it costs it even when the slot
+// never asked for a decoy and the writer volunteered a bad one unprompted,
+// which happens on plain recall and calculation items too.
+//
+// After the drop the question is judged on what survives: a slot that did ask
+// for decoys now fails at the coverage gate with "requires 1 decoy value, got
+// 0", which says the honest thing — the stem had nothing spare in it — rather
+// than blaming the label. Nothing is invented; a decoy that is really in the
+// stem and really unused is kept exactly as written.
+func RepairDecoyValues(q Question) Question {
+	if len(q.DecoyValues) == 0 {
+		return q
+	}
+	used := solutionOperands(q)
+	seen := map[string]bool{}
+	kept := make([]string, 0, len(q.DecoyValues))
+	for _, raw := range q.DecoyValues {
+		decoy := strings.TrimSpace(raw)
+		key := strings.ToLower(decoy)
+		if seen[key] || decoyFault(q, decoy, used) != "" {
+			continue
+		}
+		seen[key] = true
+		kept = append(kept, raw)
+	}
+	if len(kept) == len(q.DecoyValues) {
+		return q
+	}
+	if len(kept) == 0 {
+		q.DecoyValues = nil
+		return q
+	}
+	q.DecoyValues = kept
+	return q
 }
 
 // solutionOperands returns the numeric literals the keyed solution actually

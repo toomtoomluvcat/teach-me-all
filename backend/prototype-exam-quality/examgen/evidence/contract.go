@@ -36,6 +36,16 @@ type CoverageSlot struct {
 	MinDepth int `json:"min_depth,omitempty"`
 	// MinDecoys is how many stem givens the solution must not use.
 	MinDecoys int `json:"min_decoys,omitempty"`
+	// DecoyAtomID is a real neighbouring claim the writer can plant in the stem
+	// to satisfy MinDecoys.
+	//
+	// Asked to invent a spare detail, the writer instead named a source concept
+	// the stem never mentioned — "a gallon of gasoline" against a stem with no
+	// gasoline in it — because on a bare definitional question there is nothing
+	// spare to point at and a concept from the material is the nearest thing to
+	// hand. Naming the claim turns inventing into planting, which is the same
+	// move that made distractor_atom_id work.
+	DecoyAtomID string `json:"decoy_atom_id,omitempty"`
 	// Discrimination is how close the wrong options must sit to the key.
 	Discrimination string `json:"discrimination,omitempty"`
 }
@@ -337,6 +347,17 @@ func buildCoverageContract(lesson Lesson, graph *EvidenceGraph, contextChunks []
 				continue
 			}
 		}
+		// A slot that wants a decoy is handed one to plant. Excluding the claims
+		// the answer is built from keeps the planted detail spare by
+		// construction rather than by the writer's judgement.
+		decoyID := ""
+		if minDecoys > 0 {
+			exclude := map[string]bool{}
+			for _, id := range supportIDs {
+				exclude[id] = true
+			}
+			decoyID = decoyAtomID(atom, atoms, exclude)
+		}
 		difficulty := requiredDifficulty
 		for _, supportID := range supportIDs {
 			usedAtoms[supportID] = true
@@ -360,6 +381,7 @@ func buildCoverageContract(lesson Lesson, graph *EvidenceGraph, contextChunks []
 			Difficulty:          difficulty,
 			MinDepth:            minDepth,
 			MinDecoys:           minDecoys,
+			DecoyAtomID:         decoyID,
 			Discrimination:      discrimination,
 			Operation:           atom.Relation,
 			Target:              atom.Claim,
@@ -457,6 +479,39 @@ func analysisSupportAtomIDs(primary EvidenceAtom, atoms []EvidenceAtom, used map
 		ids = append(ids, c.id)
 	}
 	return ids
+}
+
+// decoyAtomID picks a claim the stem can carry without the answer needing it.
+//
+// It prefers the same chunk, because a detail from the paragraph the question
+// already lives in reads as part of the scenario rather than as an intrusion,
+// and it avoids the claims the answer is built from. The chosen atom is
+// deliberately not marked used: it is being planted, not assessed, so it stays
+// available to a later slot that wants to ask about it.
+func decoyAtomID(primary EvidenceAtom, atoms []EvidenceAtom, exclude map[string]bool) string {
+	best, bestScore := "", -1 <<31
+	for i, atom := range atoms {
+		if atom.ID == primary.ID || exclude[atom.ID] {
+			continue
+		}
+		score := len(atoms) - i
+		if atom.ChunkID == primary.ChunkID {
+			score += 50
+		}
+		if sharesConcept(primary.ConceptIDs, atom.ConceptIDs) {
+			score += 20
+		}
+		// A claim of the same relation type about the same concepts is what the
+		// answer is most likely to actually need; keep the decoy adjacent, not
+		// interchangeable.
+		if strings.EqualFold(atom.Relation, primary.Relation) && sharesConcept(primary.ConceptIDs, atom.ConceptIDs) {
+			score -= 40
+		}
+		if score > bestScore {
+			best, bestScore = atom.ID, score
+		}
+	}
+	return best
 }
 
 func supportingAtomIDs(primary EvidenceAtom, atoms []EvidenceAtom, used map[string]bool) []string {

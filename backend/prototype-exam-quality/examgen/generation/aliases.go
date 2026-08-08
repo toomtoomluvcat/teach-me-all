@@ -91,6 +91,10 @@ func NormalizeExpressions(q Question, ev Evaluator) Question {
 func RepairStemSelfContainment(q Question) Question {
 	return gates.RepairStemSelfContainment(q)
 }
+
+func RepairDecoyValues(q Question) Question {
+	return gates.RepairDecoyValues(q)
+}
 func gateSetCoverage(q Question, contract CoverageContract, byChunk map[string]Chunk, usedSlots, usedAtoms map[string]bool) GateResult {
 	return evidence.GateSetCoverage(q, contract, byChunk, usedSlots, usedAtoms)
 }
