@@ -91,6 +91,28 @@ baseline 5/5 คือ acceptance ต่ำลงแต่ของที่ผ�
 ผลข้างเคียงที่ตามมาทันที: template ที่ลืมใส่ `calculation` object ทำให้โมเดล
 เลิกส่ง calculation ทั้งชุด — **template คือ contract จริง ไม่ใช่ตัวอย่าง**
 
+### สาม residue สุดท้าย — แก้แล้ว 2 เต็ม 1 ครึ่ง
+
+| residue | ก่อน | หลัง |
+|---|---|---|
+| `"according to the passage"` | 1 ข้อ/run ทุก run 6+ รอบ | **0** ทั้งสองวิชา 3 run ติด |
+| error-finding copy สมการถูก | 2-3 ข้อ/run | **0** — flawed-work verified 4/6 |
+| econ recall-hard decoy ไม่อยู่ใน stem | 4 fail, accepted 3/9 | 2 fail, accepted 4/7 |
+
+ทั้งสามใช้ท่าเดียวกัน: **บอกลำดับการทำ ไม่ใช่บอกข้อห้าม**
+- ห้าม "according to the passage" เฉย ๆ = โมเดลไม่มีทางออกเมื่อ stem ขาดข้อมูล
+  เปลี่ยนเป็น "วลีนี้แปลว่า stem ขาดข้อมูล — ใส่ข้อมูลเข้าไป" + ตัวอย่าง before/after
+- "break it once" บน atom แปลงหน่วย operation เดียว = โมเดลอ่านว่าทำไม่ได้
+  บอกรูปแบบตรง ๆ ว่าคูณแทนหารคือ mistake ที่พบบ่อยสุด
+- decoy: เลือกจากเนื้อหาแล้วหวังว่า stem จะพูดถึง = กลับด้าน
+  เปลี่ยนเป็น เขียน stem ที่มีรายละเอียดเกิน 1 ตัวก่อน แล้วค่อยอ่าน decoy ออกจาก
+  stem ที่เพิ่งเขียน + ย้ำว่ารายละเอียดอยู่ใน stem ห้ามอยู่ในช้อย (รอบแรกที่ไม่ย้ำ
+  โมเดลไปยัดในช้อยจน `checkChoiceLengthSkew` ยิง)
+
+`RepairStemSelfContainment` ตัดวลีชี้ทิ้งเมื่อมันเป็นแค่ lead-in และคำถามข้างใต้
+ยืนได้เอง — วลีที่ฝังกลางประโยค ("the value in this table") ยัง fail ต่อ เพราะ
+stem นั้นพึ่งของที่นักเรียนมองไม่เห็นจริง ๆ
+
 ### ที่ยังไม่ได้ทำ / รู้แล้วว่าเป็นปัญหา
 
 - `distractor_atom_id` ที่ชี้ atom ของ slot เอง: prompt แก้แล้วไม่หาย จึงใช้
