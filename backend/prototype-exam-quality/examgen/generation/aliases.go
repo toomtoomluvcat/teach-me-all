@@ -87,6 +87,10 @@ func RepairErrorFinding(q Question, ev Evaluator) Question {
 func NormalizeExpressions(q Question, ev Evaluator) Question {
 	return gates.NormalizeExpressions(q, ev)
 }
+
+func RepairStemSelfContainment(q Question) Question {
+	return gates.RepairStemSelfContainment(q)
+}
 func gateSetCoverage(q Question, contract CoverageContract, byChunk map[string]Chunk, usedSlots, usedAtoms map[string]bool) GateResult {
 	return evidence.GateSetCoverage(q, contract, byChunk, usedSlots, usedAtoms)
 }

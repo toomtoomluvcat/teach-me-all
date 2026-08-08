@@ -358,6 +358,7 @@ func evaluateSetCandidate(ctx context.Context, lesson Lesson, graph *EvidenceGra
 	for i, q := range qs {
 		q = RepairQuestionProvenance(q, contract, graph, contextChunks)
 		q = RepairDistractorAtoms(q, contract)
+		q = RepairStemSelfContainment(q)
 		q = NormalizeExpressions(q, d.Eval)
 		q = RepairErrorFinding(q, d.Eval)
 		qs[i] = q

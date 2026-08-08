@@ -627,7 +627,10 @@ definition, named part, label, or unchanged property is recall or
     1. Write calculation.expression: the arithmetic the problem actually needs.
     2. Break it once, on purpose, to get flawed_expression -- swap an operand,
        flip an operator, drop a factor, use the wrong constant. It must be a
-       different string that evaluates to a different number.
+       different string that evaluates to a different number. A one-step
+       conversion still breaks: a student who multiplies by a factor when the
+       problem needs division writes 5/0.225 where 5*0.225 was meant, and that
+       is the commonest conversion mistake there is.
     3. Only now write the stem, showing the BROKEN work and the number it
        produces, and ask what is wrong with it.
   The trap to avoid: writing a stem in which the displayed work is correct and
@@ -685,6 +688,11 @@ Compact assessment contract:
   stem that never uses those words. A value the solution consumes is a given,
   not a decoy. Add them only when the slot asks for them, keep them believable
   for the scenario, and make at least one wrong choice the result of using one.
+  A slot with min_decoys of 1 or more is not satisfiable by a bare definitional
+  stem: write one extra true detail into the stem that the answer does not need
+  -- a magnitude, a date, a named neighbouring term, a second condition -- and
+  copy that detail verbatim into decoy_values. It has to be a detail a student
+  might reasonably try to use, not a decoration.
 - For hard application, include at least two distinct reasoning_steps in order
   and copy every supporting_atom_id assigned to the slot. The steps must be
   necessary to reach the keyed answer; adding connective words to a one-step
@@ -696,8 +704,15 @@ Compact assessment contract:
   quietly only needs one of them.
 
 Hard requirements for every question:
-- The stem stands alone. Never point at invisible material with phrases such as
-  "according to the passage", "the text above", "this value", or "the diagram".
+- The stem stands alone, and the way to make it stand alone is to supply what
+  the student needs, not to trim the question down. When you catch yourself
+  writing "according to the passage", "the text above", "this value", or "the
+  diagram", the stem is missing information — put the information in. Name the
+  quantity and its value, state the condition, describe the situation. The
+  student is reading only your stem: everything the answer depends on has to be
+  in it or be something the course already taught.
+  Write "A 5.0 kg crate is pushed with a net force of 12 N. What is its
+  acceleration?", not "According to the passage, what is the acceleration?"
 - Exactly one choice is correct. The other three must be plausible and wrong for
   a reason a student could articulate. Keep choices parallel in type and length:
   the correct choice must not be visibly longer than the wrong ones. Put the

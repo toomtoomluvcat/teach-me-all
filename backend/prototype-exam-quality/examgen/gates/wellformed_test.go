@@ -101,3 +101,49 @@ func TestGateDistinctAllowsOperandReversal(t *testing.T) {
 		t.Fatalf("operand reversal was rejected as a duplicate: %#v", got)
 	}
 }
+
+func TestRepairStemSelfContainmentStripsARemovableLeadIn(t *testing.T) {
+	q := Question{Stem: "According to the passage, what is the law of demand?"}
+	got := RepairStemSelfContainment(q).Stem
+	if got != "What is the law of demand?" {
+		t.Fatalf("stem = %q, want the question without the lead-in", got)
+	}
+}
+
+func TestRepairStemSelfContainmentHandlesThaiLeadIn(t *testing.T) {
+	q := Question{Stem: "จากข้อความข้างต้น กฎของอุปสงค์กล่าวว่าอย่างไร"}
+	got := RepairStemSelfContainment(q).Stem
+	if got != "กฎของอุปสงค์กล่าวว่าอย่างไร" {
+		t.Fatalf("stem = %q, want the question without the lead-in", got)
+	}
+}
+
+// A pointer buried mid-sentence is load-bearing: the stem genuinely depends on
+// something the student cannot see, and that is the defect the rule exists for.
+func TestRepairStemSelfContainmentLeavesABuriedPointerAlone(t *testing.T) {
+	stem := "A crate accelerates at the rate given in the passage. What is the net force?"
+	q := Question{Stem: stem}
+	if got := RepairStemSelfContainment(q).Stem; got != stem {
+		t.Fatalf("stem was rewritten to %q", got)
+	}
+	if checkNoBannedPhrase(RepairStemSelfContainment(q)) == "" {
+		t.Fatal("a buried pointer must still fail the gate")
+	}
+}
+
+// Stripping must not leave something that is no longer a question.
+func TestRepairStemSelfContainmentRefusesToBreakTheStem(t *testing.T) {
+	stem := "According to the passage, the answer."
+	q := Question{Stem: stem}
+	if got := RepairStemSelfContainment(q).Stem; got != stem {
+		t.Fatalf("stem was rewritten to %q, which asks nothing", got)
+	}
+}
+
+func TestRepairStemSelfContainmentLeavesCleanStemsAlone(t *testing.T) {
+	stem := "A 5.0 kg crate is pushed with a net force of 12 N. What is its acceleration?"
+	q := Question{Stem: stem}
+	if got := RepairStemSelfContainment(q).Stem; got != stem {
+		t.Fatalf("a clean stem was rewritten to %q", got)
+	}
+}

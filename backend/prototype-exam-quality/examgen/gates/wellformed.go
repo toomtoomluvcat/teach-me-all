@@ -502,3 +502,53 @@ func excerpt(s string, max int) string {
 	}
 	return string(r[:max]) + "…"
 }
+
+// RepairStemSelfContainment removes a source-pointing phrase when it is only a
+// lead-in and the question underneath it is already self-contained.
+//
+// "According to the passage, what is the law of demand?" asks a fine question
+// with four words of throat-clearing in front of it. The phrase appeared in one
+// question per run on economics across every run of the session, unmoved by the
+// prompt, and rejecting the whole item over a removable clause spends a
+// question to enforce a style rule.
+//
+// The repair is narrow on purpose. It only strips a phrase the stem opens with,
+// it only keeps the result if the remainder is still recognisably a question
+// and still free of every other banned phrase, and it never touches a pointer
+// buried mid-sentence — "the value in this table" is load-bearing, and a stem
+// that leans on it is genuinely broken and should fail. It also cannot help the
+// real defect the rule exists for, a stem missing the information it needs;
+// that one still fails, which is why the prompt asks for the information rather
+// than for the phrase to be avoided.
+func RepairStemSelfContainment(q Question) Question {
+	stem := strings.TrimSpace(q.Stem)
+	lower := strings.ToLower(stem)
+	for _, phrase := range bannedPhrases {
+		if !strings.HasPrefix(lower, strings.ToLower(phrase)) {
+			continue
+		}
+		trimmed := strings.TrimSpace(string([]rune(stem)[len([]rune(phrase)):]))
+		trimmed = strings.TrimSpace(strings.TrimLeft(trimmed, ",:;-—–"))
+		if trimmed == "" {
+			return q
+		}
+		candidate := q
+		candidate.Stem = capitaliseLatinLead(trimmed)
+		if checkStemIsAQuestion(candidate) != "" || checkNoBannedPhrase(candidate) != "" {
+			return q
+		}
+		return candidate
+	}
+	return q
+}
+
+// capitaliseLatinLead restores sentence case after a lead-in is cut. Scripts
+// without letter case — Thai, the reason this pipeline exists — are left alone.
+func capitaliseLatinLead(s string) string {
+	r := []rune(s)
+	if len(r) == 0 || !unicode.IsLower(r[0]) || !isLatinLetter(r[0]) {
+		return s
+	}
+	r[0] = unicode.ToUpper(r[0])
+	return string(r)
+}
