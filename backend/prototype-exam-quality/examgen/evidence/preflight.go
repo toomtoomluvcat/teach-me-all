@@ -181,6 +181,17 @@ func RepairQuestionProvenance(q Question, contract CoverageContract, graph *Evid
 		slot = candidate
 	}
 	if slot == nil {
+		// The quote resolves to exactly one claim, but no open slot asks about
+		// that claim — the draft answered something the contract did not
+		// request. It still fails, and should, but the provenance it does have
+		// is recorded so the failure is reported against the chunk the quote is
+		// really in. Without this the empty chunk ID sends gateQuote looking in
+		// no chunk at all, and a question that answered the wrong claim is
+		// reported as having fabricated its quote, which is a different and
+		// much more alarming defect than the one it has.
+		q.EvidenceAtomID = matched.ID
+		q.EvidenceChunkID = matched.ChunkID
+		q.ChunkID = matched.ChunkID
 		return q
 	}
 	q.CoverageSlotID = slot.ID

@@ -300,3 +300,31 @@ func TestRepairedQuestionStillFacesTheDiscriminationBar(t *testing.T) {
 		t.Fatalf("the written-reason fallback was rejected: %#v", got)
 	}
 }
+
+// A draft that answers a claim no slot asked about still fails, but the failure
+// has to name what happened. Reported as an unresolvable quote it looks like
+// fabrication, which is a far more alarming defect than the one it has.
+func TestCoverageNamesTheClaimWhenNoSlotMatches(t *testing.T) {
+	contract := slotWithAxes(1, 0, DiscriminationLow)
+	q := axisQuestion()
+	q.CoverageSlotID = ""
+	q.EvidenceAtomID = "A037"
+	got := runCoverage(q, contract)
+	if got.Pass {
+		t.Fatal("a draft matching no slot must still fail")
+	}
+	for _, want := range []string{"A037", "no slot asks about", "S01=A001"} {
+		if !strings.Contains(got.Reason, want) {
+			t.Errorf("reason %q is missing %q", got.Reason, want)
+		}
+	}
+}
+
+func TestCoverageStillReportsAMalformedSlotID(t *testing.T) {
+	q := axisQuestion()
+	q.CoverageSlotID = "S99"
+	got := runCoverage(q, slotWithAxes(1, 0, DiscriminationLow))
+	if got.Pass || !strings.Contains(got.Reason, `unknown coverage slot "S99"`) {
+		t.Fatalf("reason = %q", got.Reason)
+	}
+}

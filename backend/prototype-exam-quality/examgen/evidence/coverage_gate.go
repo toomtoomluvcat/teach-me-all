@@ -19,7 +19,11 @@ func gateSetCoverage(q Question, contract CoverageContract, byChunk map[string]C
 		}
 	}
 	if slot == nil {
-		res.Reason = fmt.Sprintf("unknown coverage slot %q", q.CoverageSlotID)
+		// Say which claim the draft actually used and which slots were still
+		// open. "unknown coverage slot" on its own reads like a malformed ID
+		// when the real story is usually that the writer answered a
+		// neighbouring claim nobody asked about.
+		res.Reason = describeUnmatchedSlot(q, contract)
 		return res
 	}
 	if usedSlots[q.CoverageSlotID] {
@@ -138,6 +142,23 @@ func gateSetCoverage(q Question, contract CoverageContract, byChunk map[string]C
 	res.Pass = true
 	res.Reason = fmt.Sprintf("slot %s uses atom %s from chunk %s", slot.ID, q.EvidenceAtomID, q.EvidenceChunkID)
 	return res
+}
+
+// describeUnmatchedSlot explains why a draft could not be tied to a slot, in
+// terms of what it did rather than what it lacked.
+func describeUnmatchedSlot(q Question, contract CoverageContract) string {
+	if id := strings.TrimSpace(q.CoverageSlotID); id != "" {
+		return fmt.Sprintf("unknown coverage slot %q", id)
+	}
+	open := make([]string, 0, len(contract.Slots))
+	for _, slot := range contract.Slots {
+		open = append(open, slot.ID+"="+slot.AtomID)
+	}
+	if atom := strings.TrimSpace(q.EvidenceAtomID); atom != "" {
+		return fmt.Sprintf("question names no coverage slot; its quote resolves to claim %s, which no slot asks about (slots: %s)",
+			atom, strings.Join(open, " "))
+	}
+	return fmt.Sprintf("question names no coverage slot and its quote matches no single claim (slots: %s)", strings.Join(open, " "))
 }
 
 // checkDistractorAtoms validates any wrong option that claims to be a real
