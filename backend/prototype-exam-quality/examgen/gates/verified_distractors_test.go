@@ -279,3 +279,51 @@ func TestRepairErrorFindingSkipsOrdinaryQuestions(t *testing.T) {
 		t.Fatalf("a plain calculation item grew flawed work %q", got)
 	}
 }
+
+// Arith already takes × and ÷; the ones it rejects are the typographic minus,
+// the en dash, the middle dot, and the fraction slash. Those are what folding
+// is for.
+func TestNormalizeExpressionsFoldsUnicodeOperatorsArithRejects(t *testing.T) {
+	q := numericQuestion()
+	q.Calculation = &Calculation{Expression: "17 − 14.6", Expected: 2.4}
+	q.Choices[1].DistractorExpression = "12 · 5.0"
+	q = NormalizeExpressions(q, Arith{})
+	if got := q.Calculation.Expression; got != "17 - 14.6" {
+		t.Errorf("key expression = %q, want the folded form", got)
+	}
+	if got := q.Choices[1].DistractorExpression; got != "12 * 5.0" {
+		t.Errorf("distractor expression = %q, want the folded form", got)
+	}
+}
+
+// Models show their derivation inside the field. The rightmost segment is the
+// arithmetic they mean; the rest is how they got there.
+func TestNormalizeExpressionsKeepsTheArithmeticAfterASymbolicLeadIn(t *testing.T) {
+	q := numericQuestion()
+	q.Calculation = &Calculation{Expression: "a = F_net / m = 12/5.0", Expected: 2.4}
+	q = NormalizeExpressions(q, Arith{})
+	if got := q.Calculation.Expression; got != "12/5.0" {
+		t.Fatalf("key expression = %q, want the trailing arithmetic", got)
+	}
+}
+
+// Nothing is invented. An expression with no numbers in it cannot be repaired,
+// only rejected.
+func TestNormalizeExpressionsLeavesPurelySymbolicExpressionsAlone(t *testing.T) {
+	for _, expr := range []string{"Fnet/m", "4T-f"} {
+		q := numericQuestion()
+		q.Calculation = &Calculation{Expression: expr, Expected: 2.4}
+		q = NormalizeExpressions(q, Arith{})
+		if q.Calculation.Expression != expr {
+			t.Errorf("%q was rewritten to %q; there is nothing to recover", expr, q.Calculation.Expression)
+		}
+	}
+}
+
+func TestNormalizeExpressionsLeavesValidExpressionsUntouched(t *testing.T) {
+	q := numericQuestion()
+	q = NormalizeExpressions(q, Arith{})
+	if got := q.Calculation.Expression; got != "12/5.0" {
+		t.Fatalf("a valid expression was rewritten to %q", got)
+	}
+}

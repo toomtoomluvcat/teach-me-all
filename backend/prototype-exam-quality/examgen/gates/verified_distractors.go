@@ -189,6 +189,83 @@ func distractorMentionsNumber(choice string, v float64) bool {
 	return false
 }
 
+// expressionSymbolReplacer folds the characters a writer reaches for in prose
+// onto the alphabet Arith accepts. Arith stays deliberately tiny — it will
+// re-evaluate stored expressions for years and a grammar with no identifiers
+// cannot be talked into anything — so the folding happens out here, before the
+// gates, rather than by widening the parser.
+var expressionSymbolReplacer = strings.NewReplacer(
+	"×", "*", "·", "*", "⋅", "*", "∙", "*",
+	"÷", "/", "−", "-", "–", "-", "—", "-",
+	"⁄", "/", " ", " ",
+)
+
+// NormalizeExpressions rewrites the declared arithmetic into the evaluator's
+// alphabet where that can be done without changing what it says.
+//
+// Two shapes, both lossless. The first is typographic: Arith already takes ×
+// and ÷, but not the typographic minus "−", the en dash, the middle dot, or the
+// fraction slash, all of which a writer produces without meaning anything
+// different by them.
+//
+// The second is a symbolic lead-in. Models like to show their reasoning inside
+// the field — "a = F_net / m = 100 / 5" — and the last segment is the arithmetic
+// they actually mean; everything before it is the derivation. Keeping the final
+// segment that parses is a rewrite of notation, not of content.
+//
+// What this deliberately does not do is rescue an expression with no numbers in
+// it at all. "Fnet/m" and "4T-f" were both seen in one run, and there is nothing
+// to recover: supplying values for the symbols would be inventing the
+// calculation rather than repairing it. Those still fail, which is the only
+// honest outcome.
+func NormalizeExpressions(q Question, ev Evaluator) Question {
+	if ev == nil {
+		return q
+	}
+	if q.Calculation != nil {
+		q.Calculation.Expression = normalizeExpression(q.Calculation.Expression, ev)
+	}
+	q.FlawedExpression = normalizeExpression(q.FlawedExpression, ev)
+	if len(q.Choices) > 0 {
+		normalized := append([]Choice(nil), q.Choices...)
+		for i := range normalized {
+			normalized[i].DistractorExpression = normalizeExpression(normalized[i].DistractorExpression, ev)
+		}
+		q.Choices = normalized
+	}
+	return q
+}
+
+func normalizeExpression(expr string, ev Evaluator) string {
+	original := expr
+	trimmed := strings.TrimSpace(expr)
+	if trimmed == "" {
+		return original
+	}
+	if _, err := ev.Eval(trimmed); err == nil {
+		return original
+	}
+
+	folded := strings.TrimSpace(expressionSymbolReplacer.Replace(trimmed))
+	if _, err := ev.Eval(folded); err == nil {
+		return folded
+	}
+	// Right to left: the rightmost parsable segment of "a = F/m = 100/5" is the
+	// arithmetic; anything further left is the derivation that led to it.
+	if segments := strings.Split(folded, "="); len(segments) > 1 {
+		for i := len(segments) - 1; i >= 0; i-- {
+			candidate := strings.TrimSpace(segments[i])
+			if candidate == "" {
+				continue
+			}
+			if _, err := ev.Eval(candidate); err == nil {
+				return candidate
+			}
+		}
+	}
+	return original
+}
+
 // stemEquationPattern finds a worked line an error-finding stem displays:
 // some arithmetic, an equals sign, and the number it was claimed to produce.
 // The left side must carry an operator, so a bare restatement ("mass = 5.0 kg")

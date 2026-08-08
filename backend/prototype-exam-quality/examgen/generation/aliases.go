@@ -83,6 +83,10 @@ func RepairDistractorAtoms(q Question, contract CoverageContract) Question {
 func RepairErrorFinding(q Question, ev Evaluator) Question {
 	return gates.RepairErrorFinding(q, ev)
 }
+
+func NormalizeExpressions(q Question, ev Evaluator) Question {
+	return gates.NormalizeExpressions(q, ev)
+}
 func gateSetCoverage(q Question, contract CoverageContract, byChunk map[string]Chunk, usedSlots, usedAtoms map[string]bool) GateResult {
 	return evidence.GateSetCoverage(q, contract, byChunk, usedSlots, usedAtoms)
 }

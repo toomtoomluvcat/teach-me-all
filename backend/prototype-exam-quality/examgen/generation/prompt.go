@@ -745,6 +745,10 @@ missing answer, not a blank one:
 {"questions":[{"kind":"mcq_single","stem":"...","choices":[{"content":"...","is_correct":true,"distractor_expression":"","distractor_atom_id":""},{"content":"...","is_correct":false,"distractor_expression":"12*5.0","distractor_atom_id":""},{"content":"...","is_correct":false,"distractor_expression":"","distractor_atom_id":"A042"},{"content":"...","is_correct":false,"distractor_expression":"","distractor_atom_id":"A017"}],"explanation":"...","source_quote":"...","difficulty":"easy","skill":"recall","requires_calculation":false,"calculation":{"expression":"12/5.0","expected":2.4,"unit":"m/s^2"},"supporting_atom_ids":[],"decoy_values":[],"flawed_expression":"","reasoning_steps":[],"changed_condition":"","distractor_reasons":[]}]}
 Omit the calculation object only when requires_calculation is false; when it is
 true the object is mandatory and the item is rejected without it.
+expression holds arithmetic and nothing else: numbers, operators, parentheses.
+Write "100/5", never "a = F_net / m", "Fnet/m", "4T-f", or "100/5 m/s^2". A
+symbol with no value behind it cannot be evaluated and the item is rejected —
+substitute the numbers yourself and put the derivation in explanation.
 
 An error-finding question fills the two expressions differently. The stem shows
 the mistaken work and the number it produced; calculation.expression is the
