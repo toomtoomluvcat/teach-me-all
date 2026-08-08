@@ -267,28 +267,31 @@ func EvidenceCompilePrompt(graph EvidenceGraph, chunks []Chunk) string {
 	return b.String()
 }
 
+// QuestionSetSystem adds only what the per-run slot execution protocol in
+// QuestionSetPrompt does not already say.
+//
+// It used to repeat that protocol almost line for line — process slots in
+// order, copy the ID tuple, copy skill and the calculation flag, fill
+// changed_condition and reasoning_steps for hard application, do not repeat
+// questions on a retry — roughly 300 tokens of the same instructions arriving
+// twice in the same request. Two statements of a rule are not twice the rule;
+// they are one rule and a maintenance hazard, since editing the protocol and
+// forgetting this block leaves the model holding two versions of the contract.
+// What stays here is what the protocol has no place for: the framing that this
+// is one set rather than a pile of questions, and the three ways a slot can be
+// answered wrongly while still looking answered.
 func QuestionSetSystem() string {
 	return questionSystem + `
 
 You are writing a complete assessment set, not independent questions. The
-coverage contract is authoritative. Use each slot at most once and do not
-reuse the same claim, relationship, or scenario with different numbers. Every
-question must return its exact coverage_slot_id, evidence_atom_id, operation,
-supporting_atom_ids, and evidence_chunk_id from the supplied contract/context. A quote being present is
-not enough: it must support the answer target. If a slot is not supported by
-its atom and chunk, omit that slot rather than substituting a repeated one. For
-a slot that you do return, copy the slot's ID, atom ID, and chunk ID as one
-matched tuple; never mix IDs from different slots. Copy the slot's operation
-label exactly; it is a contract value, not a free-text explanation. Process slots in the listed
-order, and before returning JSON check that every returned question has a
-non-empty ID tuple, the exact slot skill/difficulty/calculation flag, and a verbatim quote from
-that slot's chunk. For medium or hard application, fill changed_condition and
-distractor_reasons; for hard application, copy every supporting atom ID and
-provide at least two distinct reasoning_steps. A retry request may list only missing slots: do not repeat
-questions that already passed. For a slot with requires_calculation=true, make
-calculation.expression/expected mandatory. For every slot, set skill and
-requires_calculation exactly to the contract values. Do not add arithmetic to
-a slot whose flag is false. Never duplicate choice text.`
+coverage contract is authoritative: use each slot at most once and never reuse
+the same claim, relationship, or scenario with different numbers.
+
+A quote being present is not enough — it must support the answer target. If a
+slot is not supported by its atom and chunk, omit that slot rather than
+substituting a repeated one. The operation label is a contract value to copy
+exactly, not a free-text explanation. Do not add arithmetic to a slot whose
+requires_calculation flag is false.`
 }
 
 // QuestionSetSchemaForContract adds the finite ID vocabularies for a specific
@@ -460,9 +463,9 @@ func QuestionSetPrompt(lesson Lesson, graph *EvidenceGraph, chunks []Chunk, cont
 	b.WriteString("4. For medium or hard application, fill changed_condition; for hard application, copy every support atom ID and provide at least two distinct reasoning_steps. For medium and hard questions, provide one short distractor_reason per wrong choice, each naming a distinct mistake -- never repeat the same distractor_reason text twice in one question.\n")
 	if forceCalc {
 		b.WriteString("5. For a slot whose skill is not fixed above, choose skill by what solving the calculation demands: understanding if the numbers plug straight into a formula the source already states solved for the unknown; application if you must isolate an unknown by rearranging or chaining the relationship first.\n")
-		b.WriteString("6. Before returning, verify every source_quote is verbatim in its cited chunk and every ID is non-empty.\n\n")
+		b.WriteString("6. Before returning, verify every source_quote is verbatim in its cited chunk, every ID is non-empty, and no two choices in a question repeat the same text.\n\n")
 	} else {
-		b.WriteString("5. Before returning, verify every source_quote is verbatim in its cited chunk and every ID is non-empty.\n\n")
+		b.WriteString("5. Before returning, verify every source_quote is verbatim in its cited chunk, every ID is non-empty, and no two choices in a question repeat the same text.\n\n")
 	}
 	fmt.Fprintf(&b, "Write up to %d questions, one for each supported slot. Keep the set varied and return empty only for an unsupported slot. ", len(contract.Slots))
 	if forceCalc {
@@ -714,9 +717,6 @@ Hard requirements for every question:
 
 For application questions, include enough scenario facts for the student to use
 the source relationship, and make the explanation show the reasoning in order.
-For medium or hard application, fill the compact assessment contract fields;
-for hard application, the reasoning_steps must expose at least two necessary
-steps rather than merely adding connective words.
 
 When requires_calculation=true:
 	- Put the arithmetic in calculation.expression using numbers, + - * / ^,
@@ -727,10 +727,9 @@ When requires_calculation=true:
 	- Copy the calculator value exactly into calculation.expected; do not round
 	  it. If the student-facing choice is rounded, label it as approximate and
 	  keep the exact expected value in the calculation object.
-	- The correct choice contains the computed number and unit when a unit exists.
-	- The correct choice contains a decimal or integer numeric approximation and
-	  the unit when a unit exists. Do not use radicals, variables, or symbolic
-	  expressions as the answer to a calculation item.
+	- The correct choice contains a decimal or integer numeric approximation of
+	  the computed value, plus the unit when one exists. Do not use radicals,
+	  variables, or symbolic expressions as the answer to a calculation item.
 - Every input number comes from the passage or the stem; never invent hidden
   constants, conversions, or assumptions.
 
