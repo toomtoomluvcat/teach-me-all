@@ -52,22 +52,26 @@ LLM grader — grader ถูกเรียกเฉพาะตอนเสม�
 
 physics `openstax-physics.pdf 140-220` / economics `economics-3e.pdf 60-150`
 
-| case | baseline เดิม | run แรก | run สุดท้าย |
+| case | baseline เดิม | run แรก | run สุดท้าย (หลัง dedupe) |
 |---|---|---|---|
-| physics calculation | 5/5 (100%) | 2/8 (25%) | 3/7 (43%) |
+| physics calculation | 5/5 (100%) | 2/8 (25%) | 3/9 (33%) |
 | physics error-finding | — | 2/10 | 2/9 |
-| physics recall-hard | — | 1/10 (10%) | **5/5 (100%)** |
+| physics recall-hard | — | 1/10 (10%) | **5/6 (83%)** |
 | econ recall | 5/5 (100%) | 5/6 (83%) | 5/6 (83%) |
-| econ recall-hard | — | 2/8 (25%) | 4/7 (57%) |
+| econ recall-hard | — | 2/8 (25%) | 4/10 (40%) |
 | econ understanding | — | 5/5 (100%) | 5/6 (83%) |
 
 axis tally ของ run สุดท้าย: physics recall-hard = atom-backed 15, decoys 5,
-multi-claim 5 · econ recall-hard = atom-backed 12, decoys 5, multi-claim 4 ·
+multi-claim 5 · econ recall-hard = atom-backed 9, decoys 4, multi-claim 4 ·
 physics calculation = error-paths 9 · physics error-finding = flawed-work 2
 
 **recall-hard เจนได้จริงทั้งสองวิชา** คือสิ่งที่ single-axis model ทำไม่ได้
-**calculation ยัง regress** (100% → 43%): บาร์สูงขึ้นจริง (ทุกช้อยผิดต้อง trace
-ได้) แต่ยังไม่คุ้มค่า yield ต้องดูต่อ
+
+`calculation` accepted count ทั้ง session: 2, 2, 3, 3, 3, 4, 2, 3 บน draft 6-10
+— **noise กลบทุก effect** อย่าอ่านเป็น before/after ของอะไรทั้งนั้น เทียบกับ
+baseline 5/5 คือ acceptance ต่ำลงแต่ของที่ผ่านหนักกว่าเดิมมาก (error-paths 9 vs 0)
+ที่เหลือ fail คือ gate เก่า 2 ตัว (`demand_contract` ขาด changed_condition,
+`not_a_duplicate`) + โมเดลพลาด `distractor_expression` เอง
 
 ### บทเรียนที่แพงที่สุดของ session นี้
 
@@ -88,11 +92,17 @@ physics calculation = error-paths 9 · physics error-finding = flawed-work 2
   `RepairDistractorAtoms` ตัด citation ทิ้งแทน reject ทั้งข้อ (defect อยู่ที่
   label ไม่ใช่ตัวคำถาม) — แก้แล้ว econ recall 5/10 → 5/6
 - `"according to the passage"` ยังหลุดประปราย 1 ข้อ/run
-- prompt dedupe (bonus ที่ขอ) **ยังไม่ทำโดยตั้งใจ** — เปลี่ยน feature กับ prompt
-  พร้อมกันแล้ว attribute ผลไม่ได้ ตัวเลข: system prompt ≈ 3,200 token
-  (`questionSystem` 2,830 + set suffix 380) ส่วน schema description ทั้งหมด
-  **ไม่คิด token บน DeepSeek** เพราะไม่ได้ส่ง — ที่ตัดได้จริงมีแค่ prose ใน
-  `questionSystem` และ suffix ที่พูดซ้ำ slot protocol ใน user prompt
+- prompt dedupe: ทำแล้ว system prompt 3,211 → 2,902 token (−10%) ไม่ทิ้งกฎไหน
+  `QuestionSetSystem` เคยพูดซ้ำ slot protocol เกือบทั้งบล็อก (~300 token ส่งซ้ำ
+  ใน request เดียว) — อันตรายกว่าเปลืองคือแก้ protocol แล้วลืมบล็อกนี้ โมเดลจะ
+  ถือ contract 2 เวอร์ชัน ส่วน schema description **ไม่ต้องตัด** เพราะไม่ได้ส่งอยู่แล้ว
+  ผลคุณภาพหลัง dedupe: recall/recall-hard/understanding เท่าเดิม, calculation
+  อยู่ในช่วง noise เดิม
+- discrimination ที่ derive เอง = advisory แล้ว (`DiscriminationEnforced()`)
+  บังคับผ่าน gate เฉพาะ slot ที่ run pin difficulty มา — gate ลบข้อได้อย่างเดียว
+  ยกบาร์ไม่ได้ บาร์อยู่ที่ prompt + candidate selector
+- ตัวลวงเทียบตัวเลขด้วย tolerance 2% (`distractorRounding`) ไม่ใช่บาร์ของเฉลย
+  — "0.60 N" กับ 0.5988 คือตัวเดียวกันสำหรับตัวลวง
 - `error-finding` yield ต่ำ (2/9) — โมเดลยังใส่ expression ที่ถูกต้องลง
   `flawed_expression` และผูก distractor_expression ผิดช้อยอยู่บ้าง
 
