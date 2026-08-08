@@ -97,7 +97,7 @@ func gateSetCoverage(q Question, contract CoverageContract, byChunk map[string]C
 		res.Reason = fmt.Sprintf("error-finding slot %s must state the flawed work its stem shows", slot.ID)
 		return res
 	}
-	if strings.EqualFold(strings.TrimSpace(slot.Discrimination), DiscriminationHigh) {
+	if slot.DiscriminationEnforced() {
 		if reason := checkHighDiscrimination(q, slot, contract); reason != "" {
 			res.Reason = reason
 			return res

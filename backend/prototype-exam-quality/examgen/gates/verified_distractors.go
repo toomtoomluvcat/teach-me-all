@@ -2,6 +2,7 @@ package gates
 
 import (
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 
@@ -92,7 +93,7 @@ func gateDistractorPath(q Question, ev Evaluator) GateResult {
 		// This is the check that makes the whole field worth having: the number
 		// printed in the option must be the number that error path produces.
 		// Without it the model can attach any expression to any invented value.
-		if !choiceMentionsNumber(c.Content, got) {
+		if !distractorMentionsNumber(c.Content, got) {
 			res.Reason = fmt.Sprintf("choice %d reads %q but its wrong-answer expression %q evaluates to %g",
 				i+1, excerpt(c.Content, 50), expr, got)
 			return res
@@ -150,6 +151,41 @@ func gateFlawedWork(q Question, ev Evaluator) GateResult {
 	res.Pass = true
 	res.Reason = fmt.Sprintf("stem shows the mistaken result %g against a correct %g", got, keyed)
 	return res
+}
+
+// distractorRounding is how far a wrong option may sit from the value its
+// error path produces. It is looser than the answer-key matcher on purpose.
+//
+// The key's precision is part of the question: a student has to recognise the
+// right number, so "0.42" for a computed 0.41667 is a different answer unless
+// the choice says it is approximate. A distractor carries no such duty. Its
+// only job is to be a number a mistaken student would arrive at, and whether
+// the writer prints 0.5988 or 0.60 changes nothing about that. Holding wrong
+// options to the key's bar rejected four otherwise-sound calculation items in
+// one run — every one of them for rounding, none for being invented.
+//
+// 2% is wide enough for two-significant-figure rounding at any scale and still
+// far tighter than the gap between a real error path and a made-up number,
+// which also has to clear "must not equal the key" to get here at all.
+const distractorRounding = 0.02
+
+func distractorMentionsNumber(choice string, v float64) bool {
+	if choiceMentionsNumber(choice, v) {
+		return true
+	}
+	if v == 0 {
+		return false
+	}
+	for _, token := range expressionNumberPattern.FindAllString(choice, -1) {
+		printed, err := strconv.ParseFloat(token, 64)
+		if err != nil {
+			continue
+		}
+		if math.Abs(printed-v)/math.Abs(v) <= distractorRounding {
+			return true
+		}
+	}
+	return false
 }
 
 // gateDecoy checks the declared irrelevant givens.

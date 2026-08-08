@@ -196,3 +196,22 @@ func TestGateFlawedWorkRejectsUnevaluableWork(t *testing.T) {
 		t.Fatal("flawed work that does not evaluate cannot be proved wrong")
 	}
 }
+
+// A wrong option printed to two significant figures is still that error path's
+// number. Holding distractors to the answer key's precision rejected sound
+// items for rounding, which is not what the field is checking for.
+func TestGateDistractorPathAcceptsOrdinaryRounding(t *testing.T) {
+	q := numericQuestion()
+	q.Choices[2].Content = "0.42 m/s^2" // 5.0/12 = 0.41667
+	if res := gateDistractorPath(q, Arith{}); !res.Pass {
+		t.Fatalf("two-significant-figure rounding was rejected: %q", res.Reason)
+	}
+}
+
+func TestGateDistractorPathStillRejectsAnInventedNumber(t *testing.T) {
+	q := numericQuestion()
+	q.Choices[2].Content = "0.55 m/s^2" // nowhere near 5.0/12
+	if res := gateDistractorPath(q, Arith{}); res.Pass {
+		t.Fatal("a number the error path does not produce must still fail")
+	}
+}

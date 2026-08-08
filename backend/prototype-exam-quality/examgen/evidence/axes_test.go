@@ -78,6 +78,10 @@ func TestEvidenceAxesCountClaimsNotSteps(t *testing.T) {
 	}
 }
 
+// slotWithAxes builds a slot whose axes were derived from the material: the
+// discrimination tier is a preference, not a requirement. pinnedSlotWithAxes is
+// the other case — a run that explicitly asked for this difficulty — and is the
+// only one the discrimination bar can reject a question for missing.
 func slotWithAxes(depth, decoys int, disc string) CoverageContract {
 	return CoverageContract{Slots: []CoverageSlot{{
 		ID: "S01", AtomID: "A001", SourceChunkIDs: []string{"c1"},
@@ -91,6 +95,35 @@ func axisQuestion() Question {
 		CoverageSlotID: "S01", EvidenceAtomID: "A001", EvidenceChunkID: "c1",
 		Skill: "recall", Operation: "definition", SourceQuote: "source claim",
 		Choices: []Choice{{Content: "right", IsCorrect: true}, {Content: "wrong a"}, {Content: "wrong b"}, {Content: "wrong c"}},
+	}
+}
+
+func pinnedSlotWithAxes(depth, decoys int, disc string) CoverageContract {
+	contract := slotWithAxes(depth, decoys, disc)
+	contract.Slots[0].Difficulty = DifficultyFromAxes(depth, decoys, disc)
+	return contract
+}
+
+// axisQuestionFor answers a slot that pinned its difficulty, which the coverage
+// gate checks separately from the axes.
+func axisQuestionFor(contract CoverageContract) Question {
+	q := axisQuestion()
+	q.Difficulty = contract.Slots[0].Difficulty
+	return q
+}
+
+// Derived discrimination is advisory. The material happening to hold a
+// confusable neighbour is a reason to ask for close distractors, not a reason
+// to throw away a question that came back without them — a gate can only
+// subtract questions, never improve one.
+func TestDerivedDiscriminationIsAdvisory(t *testing.T) {
+	contract := slotWithAxes(1, 0, DiscriminationHigh)
+	if got := runCoverage(axisQuestion(), contract); !got.Pass {
+		t.Fatalf("an unrequested close-distractor preference must not reject: %#v", got)
+	}
+	pinned := pinnedSlotWithAxes(1, 0, DiscriminationHigh)
+	if got := runCoverage(axisQuestionFor(pinned), pinned); got.Pass {
+		t.Fatal("a run that explicitly asked for a medium item must still be held to it")
 	}
 }
 
@@ -116,8 +149,8 @@ func TestCoverageAcceptsDeclaredDecoys(t *testing.T) {
 // Prose items have no expression to point at, so the fallback is one distinct
 // written reason per wrong option.
 func TestCoverageHighDiscriminationProseFallback(t *testing.T) {
-	contract := slotWithAxes(1, 0, DiscriminationHigh)
-	q := axisQuestion()
+	contract := pinnedSlotWithAxes(1, 0, DiscriminationHigh)
+	q := axisQuestionFor(contract)
 	if got := runCoverage(q, contract); got.Pass || !strings.Contains(got.Reason, "close distractors") {
 		t.Fatalf("close distractors were not required: %#v", got)
 	}
@@ -128,9 +161,10 @@ func TestCoverageHighDiscriminationProseFallback(t *testing.T) {
 }
 
 func TestCoverageHighDiscriminationRejectsRepeatedReasons(t *testing.T) {
-	q := axisQuestion()
+	contract := pinnedSlotWithAxes(1, 0, DiscriminationHigh)
+	q := axisQuestionFor(contract)
 	q.DistractorReasons = []string{"confuses the two devices", "confuses the two devices", "confuses the two devices"}
-	if got := runCoverage(q, slotWithAxes(1, 0, DiscriminationHigh)); got.Pass {
+	if got := runCoverage(q, contract); got.Pass {
 		t.Fatal("the same mistake listed three times is one distractor, not three")
 	}
 }
@@ -138,9 +172,9 @@ func TestCoverageHighDiscriminationRejectsRepeatedReasons(t *testing.T) {
 // On a numeric item the bar is the strong one: every wrong option has to name
 // the arithmetic that produces it.
 func TestCoverageHighDiscriminationRequiresErrorPathsOnNumericItems(t *testing.T) {
-	contract := slotWithAxes(1, 0, DiscriminationHigh)
+	contract := pinnedSlotWithAxes(1, 0, DiscriminationHigh)
 	contract.Slots[0].RequiresCalculation = true
-	q := axisQuestion()
+	q := axisQuestionFor(contract)
 	q.RequiresCalculation = true
 	q.Calculation = &Calculation{Expression: "12/5", Expected: 2.4}
 	q.DistractorReasons = []string{"a", "b", "c"}
@@ -178,9 +212,9 @@ func TestCoverageEnforcesDepthForEverySkill(t *testing.T) {
 // in it must still be able to satisfy the discrimination axis, or the axis only
 // ever applies to numeric subjects.
 func TestCoverageHighDiscriminationAcceptsAtomBackedDistractors(t *testing.T) {
-	contract := slotWithAxes(1, 0, DiscriminationHigh)
+	contract := pinnedSlotWithAxes(1, 0, DiscriminationHigh)
 	contract.GraphAtomIDs = []string{"A001", "A002", "A003", "A004"}
-	q := axisQuestion()
+	q := axisQuestionFor(contract)
 	q.Choices[1].DistractorAtomID = "A002"
 	q.Choices[2].DistractorAtomID = "A003"
 	q.Choices[3].DistractorAtomID = "A004"
@@ -251,9 +285,9 @@ func TestRepairDistractorAtomsStripsCitationsThatCannotBeTrue(t *testing.T) {
 // After repair the question is judged on what is left, not on the label that
 // was removed: a slot asking for close distractors falls back to reasons.
 func TestRepairedQuestionStillFacesTheDiscriminationBar(t *testing.T) {
-	contract := slotWithAxes(1, 0, DiscriminationHigh)
+	contract := pinnedSlotWithAxes(1, 0, DiscriminationHigh)
 	contract.GraphAtomIDs = []string{"A001", "A002"}
-	q := axisQuestion()
+	q := axisQuestionFor(contract)
 	for i := 1; i < len(q.Choices); i++ {
 		q.Choices[i].DistractorAtomID = "A001"
 	}

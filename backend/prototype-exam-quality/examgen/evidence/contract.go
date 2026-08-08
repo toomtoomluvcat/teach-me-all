@@ -40,6 +40,29 @@ type CoverageSlot struct {
 	Discrimination string `json:"discrimination,omitempty"`
 }
 
+// DiscriminationEnforced reports whether close distractors are a requirement
+// this slot can be rejected for missing, rather than something the run would
+// like and rewards when it gets.
+//
+// It is exactly the slots whose difficulty the run pinned. Derived
+// discrimination — raised because the material happens to hold a confusable
+// neighbour — is advisory: the writer is still asked for close distractors, the
+// tally still counts them, and candidate selection still prefers the set that
+// produced more. What it no longer does is fail a question for it.
+//
+// Measured: leaving derived discrimination enforceable turned the coverage gate
+// into a demand generator rather than quality control, and physics calculation
+// fell from 5/5 to 3/7 on wrong options the run never asked to be close. A gate
+// is the wrong place to raise a bar — it can only subtract questions, never
+// improve one — so the bar belongs in the prompt and the selector, and the gate
+// only holds a run to what it explicitly asked for.
+func (s CoverageSlot) DiscriminationEnforced() bool {
+	if strings.TrimSpace(s.Difficulty) == "" {
+		return false
+	}
+	return strings.EqualFold(strings.TrimSpace(s.Discrimination), DiscriminationHigh)
+}
+
 // Discrimination tiers. Only two, because the enforceable difference is binary:
 // either every wrong option traces to a named error a student could make, or
 // the option set is allowed to contain filler.
