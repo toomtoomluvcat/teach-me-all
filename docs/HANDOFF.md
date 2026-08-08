@@ -103,8 +103,21 @@ baseline 5/5 คือ acceptance ต่ำลงแต่ของที่ผ�
   ยกบาร์ไม่ได้ บาร์อยู่ที่ prompt + candidate selector
 - ตัวลวงเทียบตัวเลขด้วย tolerance 2% (`distractorRounding`) ไม่ใช่บาร์ของเฉลย
   — "0.60 N" กับ 0.5988 คือตัวเดียวกันสำหรับตัวลวง
-- `error-finding` yield ต่ำ (2/9) — โมเดลยังใส่ expression ที่ถูกต้องลง
-  `flawed_expression` และผูก distractor_expression ผิดช้อยอยู่บ้าง
+- `error-finding` แก้แล้ว **0/9 → 3/9** (flawed-work verified 3, atom-backed 4)
+  สองสาเหตุคนละเรื่องกัน:
+  1. บั๊กของ gate เอง — ช้อยของ error-finding เป็น**คำวินิจฉัย ไม่ใช่ตัวเลข**
+     `distractor_expression` จึงหาเลขในช้อยไม่เจอ ล้ม 10/10
+     `RepairErrorFinding` ตัดทิ้ง แล้วให้ตัดสินด้วย `distractor_atom_id`/reasons
+     เหมือน prose item อื่น
+  2. โมเดลเข้าใจโจทย์กลับด้าน — เล่า**วิธีทำที่ถูก** แล้วถามว่าผิดตรงไหน
+     ("5 N × 0.225 lb/N = 1.125 lb. What is wrong with this work?" — ไม่ผิดเลย)
+     prompt สั่งลำดับการสร้างแทน: เขียนสมการถูกก่อน → พังมัน 1 จุด → ค่อยเขียน
+     stem รอบสมการที่พังแล้ว + บอก trap ตรง ๆ พร้อมวิธีเช็คตัวเอง
+  `RepairErrorFinding` ยังกู้สมการผิดจาก equation ที่ stem โชว์เองได้ (regex
+  `A op B = C` + eval ทั้งสองข้าง) ตอนโมเดล copy สมการถูกลงทั้งสองช่อง — แต่ถ้า
+  stem โชว์งานที่ถูกอยู่แล้วก็กู้ไม่ได้และ fail ต่อ ซึ่งถูกแล้ว
+- ที่เหลือใน error-finding: โมเดลยัง copy สมการถูกบ้าง + เขียน key เป็น symbolic
+  (`Fnet/m`, `4T-f`) ที่ evaluator รับไม่ได้ — คลาสเดิมที่มีอยู่ก่อนแล้ว
 
 
 อัปเดต 2026-08-07 บน branch `prototype/exam-quality`, working tree clean — ทุกโค้ด
