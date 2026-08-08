@@ -116,8 +116,19 @@ baseline 5/5 คือ acceptance ต่ำลงแต่ของที่ผ�
   `RepairErrorFinding` ยังกู้สมการผิดจาก equation ที่ stem โชว์เองได้ (regex
   `A op B = C` + eval ทั้งสองข้าง) ตอนโมเดล copy สมการถูกลงทั้งสองช่อง — แต่ถ้า
   stem โชว์งานที่ถูกอยู่แล้วก็กู้ไม่ได้และ fail ต่อ ซึ่งถูกแล้ว
-- ที่เหลือใน error-finding: โมเดลยัง copy สมการถูกบ้าง + เขียน key เป็น symbolic
-  (`Fnet/m`, `4T-f`) ที่ evaluator รับไม่ได้ — คลาสเดิมที่มีอยู่ก่อนแล้ว
+- symbolic key แก้แล้ว — วัดขนาดปัญหาก่อน: **4 ครั้งทั้ง repo, 2 รูปแบบ, จาก run
+  เดียว** เล็กกว่าที่คิดมาก
+  `NormalizeExpressions` แก้เฉพาะที่แก้ได้โดยไม่เปลี่ยนความหมาย: Arith รับ `×`
+  `÷` อยู่แล้วแต่ไม่รับ `−` (typographic minus) `–` `·` `⁄` และรับ symbolic
+  lead-in ไม่ได้ (`a = F_net / m = 100/5` → เอา segment ขวาสุดที่ parse ผ่าน)
+  **ไม่กู้** `Fnet/m` / `4T-f` เพราะไม่มีตัวเลขเลย — ใส่ค่าให้เอง = แต่งโจทย์
+  ไม่ใช่ซ่อม สิ่งที่กำจัดสองอันนั้นคือ prompt บรรทัดใต้ JSON template (จุดที่ติด)
+  ที่ระบุชื่อ string พวกนั้นตรง ๆ ว่าห้ามเขียน
+  Arith เองไม่แตะ — มันต้อง re-eval expression ที่เก็บใน DB ไปอีกหลายปี การที่มัน
+  ไม่มี identifier เป็นคุณสมบัติที่ควรรักษาไว้ fold จึงอยู่ข้างนอก
+- error-finding ล่าสุด **4/7** (flawed-work verified 4, atom-backed 3) และ
+  `arithmetic` fail หายเกลี้ยงในรอบเดียวกัน trajectory: 2/9 → 0/9 → 3/9 → 4/7
+  ที่เหลือคือ atom แปลงหน่วย N→lb ซึ่งมี operation เดียว โมเดลไม่ยอมพังค่าคงที่
 
 
 อัปเดต 2026-08-07 บน branch `prototype/exam-quality`, working tree clean — ทุกโค้ด
