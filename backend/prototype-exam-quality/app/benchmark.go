@@ -92,7 +92,7 @@ func benchmarkCases(selection string, lessonHint string) ([]benchmarkCase, error
 	errorFinding := benchmarkCase{
 		Name:                "error-finding",
 		LessonContains:      "newton",
-		Directive:           "Generate error-finding questions. Each stem must display a short worked attempt that contains exactly one plausible student mistake and prints the wrong result that mistake produces; the question asks what is wrong or what the result should be. Put the mistaken arithmetic in flawed_expression and the correct arithmetic in calculation.expression. Set skill to error-finding.",
+		Directive:           "Generate error-finding questions. Work in this order: first write the correct arithmetic in calculation.expression, then break it once on purpose to get flawed_expression, then write a stem that displays the BROKEN work and the wrong number it produces and asks what is wrong with it. The equation printed in the stem must not evaluate to calculation.expected -- a stem showing correct work has nothing wrong with it and is not a question. The options are diagnoses of the mistake, not numbers, so leave distractor_expression empty. Set skill to error-finding.",
 		ForceCalc:           true,
 		TargetSkill:         "error-finding",
 		RequiresCalculation: true,
@@ -171,7 +171,7 @@ func genericBenchmarkCases(selection, lessonHint string) ([]benchmarkCase, error
 	errorFinding := benchmarkCase{
 		Name:                "error-finding",
 		LessonContains:      lessonHint,
-		Directive:           "Generate error-finding questions. Each stem must display a short worked attempt that contains exactly one plausible student mistake and prints the wrong result that mistake produces; the question asks what is wrong or what the result should be. Put the mistaken arithmetic in flawed_expression and the correct arithmetic in calculation.expression. Set skill to error-finding.",
+		Directive:           "Generate error-finding questions. Work in this order: first write the correct arithmetic in calculation.expression, then break it once on purpose to get flawed_expression, then write a stem that displays the BROKEN work and the wrong number it produces and asks what is wrong with it. The equation printed in the stem must not evaluate to calculation.expected -- a stem showing correct work has nothing wrong with it and is not a question. The options are diagnoses of the mistake, not numbers, so leave distractor_expression empty. Set skill to error-finding.",
 		ForceCalc:           true,
 		TargetSkill:         "error-finding",
 		RequiresCalculation: true,

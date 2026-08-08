@@ -3,6 +3,7 @@ package gates
 import (
 	"fmt"
 	"math"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -186,6 +187,96 @@ func distractorMentionsNumber(choice string, v float64) bool {
 		}
 	}
 	return false
+}
+
+// stemEquationPattern finds a worked line an error-finding stem displays:
+// some arithmetic, an equals sign, and the number it was claimed to produce.
+// The left side must carry an operator, so a bare restatement ("mass = 5.0 kg")
+// is not mistaken for work.
+var stemEquationPattern = regexp.MustCompile(`([0-9][0-9\s.()]*(?:[-+*/^][0-9\s.()]*)+)=\s*(-?[0-9]+(?:\.[0-9]+)?)`)
+
+// stemArithmeticReplacer maps the characters a writer uses in prose onto the
+// alphabet the evaluator accepts. Nothing else is normalised: a stem that
+// writes its work in words has no equation to recover and should say so by
+// failing, not by being guessed at.
+var stemArithmeticReplacer = strings.NewReplacer(
+	"×", "*", "·", "*", "⋅", "*", "x", "*", "X", "*",
+	"÷", "/", "−", "-", "–", "-", "—", "-", ",", "",
+)
+
+// RepairErrorFinding fixes the two things an error-finding draft reliably gets
+// wrong, and rebuilds an error-finding question's flawed arithmetic from
+// the work its own stem displays.
+//
+// Measured across four runs and two rounds of prompt sharpening: the writer
+// fills flawed_expression with the correct arithmetic — the same string it just
+// put in calculation.expression — in roughly half of all error-finding drafts.
+// Telling it not to did not move the number, which is the same shape as the
+// skill-rotation finding: a field the model fills by copying is not fixed by
+// asking it to copy something else.
+//
+// It does not have to be asked. An error-finding stem must print the mistaken
+// work for the student to inspect, so the flawed arithmetic is already on the
+// page as text. Reading "2100*49+650 = 103550" out of the stem and evaluating
+// it is strictly better evidence than the model's own claim about what it did:
+// the equation is what the student actually sees, and it is only accepted when
+// the left side really does produce the right side and that result really does
+// differ from the correct value. A stem with no such equation recovers nothing
+// and still fails, which is correct — there was nothing for the student to
+// check either.
+func RepairErrorFinding(q Question, ev Evaluator) Question {
+	if !isErrorFinding(q) {
+		return q
+	}
+	// An error-finding item's options are diagnoses — "the force was multiplied
+	// instead of divided" — not numbers, so a wrong-answer expression has no
+	// number in the option to match and the writer attaches one anyway. Every
+	// draft in one run failed on exactly that. The expression is meaningless
+	// here rather than wrong, so it is dropped: the option set is judged on
+	// distractor_atom_id or written reasons like any other prose item, and the
+	// axis tally does not get to count paths that were never checkable.
+	stripped := append([]Choice(nil), q.Choices...)
+	for i := range stripped {
+		stripped[i].DistractorExpression = ""
+	}
+	q.Choices = stripped
+
+	if q.Calculation == nil || ev == nil {
+		return q
+	}
+	keyed, err := ev.Eval(q.Calculation.Expression)
+	if err != nil {
+		return q
+	}
+	// Only step in when the declared work is missing or is not wrong at all.
+	// A writer that got it right is left alone.
+	if declared := strings.TrimSpace(q.FlawedExpression); declared != "" {
+		if got, err := ev.Eval(declared); err == nil && !expectedNearlyEqual(got, keyed) {
+			return q
+		}
+	}
+
+	stem := stemArithmeticReplacer.Replace(q.Stem)
+	for _, match := range stemEquationPattern.FindAllStringSubmatch(stem, -1) {
+		expr := strings.TrimSpace(match[1])
+		claimed, err := strconv.ParseFloat(match[2], 64)
+		if err != nil {
+			continue
+		}
+		got, err := ev.Eval(expr)
+		if err != nil {
+			continue
+		}
+		// The stem has to be internally honest about what its work produced,
+		// and that result has to be the wrong one. Either failing means this
+		// line is not the mistake the question is about.
+		if !expectedNearlyEqual(got, claimed) || expectedNearlyEqual(got, keyed) {
+			continue
+		}
+		q.FlawedExpression = expr
+		return q
+	}
+	return q
 }
 
 // gateDecoy checks the declared irrelevant givens.

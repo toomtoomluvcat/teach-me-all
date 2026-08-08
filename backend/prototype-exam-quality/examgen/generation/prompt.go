@@ -623,17 +623,21 @@ definition, named part, label, or unchanged property is recall or
   It is a stricter bar than hard application at the same difficulty: hard
   application can be satisfied by one relationship used twice, analysis
   cannot.
-- error-finding: show the student a short worked attempt inside the stem, with
-  exactly one mistake in it, and ask what is wrong with it or what the result
-  should be. Print the wrong result the flawed work produces. The two
-  expressions are not interchangeable: calculation.expression is what the
-  problem should have been, flawed_expression is what the student in the stem
-  actually typed. Both are evaluated and they must produce different numbers --
-  putting the correct arithmetic in flawed_expression too leaves no mistake to
-  find and is rejected. The correct choice names the mistake rather than
-  restating the right number. The mistake must be one a student plausibly makes
-  -- a swapped operand, a dropped factor, a wrong conversion -- not a typo or
-  an invented rule. requires_calculation stays true: the item is arithmetic.
+- error-finding: build it in this order, and do not write the stem first.
+    1. Write calculation.expression: the arithmetic the problem actually needs.
+    2. Break it once, on purpose, to get flawed_expression -- swap an operand,
+       flip an operator, drop a factor, use the wrong constant. It must be a
+       different string that evaluates to a different number.
+    3. Only now write the stem, showing the BROKEN work and the number it
+       produces, and ask what is wrong with it.
+  The trap to avoid: writing a stem in which the displayed work is correct and
+  then asking what is wrong with it. That is not a question -- there is nothing
+  wrong. Before you return the item, evaluate the equation you printed in the
+  stem: if it equals calculation.expected, you have written the correct work
+  and the item is rejected. requires_calculation stays true.
+  The correct choice names the mistake; it does not restate the right number,
+  and it carries no distractor_expression. Neither do the wrong choices: on this
+  question type the options are diagnoses, not numbers.
 - requires_calculation: set true only when arithmetic is necessary to answer;
   keep skill as recall, understanding, application, or analysis according to
   the cognitive demand. Set false when the item can be answered without
@@ -740,7 +744,13 @@ template is the shape, not a suggestion -- a field left out entirely is a
 missing answer, not a blank one:
 {"questions":[{"kind":"mcq_single","stem":"...","choices":[{"content":"...","is_correct":true,"distractor_expression":"","distractor_atom_id":""},{"content":"...","is_correct":false,"distractor_expression":"12*5.0","distractor_atom_id":""},{"content":"...","is_correct":false,"distractor_expression":"","distractor_atom_id":"A042"},{"content":"...","is_correct":false,"distractor_expression":"","distractor_atom_id":"A017"}],"explanation":"...","source_quote":"...","difficulty":"easy","skill":"recall","requires_calculation":false,"calculation":{"expression":"12/5.0","expected":2.4,"unit":"m/s^2"},"supporting_atom_ids":[],"decoy_values":[],"flawed_expression":"","reasoning_steps":[],"changed_condition":"","distractor_reasons":[]}]}
 Omit the calculation object only when requires_calculation is false; when it is
-true the object is mandatory and the item is rejected without it.`
+true the object is mandatory and the item is rejected without it.
+
+An error-finding question fills the two expressions differently. The stem shows
+the mistaken work and the number it produced; calculation.expression is the
+arithmetic that was meant, flawed_expression is the arithmetic that was typed.
+They must not be the same string:
+{"stem":"A student finds the acceleration of a 5.0 kg crate under a 12 N net force by writing 12 * 5.0 = 60 m/s^2. What is wrong with this work?","skill":"error-finding","requires_calculation":true,"calculation":{"expression":"12/5.0","expected":2.4,"unit":"m/s^2"},"flawed_expression":"12*5.0","choices":[{"content":"the force was multiplied by the mass instead of divided by it","is_correct":true,"distractor_expression":"","distractor_atom_id":""}]}`
 
 func rejectionMemoryBlock(feedback []RejectedDraft) string {
 	var b strings.Builder

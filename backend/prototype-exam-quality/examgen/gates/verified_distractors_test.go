@@ -215,3 +215,67 @@ func TestGateDistractorPathStillRejectsAnInventedNumber(t *testing.T) {
 		t.Fatal("a number the error path does not produce must still fail")
 	}
 }
+
+// The writer fills flawed_expression with the correct arithmetic in about half
+// of all error-finding drafts and does not stop when told to. The work is
+// already on the page — the stem has to show it — so it is read from there.
+func TestRepairErrorFindingReadsTheStemWhenTheWriterCopiedTheCorrectExpression(t *testing.T) {
+	q := flawedWorkQuestion()
+	q.FlawedExpression = "12/5.0" // the correct arithmetic, copied
+	q = RepairErrorFinding(q, Arith{})
+	if q.FlawedExpression != "12 * 5.0" {
+		t.Fatalf("flawed work = %q, want the stem's own equation", q.FlawedExpression)
+	}
+	if res := gateFlawedWork(q, Arith{}); !res.Pass {
+		t.Fatalf("recovered work did not survive the gate: %q", res.Reason)
+	}
+}
+
+func TestRepairErrorFindingFillsAnEmptyField(t *testing.T) {
+	q := flawedWorkQuestion()
+	q.FlawedExpression = ""
+	q = RepairErrorFinding(q, Arith{})
+	if q.FlawedExpression == "" {
+		t.Fatal("an equation present in the stem should have been recovered")
+	}
+}
+
+// A writer that got it right is left alone.
+func TestRepairErrorFindingLeavesGoodDraftsUntouched(t *testing.T) {
+	q := flawedWorkQuestion()
+	if got := RepairErrorFinding(q, Arith{}).FlawedExpression; got != "12*5.0" {
+		t.Fatalf("a correct declaration was rewritten to %q", got)
+	}
+}
+
+// Nothing is invented. A stem that never shows its work still fails, because
+// the student had nothing to check either.
+func TestRepairErrorFindingInventsNothing(t *testing.T) {
+	q := flawedWorkQuestion()
+	q.Stem = "A student computes the acceleration of a 5.0 kg crate under a 12 N net force and gets it wrong. What is the mistake?"
+	q.FlawedExpression = "12/5.0"
+	q = RepairErrorFinding(q, Arith{})
+	if res := gateFlawedWork(q, Arith{}); res.Pass {
+		t.Fatal("a stem with no displayed work must still fail")
+	}
+}
+
+// An equation whose own two sides disagree is a typo in the stem, not the
+// mistake the question is about.
+func TestRepairErrorFindingIgnoresSelfInconsistentStemArithmetic(t *testing.T) {
+	q := flawedWorkQuestion()
+	q.Stem = "A student writes 12 * 5.0 = 47 m/s^2 for a 5.0 kg crate under a 12 N net force. What is wrong?"
+	q.FlawedExpression = "12/5.0"
+	q = RepairErrorFinding(q, Arith{})
+	if q.FlawedExpression != "12/5.0" {
+		t.Fatalf("recovered %q from an equation that does not hold", q.FlawedExpression)
+	}
+}
+
+// Leaves non-error-finding questions entirely alone.
+func TestRepairErrorFindingSkipsOrdinaryQuestions(t *testing.T) {
+	q := numericQuestion()
+	if got := RepairErrorFinding(q, Arith{}).FlawedExpression; got != "" {
+		t.Fatalf("a plain calculation item grew flawed work %q", got)
+	}
+}

@@ -29,6 +29,7 @@ const (
 	DiscriminationHigh = evidence.DiscriminationHigh
 	SkillErrorFinding  = evidence.SkillErrorFinding
 )
+
 type ConceptNode = evidence.ConceptNode
 type ConceptEdge = evidence.ConceptEdge
 type EdgeKind = evidence.EdgeKind
@@ -77,6 +78,10 @@ func RepairQuestionProvenance(q Question, contract CoverageContract, graph *Evid
 
 func RepairDistractorAtoms(q Question, contract CoverageContract) Question {
 	return evidence.RepairDistractorAtoms(q, contract)
+}
+
+func RepairErrorFinding(q Question, ev Evaluator) Question {
+	return gates.RepairErrorFinding(q, ev)
 }
 func gateSetCoverage(q Question, contract CoverageContract, byChunk map[string]Chunk, usedSlots, usedAtoms map[string]bool) GateResult {
 	return evidence.GateSetCoverage(q, contract, byChunk, usedSlots, usedAtoms)
