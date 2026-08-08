@@ -689,10 +689,20 @@ Compact assessment contract:
   not a decoy. Add them only when the slot asks for them, keep them believable
   for the scenario, and make at least one wrong choice the result of using one.
   A slot with min_decoys of 1 or more is not satisfiable by a bare definitional
-  stem: write one extra true detail into the stem that the answer does not need
-  -- a magnitude, a date, a named neighbouring term, a second condition -- and
-  copy that detail verbatim into decoy_values. It has to be a detail a student
-  might reasonably try to use, not a decoration.
+  stem, and the order matters. Do not pick a decoy from the source and then
+  hope the stem mentions it -- that is what produces a decoy_values entry no
+  stem ever contained. Instead: write the stem, deliberately putting one extra
+  true detail into it that the answer does not need (a magnitude, a date, a
+  named neighbouring term, a second condition), then read the decoy back out of
+  the stem you just wrote and copy those words. If the stem you wrote does not
+  contain the words, they are not a decoy.
+  "In economic terminology, what is the difference between demand and quantity
+  demanded?" has nothing spare in it and cannot carry a decoy. "A market for
+  gasoline is described by both a demand curve and a demand schedule. In
+  economic terminology, what is the difference between demand and quantity
+  demanded?" can, and its decoy is "a demand schedule".
+  The extra detail belongs in the stem, never in the options: the choices stay
+  parallel in length and type whatever the stem carries.
 - For hard application, include at least two distinct reasoning_steps in order
   and copy every supporting_atom_id assigned to the slot. The steps must be
   necessary to reach the keyed answer; adding connective words to a one-step
