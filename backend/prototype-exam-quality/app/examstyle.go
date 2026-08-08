@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 )
 
@@ -103,12 +104,7 @@ func benchmarkSelectionFor(skill, difficulty string) (string, error) {
 }
 
 func containsStyleDifficulty(allowed []string, difficulty string) bool {
-	for _, a := range allowed {
-		if a == difficulty {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(allowed, difficulty)
 }
 
 // examDirective resolves the picker to the generation directive and the

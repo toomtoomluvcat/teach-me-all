@@ -145,11 +145,40 @@ DeepSeek example:
 .\protoexam.exe --provider deepseek --pdf ..\..\samples\algebra-en.pdf
 ```
 
+### The study/exam web UI
+
+```powershell
+.\protoexam.exe -serve :8099
+```
+
+Run it from the repository root, so it shares `.scratch/` with the terminal
+path: a document prepared from the CLI opens instantly in the browser and the
+other way round. Then open <http://localhost:8099> and walk the five steps —
+model, document, lesson, exam settings, exam. Uploads land in
+`.scratch/uploads/`; `--docs-dir` chooses which folder is listed (default
+`samples`).
+
+It is the same pipeline, not a second one. The browser only picks options and
+renders; extraction, pass 1, generation, and every gate run in the exact code
+the TUI drives. Two things are worth knowing before reading the screens:
+
+- **Skill and difficulty are not free-form.** The coverage contract derives
+  both from the run directive, so the picker maps to the subject-neutral
+  benchmark directives in `app/benchmark.go` — the same strings the measured
+  runs in `docs/HANDOFF.md` used. A combination with no measured directive is
+  greyed out rather than invented (`app/examstyle.go`, and the test that pins
+  every offered combination to a directive the contract can still read).
+- **Rejected drafts are kept.** The paper a student sits holds accepted
+  questions only; the reviewer toggle shows the drafts a gate dropped, with the
+  reason, plus the axis tally of what Go actually verified in the set.
+
 Flags:
 
 | Flag | Default | Meaning |
 |------|---------|---------|
-| `--pdf` | *(required)* | source PDF |
+| `--pdf` | *(required for the TUI)* | source PDF; the web UI picks it per run |
+| `-serve` | *(off)* | serve the study/exam web UI on this address instead of the TUI, e.g. `:8099` |
+| `--docs-dir` | `samples` | directory the web UI lists source PDFs from |
 | `--provider` | `ollama` | `ollama`, `openai`, `gemini`, or the `deepseek` preset |
 | `--extract` | `auto` | `auto` and `docling` both run the single supported Docling pipeline; there is no lower-quality fallback |
 | `--extract-dir` | `.scratch/<hash>/extract` | output directory for the reusable extraction bundle |
@@ -240,7 +269,8 @@ branch. Main keeps the decision, not the prototype.
 
 ```
 cmd/protoexam/   process entrypoint — throwaway
-app/             CLI orchestration, TUI, cache/artifacts, benchmark — throwaway
+app/             CLI orchestration, TUI, web server, cache/artifacts, benchmark — throwaway
+app/web/         embedded study/exam UI (no build step, no CDN)     — throwaway
 examgen/         model, evidence, gates, generation              — LIFTABLE
 llm/             core, providers, generation, judging            — mostly liftable
 pdfx/            extract, bundle                                  — liftable, see risk note

@@ -157,7 +157,9 @@ async function pickProvider(provider) {
       return;
     }
     select.replaceChildren(...res.models.map((m) => h('option', { value: m, text: m })));
-    if (res.models.includes(provider.model)) select.value = provider.model;
+    // Ollama reports an implicit :latest tag that the default model name omits.
+    const preferred = res.models.find((m) => m === provider.model || m === `${provider.model}:latest`);
+    if (preferred) select.value = preferred;
     select.hidden = false;
     input.hidden = true;
   } catch (err) {
@@ -239,8 +241,11 @@ async function prepare() {
 
 function renderOutline() {
   const prep = state.prep;
+  // Pass 1 does not always name the course; the file name is the honest
+  // fallback rather than a blank line where a title should be.
+  prep.course = prep.course || prep.document.name;
   $('#outline-meta').textContent =
-    `${prep.course} · ${prep.document.name} · ${prep.pages} หน้า · ${prep.chunks} ส่วน · ${prep.atoms} ข้อเท็จจริงที่สกัดได้ · ${prep.model}`;
+    `${prep.course} · ${prep.pages} หน้า · ${prep.chunks} ส่วน · ${prep.atoms} ข้อเท็จจริงที่สกัดได้ · ${prep.model}`;
 
   $('#lessons').replaceChildren(...prep.lessons.map((lesson) => h('div', { class: 'pick' },
     h('b', { text: lesson.title }),
@@ -346,7 +351,7 @@ function renderExam() {
   state.answers = {};
   state.graded = false;
 
-  $('#exam-course').textContent = exam.course;
+  $('#exam-course').textContent = exam.course || exam.document;
   $('#exam-lesson').textContent = `${exam.lesson.title} · ${exam.document}`;
   const skill = (state.boot.styles.find((s) => s.skill === exam.skill) || {}).label || exam.skill;
   const level = state.boot.difficulty_map[exam.difficulty] || '';
