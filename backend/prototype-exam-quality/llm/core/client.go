@@ -265,17 +265,17 @@ func (c *Client) Unload(ctx context.Context, model string) error {
 	return c.post(ctx, "/api/chat", req, &resp)
 }
 
-// Installed reports whether a model has been pulled. /api/tags is used rather
-// than /api/show because its behaviour for an unknown model is documented and
+// Tags lists the models that have been pulled. /api/tags is used rather than
+// /api/show because its behaviour for an unknown model is documented and
 // /api/show's is not.
-func (c *Client) Installed(ctx context.Context, model string) (bool, error) {
+func (c *Client) Tags(ctx context.Context) ([]string, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.Host+"/api/tags", nil)
 	if err != nil {
-		return false, err
+		return nil, err
 	}
 	resp, err := c.HTTP.Do(req)
 	if err != nil {
-		return false, fmt.Errorf("GET /api/tags: %w (is ollama running on %s?)", err, c.Host)
+		return nil, fmt.Errorf("GET /api/tags: %w (is ollama running on %s?)", err, c.Host)
 	}
 	defer resp.Body.Close()
 
@@ -285,14 +285,27 @@ func (c *Client) Installed(ctx context.Context, model string) (bool, error) {
 		} `json:"models"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&tags); err != nil {
+		return nil, err
+	}
+	names := make([]string, 0, len(tags.Models))
+	for _, m := range tags.Models {
+		names = append(names, m.Model)
+	}
+	return names, nil
+}
+
+// Installed reports whether a model has been pulled.
+func (c *Client) Installed(ctx context.Context, model string) (bool, error) {
+	names, err := c.Tags(ctx)
+	if err != nil {
 		return false, err
 	}
 	want := model
 	if !strings.Contains(want, ":") {
 		want += ":latest"
 	}
-	for _, m := range tags.Models {
-		if m.Model == want || m.Model == model {
+	for _, name := range names {
+		if name == want || name == model {
 			return true, nil
 		}
 	}

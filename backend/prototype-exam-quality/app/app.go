@@ -123,7 +123,7 @@ func buildDependencies(cfg config, modelClient llm.ModelClient) examgen.Deps {
 		Gen:           gen,
 		Eval:          examgen.Arith{},
 		Quality:       llm.NewQualityGrader(modelClient, cfg.model),
-		Log:           examgen.Progress(safeProgress()),
+		Log:           safeProgress(cfg.progressFn()),
 		Parallel:      cfg.parallel,
 		KeepAllTopics: !cfg.filterTopics,
 	}
@@ -154,7 +154,7 @@ func extractDocument(ctx context.Context, cfg config, from, to int) (extractionC
 				Python: cfg.doclingPython, OCREngine: cfg.doclingOCREngine,
 				OCRLanguage: cfg.doclingOCRLang, OCRMode: cfg.doclingOCRMode,
 				FormulaMode: cfg.doclingFormulaMode, OCRFullPage: cfg.doclingOCRFullPage,
-				Progress: renderProgress,
+				Progress: pdfx.ProgressFunc(cfg.progressFn()),
 			})
 			return extractionCache{Pages: result.Pages, Mode: result.Mode, Prepared: result.Prepared}, err
 		case "docling":
@@ -163,7 +163,7 @@ func extractDocument(ctx context.Context, cfg config, from, to int) (extractionC
 				From: from, To: to, OCREngine: cfg.doclingOCREngine,
 				OCRLanguage: cfg.doclingOCRLang, OCRMode: cfg.doclingOCRMode,
 				FormulaMode: cfg.doclingFormulaMode, OCRFullPage: cfg.doclingOCRFullPage,
-				Progress: renderProgress,
+				Progress: pdfx.ProgressFunc(cfg.progressFn()),
 			})
 			mode := "docling"
 			if result.ResolvedOCREngine != "" {
@@ -190,15 +190,19 @@ func buildOutline(ctx context.Context, cfg config, chunks []examgen.Chunk, deps 
 	// v4: evidence compilation is no longer optional, so every cached outline
 	// carries atoms. A v3 cache has none and set generation cannot run on it.
 	oc, err := cachedT(cfg, "outline-v4", func() (outlineCache, error) {
-		clear()
-		header("STEP 2 — reading the whole document (pass 1)")
-		mapPlan := "one model call each"
-		if hostedProvider(cfg.provider) {
-			mapPlan = fmt.Sprintf("%d bounded map calls + 1 reduce call", llm.PlannedTopicBatches(chunks))
+		if !cfg.quiet() {
+			clear()
+			header("STEP 2 — reading the whole document (pass 1)")
+			mapPlan := "one model call each"
+			if hostedProvider(cfg.provider) {
+				mapPlan = fmt.Sprintf("%d bounded map calls + 1 reduce call", llm.PlannedTopicBatches(chunks))
+			}
+			fmt.Printf("%sThis is the slow part. %d chunks, %s.%s\n\n", dim, len(chunks), mapPlan, reset)
 		}
-		fmt.Printf("%sThis is the slow part. %d chunks, %s.%s\n\n", dim, len(chunks), mapPlan, reset)
 		o, withLessons, err := examgen.BuildOutline(ctx, chunks, deps)
-		fmt.Println()
+		if !cfg.quiet() {
+			fmt.Println()
+		}
 		return outlineCache{Outline: o, Chunks: withLessons}, err
 	})
 	if err != nil {

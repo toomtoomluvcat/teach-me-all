@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ห้องเรียนและห้องสอบ — teach-me-all</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="masthead">
+  <div class="crest">ทม</div>
+  <div>
+    <h1>ห้องเรียนและห้องสอบ</h1>
+    <p class="sub">อ่านจากเอกสารของคุณเอง แล้วออกข้อสอบจากบทเดียวกัน</p>
+  </div>
+  <div class="bell" id="run-badge" hidden></div>
+</header>
+
+<nav class="stepper" id="stepper">
+  <button class="step" data-goto="1"><b>1</b> โมเดล</button>
+  <button class="step" data-goto="2"><b>2</b> เอกสาร</button>
+  <button class="step" data-goto="3"><b>3</b> บทเรียน</button>
+  <button class="step" data-goto="4"><b>4</b> ตั้งข้อสอบ</button>
+  <button class="step" data-goto="5"><b>5</b> ห้องสอบ</button>
+</nav>
+
+<main>
+
+<!-- 1 ─────────────────────────────────────────── model -->
+<section class="card" data-step="1">
+  <h2>เลือกโมเดลที่จะใช้</h2>
+  <p class="note">โมเดลตัวนี้ทำทั้งสรุปเนื้อหาและออกข้อสอบ ข้อสอบทุกข้อยังถูกตรวจซ้ำด้วยเกตที่เขียนใน Go ไม่ใช่โมเดลตัดสินเอง</p>
+
+  <div class="providers" id="providers"></div>
+
+  <div class="grid">
+    <label>โมเดล
+      <span class="hint" id="model-hint"></span>
+      <select id="model-select" hidden></select>
+      <input id="model-input" type="text" placeholder="ชื่อโมเดล">
+    </label>
+    <label>โมเดล embedding <span class="hint">ใช้กันข้อซ้ำ เว้นว่างได้</span>
+      <input id="embed-input" type="text" placeholder="ค่าเริ่มต้นของผู้ให้บริการ">
+    </label>
+    <label id="host-field">Ollama host
+      <input id="host-input" type="text" placeholder="http://localhost:11434">
+    </label>
+    <label id="baseurl-field" hidden>Base URL
+      <input id="baseurl-input" type="text" placeholder="https://openrouter.ai/api/v1">
+    </label>
+    <label id="key-field" hidden>API key <span class="hint">เว้นว่างเพื่อใช้ค่าจาก .env</span>
+      <input id="key-input" type="password" placeholder="อ่านจาก .env">
+    </label>
+  </div>
+
+  <div class="actions">
+    <button class="primary" id="to-doc">ถัดไป — เลือกเอกสาร</button>
+    <span class="msg" id="model-msg"></span>
+  </div>
+</section>
+
+<!-- 2 ─────────────────────────────────────────── document -->
+<section class="card" data-step="2" hidden>
+  <h2>เลือกเอกสาร</h2>
+  <p class="note">ทุกอย่างที่ออกมาต้องอ้างอิงข้อความในไฟล์นี้เท่านั้น ระบบไม่เติมความรู้จากที่อื่น</p>
+
+  <div class="shelf" id="documents"></div>
+
+  <div class="grid">
+    <label>ช่วงหน้า <span class="hint">เช่น 140-220 เว้นว่าง = ทั้งเล่ม (ช้ามาก)</span>
+      <input id="pages-input" type="text" placeholder="140-220">
+    </label>
+    <label>อัปโหลด PDF
+      <input id="upload-input" type="file" accept="application/pdf">
+    </label>
+    <label class="checkbox"><input id="fresh-input" type="checkbox"> ไม่ใช้แคช อ่านใหม่ทั้งหมด</label>
+  </div>
+
+  <div class="actions">
+    <button class="primary" id="to-prepare">เตรียมบทเรียน</button>
+    <button class="ghost" data-goto="1">ย้อนกลับ</button>
+    <span class="msg" id="doc-msg"></span>
+  </div>
+
+  <div class="progress" id="prepare-progress" hidden>
+    <div class="bar"><span></span></div>
+    <div class="progress-line"><b id="prepare-stage"></b> <span id="prepare-note"></span></div>
+    <p class="note">ขั้นนี้อ่านทั้งเอกสารทีละส่วน ครั้งแรกใช้เวลาหลายนาที ครั้งต่อไปของช่วงหน้าเดิมจะเปิดได้ทันทีจากแคช</p>
+  </div>
+</section>
+
+<!-- 3 ─────────────────────────────────────────── lessons -->
+<section class="card" data-step="3" hidden>
+  <h2>สารบัญบทเรียน</h2>
+  <p class="note" id="outline-meta"></p>
+  <div class="lessons" id="lessons"></div>
+  <div class="actions">
+    <button class="ghost" data-goto="2">ย้อนกลับ</button>
+  </div>
+</section>
+
+<!-- reader ─────────────────────────────────────── -->
+<section class="card paper reader" data-step="reader" hidden>
+  <div class="reader-head">
+    <div>
+      <h2 id="reader-title"></h2>
+      <p class="note" id="reader-meta"></p>
+    </div>
+    <div class="actions">
+      <button class="ghost" id="reader-back">กลับไปสารบัญ</button>
+      <button class="primary" id="reader-exam">ออกข้อสอบจากบทนี้</button>
+    </div>
+  </div>
+  <article id="reader-body"></article>
+</section>
+
+<!-- 4 ─────────────────────────────────────────── exam setup -->
+<section class="card" data-step="4" hidden>
+  <h2>ตั้งค่าข้อสอบ</h2>
+  <p class="note" id="setup-lesson"></p>
+
+  <div class="grid">
+    <label>จำนวนข้อ
+      <input id="count-input" type="number" min="1" max="20" value="5">
+      <span class="hint" id="budget-hint"></span>
+    </label>
+    <label>จำนวนชุดที่ให้โมเดลลองเขียน <span class="hint">มากขึ้น = ดีขึ้นแต่ช้าขึ้น</span>
+      <input id="candidates-input" type="number" min="1" max="5" value="3">
+    </label>
+  </div>
+
+  <h3>ทักษะที่ต้องการวัด</h3>
+  <div class="styles" id="styles"></div>
+
+  <h3>ระดับความยาก</h3>
+  <div class="chips" id="difficulties"></div>
+  <p class="note" id="style-hint"></p>
+
+  <div class="actions">
+    <button class="primary" id="to-generate">ออกข้อสอบ</button>
+    <button class="ghost" id="setup-back">ย้อนกลับ</button>
+    <span class="msg" id="setup-msg"></span>
+  </div>
+
+  <div class="progress" id="generate-progress" hidden>
+    <div class="bar"><span></span></div>
+    <div class="progress-line"><b id="generate-stage"></b> <span id="generate-note"></span></div>
+    <p class="note">เขียนหลายชุด แล้วให้เกตตัดข้อที่อ้างอิงไม่ตรง คำนวณไม่ลง หรือซ้ำกับข้ออื่นออกก่อนส่งถึงคุณ</p>
+  </div>
+</section>
+
+<!-- 5 ─────────────────────────────────────────── exam -->
+<section class="paper exam" data-step="5" hidden>
+  <div class="exam-head">
+    <div class="exam-title">
+      <h2 id="exam-course"></h2>
+      <p id="exam-lesson"></p>
+    </div>
+    <div class="exam-clock"><span id="exam-clock">00:00</span></div>
+  </div>
+
+  <div class="exam-id">
+    <span>ชื่อ–สกุล <i></i></span>
+    <span>เลขที่ <i></i></span>
+    <span id="exam-meta"></span>
+  </div>
+
+  <p class="exam-rule">คำชี้แจง: เลือกคำตอบที่ถูกที่สุดเพียงข้อเดียว ทุกข้ออ้างอิงเนื้อหาในบทเรียนที่เลือกไว้</p>
+
+  <ol class="questions" id="questions"></ol>
+
+  <div class="actions exam-actions">
+    <button class="primary" id="submit-exam">ส่งคำตอบ</button>
+    <button class="ghost" id="retake-exam" hidden>ทำใหม่</button>
+    <button class="ghost" id="back-to-setup">ออกข้อสอบชุดใหม่</button>
+    <label class="checkbox"><input id="reviewer-toggle" type="checkbox"> โหมดผู้ตรวจ</label>
+  </div>
+
+  <div class="score" id="score" hidden></div>
+  <div class="reviewer" id="reviewer" hidden></div>
+</section>
+
+</main>
+
+<script src="app.js"></script>
+</body>
+</html>

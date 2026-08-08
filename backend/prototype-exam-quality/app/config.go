@@ -48,7 +48,28 @@ type config struct {
 	calcTool           bool
 	filterTopics       bool
 	parallel           int
+	serve              string
+	docsDir            string
+
+	// progress replaces terminal rendering when the pipeline is driven by
+	// something other than the TUI. It is not a flag: the web server sets it
+	// per job so extraction and pass 1 report into that job's event stream
+	// instead of stdout.
+	progress examgen.Progress
 }
+
+// progressFn is what the pipeline should report into. The TUI is the default
+// so nothing in the terminal path changes.
+func (cfg config) progressFn() examgen.Progress {
+	if cfg.progress != nil {
+		return cfg.progress
+	}
+	return renderProgress
+}
+
+// quiet reports whether the pipeline is running for a caller that owns its own
+// screen. Full-screen TUI steps are skipped in that case.
+func (cfg config) quiet() bool { return cfg.progress != nil }
 
 type extractionCache struct {
 	Pages    []examgen.Page       `json:"pages"`
@@ -97,6 +118,8 @@ func parseConfig() config {
 	flag.BoolVar(&cfg.filterTopics, "filter-topics", true, "drop chunks pass 1 classified as teacher-guide apparatus or page furniture; set false for a source that really is mostly exercises")
 	flag.BoolVar(&cfg.calcTool, "calc-tool", true, "let the model use a calculator tool before writing questions with arithmetic")
 	flag.IntVar(&cfg.parallel, "parallel", 4, "model calls in flight at once; Ollama also needs OLLAMA_NUM_PARALLEL to match")
+	flag.StringVar(&cfg.serve, "serve", "", "serve the study/exam web UI on this address instead of the TUI, e.g. :8099")
+	flag.StringVar(&cfg.docsDir, "docs-dir", "samples", "directory the web UI lists source PDFs from")
 	flag.Parse()
 	return cfg
 }
@@ -114,22 +137,6 @@ func applyConfigDefaults(cfg *config) error {
 	if cfg.apiKey == "" {
 		cfg.apiKey = os.Getenv("LLM_API_KEY")
 	}
-	if cfg.provider != "ollama" && cfg.provider != "gemini" && cfg.provider != "openai" {
-		return fmt.Errorf("--provider must be ollama, openai, or gemini (or a preset such as deepseek), got %q", cfg.provider)
-	}
-	if cfg.provider == "openai" && cfg.baseURL == "" {
-		return fmt.Errorf("--provider openai needs --base-url, e.g. https://openrouter.ai/api/v1 or http://localhost:8000/v1")
-	}
-	if cfg.model == "" {
-		switch cfg.provider {
-		case "gemini":
-			cfg.model = "gemini-2.5-flash"
-		case "openai":
-			return fmt.Errorf("--provider openai needs --model; the base URL does not imply one")
-		default:
-			cfg.model = "scb10x/typhoon2.5-qwen3-4b"
-		}
-	}
 	// An explicitly empty --embed-model still disables ranking. Only fill in a
 	// provider default when the flag was not supplied at all.
 	embedModelSet := false
@@ -138,6 +145,38 @@ func applyConfigDefaults(cfg *config) error {
 			embedModelSet = true
 		}
 	})
+	if err := resolveProviderDefaults(cfg, embedModelSet); err != nil {
+		return err
+	}
+	// The web UI picks the document per run, so --pdf is only required by the
+	// terminal path, which has no other way to learn it.
+	if cfg.pdfPath == "" && cfg.serve == "" {
+		return fmt.Errorf("--pdf is required")
+	}
+	return nil
+}
+
+// resolveProviderDefaults validates the provider and fills in the defaults
+// that depend on it. The web server calls it once per run, because there the
+// provider is chosen in the browser rather than on the command line, and both
+// entry points have to agree on what an unset model means.
+func resolveProviderDefaults(cfg *config, embedModelSet bool) error {
+	if cfg.provider != "ollama" && cfg.provider != "gemini" && cfg.provider != "openai" {
+		return fmt.Errorf("provider must be ollama, openai, or gemini (or a preset such as deepseek), got %q", cfg.provider)
+	}
+	if cfg.provider == "openai" && cfg.baseURL == "" {
+		return fmt.Errorf("provider openai needs a base URL, e.g. https://openrouter.ai/api/v1 or http://localhost:8000/v1")
+	}
+	if cfg.model == "" {
+		switch cfg.provider {
+		case "gemini":
+			cfg.model = "gemini-2.5-flash"
+		case "openai":
+			return fmt.Errorf("provider openai needs a model; the base URL does not imply one")
+		default:
+			cfg.model = "scb10x/typhoon2.5-qwen3-4b"
+		}
+	}
 	if !embedModelSet {
 		switch cfg.provider {
 		case "gemini":
@@ -149,9 +188,6 @@ func applyConfigDefaults(cfg *config) error {
 		default:
 			cfg.embedModel = "bge-m3"
 		}
-	}
-	if cfg.pdfPath == "" {
-		return fmt.Errorf("--pdf is required")
 	}
 	return nil
 }

@@ -27,5 +27,8 @@ func Run(ctx context.Context) error {
 		}
 		return &ExitError{Code: 2, Err: err}
 	}
+	if cfg.serve != "" {
+		return serveWeb(ctx, cfg)
+	}
 	return run(ctx, cfg)
 }

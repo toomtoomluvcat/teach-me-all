@@ -203,12 +203,15 @@ func renderSummary(res *examgen.ExamResult) {
 
 // safeProgress serialises progress writes. Once the pipeline runs calls
 // concurrently, several goroutines reach for the same terminal line.
-func safeProgress() examgen.Progress {
+// safeProgress serialises concurrent pipeline reports. The pipeline runs model
+// calls in parallel and every sink downstream — a terminal line or a web event
+// stream — assumes one writer at a time.
+func safeProgress(sink examgen.Progress) examgen.Progress {
 	var mu sync.Mutex
 	return func(stage string, done, total int, note string) {
 		mu.Lock()
 		defer mu.Unlock()
-		renderProgress(stage, done, total, note)
+		sink(stage, done, total, note)
 	}
 }
 
